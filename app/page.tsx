@@ -4,6 +4,7 @@ import Hero from "@/components/Hero";
 import PromisesSection from "@/components/PromisesSection";
 import TopCategories from "@/components/TopCategories";
 import TrendingProducts from "@/components/TrendingProducts";
+import OfferBanners from "@/components/OfferBanners";
 
 export default function Home() {
   return (
@@ -14,6 +15,7 @@ export default function Home() {
       <PromisesSection />
       <TopCategories />
       <TrendingProducts />
+      <OfferBanners />
       
       <section className="bg-white py-20">
         <div className="container mx-auto px-6 md:px-12">

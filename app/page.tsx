@@ -1,10 +1,16 @@
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
+import SpecialOffers from "@/components/SpecialOffers";
+import TopSellingProducts from "@/components/TopSellingProducts";
 import PromisesSection from "@/components/PromisesSection";
 import TopCategories from "@/components/TopCategories";
 import TrendingProducts from "@/components/TrendingProducts";
 import OfferBanners from "@/components/OfferBanners";
+import InfoBanners from "@/components/InfoBanners";
+import Testimonials from "@/components/Testimonials";
+import FAQ from "@/components/FAQ";
+import Footer from "@/components/Footer";
 
 export default function Home() {
   return (
@@ -16,13 +22,12 @@ export default function Home() {
       <TopCategories />
       <TrendingProducts />
       <OfferBanners />
-      
-      <section className="bg-white py-20">
-        <div className="container mx-auto px-6 md:px-12">
-          <h2 className="text-3xl font-bold text-[#374151]">More Products</h2>
-          <p className="text-[#9CA3AF] mt-2 text-lg">Coming soon...</p>
-        </div>
-      </section>
+      <SpecialOffers />
+      <TopSellingProducts />   
+      <InfoBanners />
+      <Testimonials />
+      <FAQ />
+      <Footer />
     </main>
   );
 }

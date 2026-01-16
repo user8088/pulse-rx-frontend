@@ -1,26 +1,89 @@
 @import "tailwindcss";
 
+@theme {
+  --font-nunito: var(--font-nunito-sans);
+  
+  /* Brand Palette */
+  --color-brand-primary: #01AC28;
+  --color-brand-dark: #044644;
+  --color-brand-light: #5C9D40;
+  
+  /* UI Colors */
+  --color-ui-white: #FFFFFF;
+  --color-ui-gray-light: #EFEFEF;
+  --color-ui-gray-medium: #9CA3AF;
+  --color-ui-gray-dark: #374151;
+  --color-ui-black: #000000;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --brand-primary: #01AC28;
+  --brand-dark: #044644;
+  --brand-light: #5C9D40;
+  --ui-gray-light: #EFEFEF;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    @apply bg-white text-ui-black;
+    font-family: var(--font-nunito-sans), sans-serif;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Hide scrollbar for mobile navigation */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Magic Cursor Styles */
+@media (min-width: 768px) {
+  body.magic-cursor-active {
+    cursor: none;
+  }
+  
+  body.magic-cursor-active * {
+    cursor: none !important;
+  }
+}
+
+#magic-cursor {
+  pointer-events: none;
+}
+
+#ball {
+  pointer-events: none;
+  user-select: none;
+}
+
+.ball-view {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Lenis smooth scroll essential styles */
+html.lenis {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
 }

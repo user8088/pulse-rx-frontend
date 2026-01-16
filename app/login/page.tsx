@@ -29,8 +29,9 @@ export default function LoginPage() {
     try {
       await login(formData.email, formData.password);
       router.push('/profile');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid email or password. Please try again.');
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { message?: string } }; message: string };
+      setError(error.response?.data?.message || error .message || 'Invalid email or password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -112,7 +113,7 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex justify-between items-center px-1">
                   <label className="text-xs font-bold text-[#374151] uppercase tracking-widest">Password</label>
-                  <Link href="/forgot-password" size="sm" className="text-xs font-bold text-[#01AC28] hover:text-[#044644] transition-colors">
+                  <Link href="/forgot-password" className="text-xs font-bold text-[#01AC28] hover:text-[#044644] transition-colors">
                     Forgot Password?
                   </Link>
                 </div>

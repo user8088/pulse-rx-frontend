@@ -29,6 +29,16 @@ export default function MagicCursor() {
         isInitializedRef.current = true;
         setIsVisible(true);
       }
+      
+      // Check if we're over a cursor element
+      const target = e.target as HTMLElement;
+      const cursorElement = target.closest('[data-cursor]') as HTMLElement | null;
+      
+      if (!cursorElement) {
+        // Reset if not over a cursor element
+        setIsHovering(false);
+        setCursorText('');
+      }
     };
 
     const updatePosition = () => {
@@ -63,14 +73,9 @@ export default function MagicCursor() {
         return;
       }
       
-      // Hide cursor on links/buttons without data-cursor
-      if (target.tagName === 'A' || target.tagName === 'BUTTON') {
-        if (!target.closest('[data-cursor]')) {
-          setIsVisible(false);
-          return;
-        }
-      }
-      
+      // Reset if not on a cursor element
+      setIsHovering(false);
+      setCursorText('');
       setIsVisible(true);
     };
 
@@ -79,12 +84,16 @@ export default function MagicCursor() {
       const cursorElement = target.closest('[data-cursor]') as HTMLElement | null;
       
       if (cursorElement) {
-        // Check if we're still within the cursor element
+        // Check if we're moving to another element within the cursor element
         const relatedTarget = e.relatedTarget as HTMLElement | null;
         if (!relatedTarget || !cursorElement.contains(relatedTarget)) {
           setIsHovering(false);
           setCursorText('');
         }
+      } else {
+        // Always reset when leaving any element
+        setIsHovering(false);
+        setCursorText('');
       }
     };
 

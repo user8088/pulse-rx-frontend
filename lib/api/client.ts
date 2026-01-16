@@ -1,28 +1,70 @@
 import axios from 'axios';
 
+// Validate API URL - prevent localhost in production
+const getApiBaseURL = () => {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  
+  // In production, ensure we have a valid API URL (not localhost)
+  if (process.env.NODE_ENV === 'production') {
+    if (!apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
+      console.warn(
+        'NEXT_PUBLIC_API_URL is not set or points to localhost in production. ' +
+        'Please set it in your Vercel environment variables.'
+      );
+      // Return empty string to prevent invalid requests
+      return '';
+    }
+  }
+  
+  return apiUrl || 'http://localhost:8000/api';
+};
+
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
+  baseURL: getApiBaseURL(),
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   },
+  // Add timeout to prevent hanging requests
+  timeout: 10000, // 10 seconds
 });
 
 // Add token to all requests
-apiClient.interceptors.request.use((config) => {
-  if (typeof window !== 'undefined') {
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+apiClient.interceptors.request.use(
+  (config) => {
+    // Skip request if baseURL is invalid (production without proper env var)
+    if (!config.baseURL) {
+      return Promise.reject(
+        new Error('API URL is not configured. Please set NEXT_PUBLIC_API_URL environment variable.')
+      );
     }
+    
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
-// Handle 401 errors (token expired)
+// Handle errors
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle network errors (API unreachable)
+    if (!error.response) {
+      if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
+        console.error('API server is unreachable. Check your NEXT_PUBLIC_API_URL configuration.');
+      }
+      return Promise.reject(error);
+    }
+    
+    // Handle 401 errors (token expired)
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('auth_token');
@@ -32,6 +74,12 @@ apiClient.interceptors.response.use(
         }
       }
     }
+    
+    // Handle 404 errors
+    if (error.response?.status === 404) {
+      console.warn(`API endpoint not found: ${error.config?.url}`);
+    }
+    
     return Promise.reject(error);
   }
 );

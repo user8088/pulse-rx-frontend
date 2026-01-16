@@ -35,6 +35,14 @@ export default function Navbar() {
       {/* Desktop Navigation */}
       <div className="hidden md:block px-6 lg:px-12 py-3 md:py-4">
         <ul className="flex items-center gap-8 lg:gap-10">
+          <li>
+            <Link
+              href="/special-offers"
+              className="text-sm font-semibold text-[#01AC28] hover:text-[#044644] transition-colors"
+            >
+              Special Offers
+            </Link>
+          </li>
           {categories.map((category) => (
             <li key={category}>
               <Link
@@ -67,6 +75,15 @@ export default function Navbar() {
         {isMobileMenuOpen && (
           <div className="absolute top-full left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200 shadow-lg z-50 max-h-[70vh] overflow-y-auto">
             <ul className="flex flex-col">
+              <li className="border-b border-gray-100">
+                <Link
+                  href="/special-offers"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-sm font-semibold text-[#01AC28] hover:text-[#044644] hover:bg-[#EFEFEF] transition-colors"
+                >
+                  Special Offers
+                </Link>
+              </li>
               {categories.map((category) => (
                 <li key={category} className="border-b border-gray-100 last:border-b-0">
                   <Link

@@ -19,7 +19,7 @@ export default function InfoBanners() {
 
           {/* Right Banner - Promotional Offer */}
           <Link
-            href="/products?offer=25-off-free-delivery"
+            href="/special-offers"
             data-cursor="Place Order"
             className="relative rounded-2xl overflow-hidden aspect-[4/3] lg:aspect-auto lg:h-[400px] block"
           >

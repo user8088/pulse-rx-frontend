@@ -39,7 +39,7 @@ export default function OfferBanners() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Main Offer Card - Left Side */}
           <Link
-            href="/products/black-garlic-oil"
+            href="/special-offers"
             data-cursor="View Products"
             className="group relative lg:col-span-2 rounded-2xl overflow-hidden aspect-[4/3] lg:aspect-auto lg:h-[600px]"
           >
@@ -92,7 +92,7 @@ export default function OfferBanners() {
             {offers.slice(1).map((offer) => (
               <Link
                 key={offer.id}
-                href={`/products/${offer.title.toLowerCase().replace(/\s+/g, '-')}`}
+                href="/special-offers"
                 data-cursor="View Products"
                 className="group relative rounded-2xl overflow-hidden aspect-[4/3] lg:aspect-auto lg:flex-1 lg:h-[290px]"
               >

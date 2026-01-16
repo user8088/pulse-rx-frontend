@@ -94,7 +94,7 @@ export default function SpecialOffers() {
             Special Offers For You
           </h2>
           <Link
-            href="/products?filter=special-offers"
+            href="/special-offers"
             className="text-[#01AC28] font-semibold text-sm md:text-base hover:underline flex items-center gap-1"
           >
             View All <ChevronRight className="w-4 h-4" />

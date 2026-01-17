@@ -3,7 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2 } from 'lucide-react';
+import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { useCart } from '@/lib/context/CartContext';
 
 export default function CartSidebar() {
@@ -98,6 +98,34 @@ export default function CartSidebar() {
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
                       {item.variation} • {item.quantity}
                     </p>
+                    {item.requiresPrescription && (
+                      <div className="mt-2 flex items-center gap-1.5">
+                        {item.prescription?.status === 'verified' && (
+                          <>
+                            <CheckCircle2 className="w-3 h-3 text-green-600" />
+                            <span className="text-[10px] font-bold text-green-600">Prescription Verified</span>
+                          </>
+                        )}
+                        {item.prescription?.status === 'pending' && (
+                          <>
+                            <Clock className="w-3 h-3 text-yellow-600 animate-pulse" />
+                            <span className="text-[10px] font-bold text-yellow-600">Verification Pending</span>
+                          </>
+                        )}
+                        {item.prescription?.status === 'rejected' && (
+                          <>
+                            <XCircle className="w-3 h-3 text-red-600" />
+                            <span className="text-[10px] font-bold text-red-600">Prescription Rejected</span>
+                          </>
+                        )}
+                        {!item.prescription && (
+                          <>
+                            <AlertCircle className="w-3 h-3 text-orange-600" />
+                            <span className="text-[10px] font-bold text-orange-600">Prescription Required</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between mt-4">

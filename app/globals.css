@@ -51,6 +51,16 @@
   body.magic-cursor-active * {
     cursor: none !important;
   }
+  
+  /* Allow pointer cursor on interactive elements for better UX */
+  body.magic-cursor-active button,
+  body.magic-cursor-active a,
+  body.magic-cursor-active input,
+  body.magic-cursor-active select,
+  body.magic-cursor-active textarea,
+  body.magic-cursor-active [data-cursor-hide] {
+    cursor: pointer !important;
+  }
 }
 
 #magic-cursor {

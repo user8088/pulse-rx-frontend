@@ -63,6 +63,29 @@ export default function MagicCursor() {
 
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      
+      // First check if hovering over an element that should hide the cursor (buttons, interactive elements)
+      // This check should happen before checking for cursor elements
+      const hideCursorElement = target.closest('[data-cursor-hide], button, input, select, textarea') as HTMLElement | null;
+      
+      if (hideCursorElement) {
+        // Always hide cursor when hovering over interactive elements like buttons
+        setIsHovering(false);
+        setCursorText('');
+        setIsVisible(false);
+        return;
+      }
+      
+      // Check for links without data-cursor (standalone links should hide cursor)
+      const standaloneLink = target.closest('a[href]:not([data-cursor])') as HTMLElement | null;
+      if (standaloneLink) {
+        setIsHovering(false);
+        setCursorText('');
+        setIsVisible(false);
+        return;
+      }
+      
+      // Now check for cursor elements
       const cursorElement = target.closest('[data-cursor]') as HTMLElement | null;
       
       if (cursorElement) {

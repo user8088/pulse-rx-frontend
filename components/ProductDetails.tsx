@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { X, Plus, Minus } from "lucide-react";
+import { X, Plus, Minus, AlertCircle } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
 
 interface ProductDetailsProps {
@@ -80,8 +80,6 @@ const faqs = [
 ];
 
 export default function ProductDetails({ productId }: ProductDetailsProps) {
-  // productId will be used for API calls in the future
-  void productId;
   const [selectedVariation, setSelectedVariation] = useState(variations[1]); // Default to 250mg
   const [selectedQuantity, setSelectedQuantity] = useState(quantities[1]); // Default to 60TAB
   const [selectedDelivery, setSelectedDelivery] = useState(deliveryOptions[0]); // Default to STANDARD
@@ -90,6 +88,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
 
   const currentImage = selectedVariation.image;
   const price = 99.00;
+  const productIdNum = parseInt(productId);
+  const requiresPrescription = productIdNum >= 3; // Products with ID 3+ require prescription
 
   const handleVariationChange = (variation: typeof variations[0]) => {
     setSelectedVariation(variation);
@@ -97,13 +97,14 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
 
   const handleAddToCart = () => {
     addItem({
-      id: 1, // MedRelief
+      id: productIdNum,
       name: "MedRelief Fast-Acting Pain Killer",
       variation: selectedVariation.label,
       quantity: selectedQuantity.label,
       price: price,
       image: currentImage,
-      qty: 1
+      qty: 1,
+      requiresPrescription: requiresPrescription
     });
   };
 
@@ -173,9 +174,19 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                   <span className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">
                     PAIN KILLER
                   </span>
-                  <h1 className="text-4xl md:text-5xl font-bold text-[#374151]">
-                    MedRelief
-                  </h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-4xl md:text-5xl font-bold text-[#374151]">
+                      MedRelief
+                    </h1>
+                    {requiresPrescription && (
+                      <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-3 py-1.5">
+                        <AlertCircle className="w-4 h-4 text-orange-600" />
+                        <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
+                          Prescription Required
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <span className="text-xl md:text-2xl font-bold text-[#374151] pt-2">
                   ${price.toFixed(2)}
@@ -185,6 +196,22 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
               <p className="text-sm md:text-base text-[#6B7280] mb-10 mt-6 leading-relaxed max-w-xl">
                 MedRelief offers fast relief from mild to moderate pain like headaches, muscle aches, and cramps. It targets pain directly, providing long-lasting comfort without drowsiness.
               </p>
+
+              {requiresPrescription && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-blue-900 mb-1">
+                        Prescription Required
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        This product requires a valid prescription. You&apos;ll be asked to upload your prescription during checkout. Our pharmacy team will verify it before confirming your order.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Rows */}
               <div className="space-y-6 border-t border-gray-100 pt-8">

@@ -44,7 +44,8 @@ export default function ProductGrid({ products }: ProductGridProps) {
                 e.stopPropagation();
                 // Handle add to cart
               }}
-              className="absolute bottom-3 right-3 w-10 h-10 md:w-12 md:h-12 bg-[#01AC28] rounded-full flex items-center justify-center text-white shadow-lg hover:bg-[#044644] transition-colors z-10"
+              data-cursor-hide
+              className="absolute bottom-3 right-3 w-10 h-10 md:w-12 md:h-12 bg-[#01AC28] rounded-full flex items-center justify-center text-white shadow-lg hover:bg-[#044644] transition-colors z-10 cursor-pointer"
               aria-label="Add to cart"
             >
               <ShoppingCart className="w-4 h-4 md:w-5 md:h-5" />

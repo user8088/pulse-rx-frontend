@@ -1,46 +1,17 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Minus, Plus, Trash2, ChevronRight, ArrowLeft, ShoppingBag } from 'lucide-react';
+import { Minus, Plus, Trash2, ChevronRight, ArrowLeft, ShoppingBag, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-
-// Mock cart data
-const initialCartItems = [
-  {
-    id: 1,
-    name: "MedRelief Fast-Acting Pain Killer",
-    variation: "250mg",
-    quantity: "60TAB",
-    price: 99.00,
-    image: "/assets/home/product-250mg.png",
-  },
-  {
-    id: 2,
-    name: "Solgar ESTER 100 PLUS Kapsul 500MG",
-    variation: "500mg",
-    quantity: "30TAB",
-    price: 43.00,
-    image: "/assets/home/product-1.png",
-  }
-];
+import { useCart } from '@/lib/context/CartContext';
 
 export default function CartPage() {
-  const [cartItems, setCartItems] = useState(initialCartItems);
+  const { cartItems, updateQty, removeItem, cartTotal } = useCart();
 
-  const updateQuantity = (id: number, increment: boolean) => {
-    // In a real app, this would update state or local storage
-    console.log(`Update quantity for ${id}: ${increment ? 'increment' : 'decrement'}`);
-  };
-
-  const removeItem = (id: number) => {
-    setCartItems(cartItems.filter(item => item.id !== id));
-  };
-
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price, 0);
+  const subtotal = cartTotal;
   const tax = subtotal * 0.15;
   const shipping = subtotal > 199 ? 0 : 15.00;
   const total = subtotal + tax + shipping;
@@ -91,6 +62,34 @@ export default function CartPage() {
                         <p className="text-xs text-[#6B7280] font-medium uppercase tracking-wider">
                           {item.variation} • {item.quantity}
                         </p>
+                        {item.requiresPrescription && (
+                          <div className="mt-2 flex items-center gap-1.5">
+                            {item.prescription?.status === 'verified' && (
+                              <>
+                                <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />
+                                <span className="text-[10px] font-bold text-green-600">Prescription Verified</span>
+                              </>
+                            )}
+                            {item.prescription?.status === 'pending' && (
+                              <>
+                                <Clock className="w-3.5 h-3.5 text-yellow-600 animate-pulse" />
+                                <span className="text-[10px] font-bold text-yellow-600">Verification Pending</span>
+                              </>
+                            )}
+                            {item.prescription?.status === 'rejected' && (
+                              <>
+                                <XCircle className="w-3.5 h-3.5 text-red-600" />
+                                <span className="text-[10px] font-bold text-red-600">Prescription Rejected</span>
+                              </>
+                            )}
+                            {!item.prescription && (
+                              <>
+                                <AlertCircle className="w-3.5 h-3.5 text-orange-600" />
+                                <span className="text-[10px] font-bold text-orange-600">Prescription Required</span>
+                              </>
+                            )}
+                          </div>
+                        )}
                         <button 
                           onClick={() => removeItem(item.id)}
                           className="mt-2 flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-wider"
@@ -104,14 +103,14 @@ export default function CartPage() {
                     <div className="col-span-1 md:col-span-2 flex justify-center">
                       <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg overflow-hidden">
                         <button 
-                          onClick={() => updateQuantity(item.id, false)}
+                          onClick={() => updateQty(item.id, item.qty - 1)}
                           className="p-2 hover:bg-gray-100 transition-colors text-gray-500"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
-                        <span className="px-4 font-bold text-[#374151]">1</span>
+                        <span className="px-4 font-bold text-[#374151]">{item.qty}</span>
                         <button 
-                          onClick={() => updateQuantity(item.id, true)}
+                          onClick={() => updateQty(item.id, item.qty + 1)}
                           className="p-2 hover:bg-gray-100 transition-colors text-gray-500"
                         >
                           <Plus className="w-4 h-4" />
@@ -127,7 +126,7 @@ export default function CartPage() {
                     {/* Item Total */}
                     <div className="col-span-1 md:col-span-2 text-right">
                       <span className="text-lg font-bold text-[#01AC28] md:text-[#374151] md:group-hover:text-[#01AC28] transition-colors">
-                        ${item.price.toFixed(2)}
+                        ${(item.price * item.qty).toFixed(2)}
                       </span>
                     </div>
                   </div>

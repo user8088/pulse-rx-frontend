@@ -44,11 +44,11 @@ export default function Hero() {
       </div>
 
       {/* Carousel Dots */}
-      <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 flex gap-2 md:gap-3 z-30">
+      {/* <div className="absolute bottom-4 md:bottom-8 left-1/2 -translate-x-1/2 flex gap-2 md:gap-3 z-30">
         <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-white"></div>
         <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-white/30"></div>
         <div className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-white/30"></div>
-      </div>
+      </div> */}
     </section>
   );
 }

@@ -3,31 +3,13 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ChevronRight, ArrowLeft, ShieldCheck, CreditCard, Truck, MapPin, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ArrowLeft, ShieldCheck, CreditCard, Truck, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductGrid from '@/components/ProductGrid';
-
-// Mock data
-const cartItems = [
-  {
-    id: 1,
-    name: "MedRelief Fast-Acting Pain Killer",
-    variation: "250mg",
-    quantity: "1 x 60TAB",
-    price: 99.00,
-    image: "/assets/home/product-250mg.png",
-  },
-  {
-    id: 2,
-    name: "Solgar ESTER 100 PLUS Kapsul 500MG",
-    variation: "500mg",
-    quantity: "1 x 30TAB",
-    price: 43.00,
-    image: "/assets/home/product-1.png",
-  }
-];
+import PrescriptionUpload from '@/components/PrescriptionUpload';
+import { useCart } from '@/lib/context/CartContext';
 
 const recommendedProducts = [
   {
@@ -63,10 +45,22 @@ const recommendedProducts = [
 
 export default function CheckoutPage() {
   const [step, setStep] = useState(1);
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price, 0);
+  const { cartItems, cartTotal, uploadPrescription, canPlaceOrder } = useCart();
+  
+  const subtotal = cartTotal;
   const tax = subtotal * 0.15;
   const shipping = 0; // Free for demo
   const total = subtotal + tax + shipping;
+
+  const prescriptionRequiredItems = cartItems.filter(item => item.requiresPrescription);
+
+  const handlePlaceOrder = () => {
+    if (!canPlaceOrder) {
+      alert('Please ensure all prescription-required products have verified prescriptions before placing your order.');
+      return;
+    }
+    alert('Order placed successfully! (Demo mode)');
+  };
 
   return (
     <main className="min-h-screen bg-white">
@@ -111,6 +105,49 @@ export default function CheckoutPage() {
                   <span className="text-xs font-bold uppercase tracking-widest">Review</span>
                 </div>
               </div>
+
+              {/* Prescription Upload Section */}
+              {prescriptionRequiredItems.length > 0 && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <AlertCircle className="w-5 h-5 text-[#01AC28]" />
+                    <h2 className="text-xl font-bold text-[#374151]">Prescription Verification</h2>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-6">
+                    The following products require a valid prescription. Please upload clear images of your prescriptions for verification.
+                  </p>
+                  <div className="space-y-6">
+                    {prescriptionRequiredItems.map((item) => (
+                      <div key={item.id} className="border border-gray-200 rounded-xl p-6">
+                        <div className="flex items-start gap-4 mb-4">
+                          <div className="relative w-20 h-20 rounded-lg bg-gray-50 border border-gray-200 flex-shrink-0 overflow-hidden">
+                            <Image
+                              src={item.image}
+                              alt={item.name}
+                              fill
+                              className="object-contain p-2"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <h3 className="text-sm font-bold text-[#374151] mb-1">{item.name}</h3>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider">
+                              {item.variation} • {item.quantity}
+                            </p>
+                          </div>
+                        </div>
+                        <PrescriptionUpload
+                          itemId={item.id}
+                          itemName={item.name}
+                          currentStatus={item.prescription?.status || null}
+                          fileName={item.prescription?.fileName}
+                          rejectionReason={item.prescription?.rejectionReason}
+                          onUpload={(file) => uploadPrescription(item.id, file)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Shipping Form */}
               <div className="space-y-8">
@@ -237,9 +274,27 @@ export default function CheckoutPage() {
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-bold truncate">{item.name}</h4>
                         <div className="flex justify-between items-center mt-1">
-                          <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">{item.quantity}</span>
-                          <span className="text-sm font-bold">${item.price.toFixed(2)}</span>
+                          <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
+                            {item.variation} • {item.quantity} • Qty: {item.qty}
+                          </span>
+                          <span className="text-sm font-bold">${(item.price * item.qty).toFixed(2)}</span>
                         </div>
+                        {item.requiresPrescription && (
+                          <div className="mt-1">
+                            {item.prescription?.status === 'verified' && (
+                              <span className="text-[10px] text-green-400 font-bold">✓ Prescription Verified</span>
+                            )}
+                            {item.prescription?.status === 'pending' && (
+                              <span className="text-[10px] text-yellow-400 font-bold">⏳ Verification Pending</span>
+                            )}
+                            {item.prescription?.status === 'rejected' && (
+                              <span className="text-[10px] text-red-400 font-bold">✗ Prescription Rejected</span>
+                            )}
+                            {!item.prescription && (
+                              <span className="text-[10px] text-orange-400 font-bold">⚠ Prescription Required</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -267,10 +322,30 @@ export default function CheckoutPage() {
 
                 <button 
                   data-cursor="Place Order"
-                  className="w-full bg-[#01AC28] hover:bg-[#044644] text-white py-4 rounded-xl font-bold text-xs tracking-[0.2em] transition-all uppercase flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                  onClick={handlePlaceOrder}
+                  disabled={!canPlaceOrder}
+                  className={`w-full py-4 rounded-xl font-bold text-xs tracking-[0.2em] transition-all uppercase flex items-center justify-center gap-2 shadow-lg ${
+                    canPlaceOrder
+                      ? 'bg-[#01AC28] hover:bg-[#044644] text-white hover:shadow-xl cursor-pointer'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
-                  Confirm & Place Order <CheckCircle2 className="w-4 h-4" />
+                  {canPlaceOrder ? (
+                    <>
+                      Confirm & Place Order <CheckCircle2 className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      Verify Prescriptions First <AlertCircle className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
+                
+                {!canPlaceOrder && (
+                  <p className="text-xs text-red-600 text-center mt-2">
+                    Please ensure all prescription-required products have verified prescriptions.
+                  </p>
+                )}
 
                 <div className="mt-8 pt-6 border-t border-white/10">
                   <div className="flex items-center gap-3">

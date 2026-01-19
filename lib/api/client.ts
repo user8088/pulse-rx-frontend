@@ -1,23 +1,5 @@
 import axios from 'axios';
-
-// Validate API URL - prevent localhost in production
-const getApiBaseURL = () => {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-  
-  // In production, ensure we have a valid API URL (not localhost)
-  if (process.env.NODE_ENV === 'production') {
-    if (!apiUrl || apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1')) {
-      console.warn(
-        'NEXT_PUBLIC_API_URL is not set or points to localhost in production. ' +
-        'Please set it in your Vercel environment variables.'
-      );
-      // Return empty string to prevent invalid requests
-      return '';
-    }
-  }
-  
-  return apiUrl || 'http://localhost:8000/api';
-};
+import { getApiBaseURL } from './baseUrl';
 
 const apiClient = axios.create({
   baseURL: getApiBaseURL(),

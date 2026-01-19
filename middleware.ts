@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { DASHBOARD_AUTH_COOKIE, DASHBOARD_AUTH_VALUE } from "./lib/dashboardAuth";
+import { DASHBOARD_AUTH_COOKIE } from "./lib/dashboardAuth";
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
@@ -14,7 +14,7 @@ export function middleware(req: NextRequest) {
   }
 
   const session = req.cookies.get(DASHBOARD_AUTH_COOKIE)?.value;
-  if (session === DASHBOARD_AUTH_VALUE) {
+  if (session && session.trim().length > 0) {
     return NextResponse.next();
   }
 

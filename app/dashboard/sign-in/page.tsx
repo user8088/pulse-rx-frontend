@@ -3,13 +3,15 @@ import { dashboardSignIn } from "./actions";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
-export default function DashboardSignInPage({
+export default async function DashboardSignInPage({
   searchParams,
 }: {
-  searchParams?: { next?: string; error?: string };
+  searchParams?: Promise<{ next?: string; error?: string; message?: string }>;
 }) {
-  const next = searchParams?.next ?? "/dashboard/inventory";
-  const error = searchParams?.error;
+  const sp = (await searchParams) ?? {};
+  const next = sp.next ?? "/dashboard/inventory";
+  const error = sp.error;
+  const message = sp.message;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
@@ -30,14 +32,26 @@ export default function DashboardSignInPage({
             </div>
             <h1 className="mt-2 text-2xl font-black text-[#374151]">Sign in</h1>
             <p className="mt-2 text-sm text-gray-600">
-              This is a mock sign-in flow (dashboard-only).
+              Sign in with an admin/staff account to access the dashboard.
             </p>
           </div>
 
           <div className="p-7">
-            {error === "missing" && (
+            {error && (
               <div className="mb-5 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
-                Please enter an email and password.
+                {error === "missing"
+                  ? "Please enter an email and password."
+                  : error === "forbidden"
+                    ? "Forbidden: this account does not have dashboard access."
+                    : error === "api_url"
+                      ? "API URL is not configured. Set NEXT_PUBLIC_API_URL."
+                  : error === "network"
+                    ? message || "Network error. Please check the API server and try again."
+                  : error === "expired"
+                    ? message || "Session expired. Please sign in again."
+                      : message
+                        ? message
+                        : "Sign-in failed. Please try again."}
               </div>
             )}
 
@@ -61,10 +75,6 @@ export default function DashboardSignInPage({
               <Button type="submit" className="w-full">
                 Sign in to Dashboard
               </Button>
-
-              <div className="text-center text-xs text-gray-500">
-                Tip: use any email/password for now.
-              </div>
             </form>
           </div>
         </div>

@@ -5,8 +5,8 @@ This document tracks the available API endpoints, their expected request bodies,
 ## Base Configuration
 
 - **Base URL**: `http://your-domain.com/api`
-- **Backend (local dev)**: `https://pulse-rx-backend-dev-aiqyjn.laravel.cloud`
-- **API Base URL (local dev)**: `https://pulse-rx-backend-dev-aiqyjn.laravel.cloud/api`
+- **Backend (local dev)**: `http://localhost:8000`
+- **API Base URL (local dev)**: `http://localhost:8000/api`
 - **Authentication**: Bearer Token (Laravel Sanctum)
 - **Multi-Tenancy**: Automatically resolved from the authenticated user.
 

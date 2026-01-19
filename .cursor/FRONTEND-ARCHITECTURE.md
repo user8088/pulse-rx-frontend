@@ -51,7 +51,7 @@ All frontend apps connect to the same backend:
 
 ```
 Production: https://api.pulserx.app/api
-Development: https://pulse-rx-backend-dev-aiqyjn.laravel.cloud/api
+Development: http://localhost:8000/api
 ```
 
 ### 2.2 Authentication
@@ -161,7 +161,7 @@ Response: { token, user, tenant }
 import axios from 'axios';
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://pulse-rx-backend-dev-aiqyjn.laravel.cloud/api',
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',

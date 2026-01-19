@@ -16,6 +16,6 @@ export function getApiBaseURL() {
     }
   }
 
-  return apiUrl || "https://pulse-rx-backend-dev-aiqyjn.laravel.cloud/api";
+  return apiUrl || "http://localhost:8000/api";
 }
 

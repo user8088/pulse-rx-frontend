@@ -2,7 +2,9 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import StoreProviders from "@/components/StoreProviders";
+import dynamic from "next/dynamic";
+
+const StoreProviders = dynamic(() => import("@/components/StoreProviders"), { ssr: false });
 
 export default function AppProviders({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

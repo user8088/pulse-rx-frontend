@@ -3,22 +3,8 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getApiBaseURL } from "@/lib/api/baseUrl";
+import { readErrorMessage } from "@/lib/api/readErrorMessage";
 import { DASHBOARD_AUTH_COOKIE, DASHBOARD_AUTH_COOKIE_PATH } from "@/lib/dashboardAuth";
-
-async function readErrorMessage(res: Response) {
-  try {
-    const data = (await res.json()) as { errors?: Record<string, unknown[] | string>; message?: string };
-    if (data?.errors && typeof data.errors === "object") {
-      const firstKey = Object.keys(data.errors)[0];
-      const first = firstKey ? data.errors[firstKey] : undefined;
-      if (Array.isArray(first) && first[0]) return String(first[0]);
-    }
-    if (data?.message) return String(data.message);
-  } catch {
-    // ignore
-  }
-  return `Request failed (${res.status})`;
-}
 
 function safeNext(nextPath: string) {
   return nextPath.startsWith("/dashboard") ? nextPath : "/dashboard/inventory";

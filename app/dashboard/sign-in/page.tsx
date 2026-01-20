@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { dashboardSignIn } from "./actions";
-import { Button } from "@/components/ui/Button";
+import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { Input } from "@/components/ui/Input";
 
 export default async function DashboardSignInPage({
@@ -72,9 +72,9 @@ export default async function DashboardSignInPage({
                 <Input name="password" type="password" placeholder="••••••••" required />
               </div>
 
-              <Button type="submit" className="w-full">
+              <PendingSubmitButton className="w-full" pendingText="Signing in…">
                 Sign in to Dashboard
-              </Button>
+              </PendingSubmitButton>
             </form>
           </div>
         </div>

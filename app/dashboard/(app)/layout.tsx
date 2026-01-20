@@ -50,12 +50,12 @@ export default async function DashboardAppLayout({ children }: { children: React
 
   return (
     <div className="min-h-screen">
-      <div className="mx-auto flex w-full max-w-[1400px]">
+      <div className="mx-auto flex min-h-screen w-full max-w-[1800px]">
         <SidebarNav />
 
-        <div className="flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 border-b border-gray-200 bg-white/90 backdrop-blur">
-            <div className="px-6 py-4 flex items-center justify-between">
+            <div className="px-4 py-4 sm:px-6 lg:px-8 flex items-center justify-between">
               <div>
                 <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
                   Pulse RX
@@ -74,7 +74,7 @@ export default async function DashboardAppLayout({ children }: { children: React
             </div>
           </header>
 
-          <main className="px-6 py-6">{children}</main>
+          <main className="flex-1 min-h-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
     </div>

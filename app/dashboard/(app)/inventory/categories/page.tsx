@@ -5,13 +5,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { ConfirmingSubmitButton } from "@/components/ui/ConfirmingSubmitButton";
+import { Pagination } from "@/components/ui/Pagination";
 import { createCategory, updateCategory, deleteCategory } from "./actions";
 import { Trash2 } from "lucide-react";
 import { CategoryEditCell } from "./CategoryEditCell";
 
-async function getCategories(): Promise<PaginatedCategories | null> {
+async function getCategories({
+  page,
+}: {
+  page?: number;
+}): Promise<PaginatedCategories | null> {
   try {
-    const res = await dashboardFetch("/categories");
+    const sp = new URLSearchParams();
+    if (page && Number.isFinite(page)) sp.set("page", String(page));
+    const qs = sp.toString();
+
+    const res = await dashboardFetch(qs ? `/categories?${qs}` : "/categories");
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -22,13 +31,14 @@ async function getCategories(): Promise<PaginatedCategories | null> {
 export default async function CategoriesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ message?: string; error?: string }>;
+  searchParams?: Promise<{ message?: string; error?: string; page?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   const message = sp.message;
   const error = sp.error;
+  const page = sp.page ? Number.parseInt(sp.page, 10) : undefined;
 
-  const categoriesData = await getCategories();
+  const categoriesData = await getCategories({ page });
   const categories = categoriesData?.data ?? [];
 
   return (
@@ -148,6 +158,17 @@ export default async function CategoriesPage({
           </Card>
         </div>
       </div>
+
+      {categoriesData ? (
+        <Pagination
+          basePath="/dashboard/inventory/categories"
+          currentPage={categoriesData.current_page}
+          lastPage={categoriesData.last_page}
+          total={categoriesData.total}
+          from={categoriesData.from}
+          to={categoriesData.to}
+        />
+      ) : null}
     </div>
   );
 }

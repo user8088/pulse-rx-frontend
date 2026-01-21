@@ -93,6 +93,10 @@ export function ProductTableRow({
           <span className="text-sm text-gray-700">{categoryName || "—"}</span>
         </td>
 
+        <td className="hidden md:table-cell px-3 py-4 sm:px-5">
+          {/* API does not return retail price yet */}
+        </td>
+
         <td className="px-3 py-4 sm:px-5">
           <span
             className={
@@ -147,7 +151,7 @@ export function ProductTableRow({
 
       {isEditing ? (
         <tr>
-          <td colSpan={7} className="px-5 pb-5">
+          <td colSpan={8} className="px-5 pb-5">
             <div className="mt-2 rounded-2xl border border-gray-200 bg-white p-4">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <form

@@ -189,7 +189,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                   </div>
                 </div>
                 <span className="text-xl md:text-2xl font-bold text-[#374151] pt-2">
-                  ${price.toFixed(2)}
+                  Rs. {price.toFixed(2)}
                 </span>
               </div>
 

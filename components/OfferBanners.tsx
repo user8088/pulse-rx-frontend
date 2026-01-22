@@ -76,10 +76,10 @@ export default function OfferBanners() {
                   )}
                   <div className="flex items-center gap-3 flex-wrap">
                     <span className="text-sm md:text-base text-white/70 line-through">
-                      ${offers[0].originalPrice.toFixed(2)}
+                      Rs. {offers[0].originalPrice.toFixed(2)}
                     </span>
                     <span className="text-lg md:text-xl lg:text-2xl font-bold">
-                      ${offers[0].currentPrice.toFixed(2)} Including Tax
+                      Rs. {offers[0].currentPrice.toFixed(2)} Including Tax
                     </span>
                   </div>
                 </div>
@@ -123,10 +123,10 @@ export default function OfferBanners() {
                       </h3>
                       <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                         <span className="text-xs md:text-sm text-white/70 line-through">
-                          ${offer.originalPrice.toFixed(2)}
+                          Rs. {offer.originalPrice.toFixed(2)}
                         </span>
                         <span className="text-sm md:text-base lg:text-lg font-bold">
-                          ${offer.currentPrice.toFixed(2)} Including Tax
+                          Rs. {offer.currentPrice.toFixed(2)} Including Tax
                         </span>
                       </div>
                     </div>

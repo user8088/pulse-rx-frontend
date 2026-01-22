@@ -16,7 +16,7 @@ const personalOffers = [
   {
     id: 2,
     title: 'Free Delivery on Next Order',
-    description: 'Enjoy free doorstep delivery on any order above $50. Valid for one-time use.',
+    description: 'Enjoy free doorstep delivery on any order above Rs. 50. Valid for one-time use.',
     code: 'FREESHIP',
     expires: 'In 12 days',
     type: 'Reward',
@@ -101,7 +101,7 @@ export default function OffersPage() {
             </div>
             <h2 className="text-2xl font-bold mb-3">Loyalty Milestone!</h2>
             <p className="text-white/80 text-sm mb-8 max-w-[240px]">
-              You&apos;re only 2 orders away from unlocking a $20 Gift Card.
+              You&apos;re only 2 orders away from unlocking a Rs. 20 Gift Card.
             </p>
             <div className="w-full bg-white/10 rounded-full h-2 mb-4 overflow-hidden border border-white/10">
               <div className="bg-white h-full w-2/3 shadow-[0_0_15px_rgba(255,255,255,0.5)]" />

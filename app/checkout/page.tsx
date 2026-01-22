@@ -204,7 +204,7 @@ export default function CheckoutPage() {
                         <p className="text-sm font-bold text-[#374151]">Express Delivery</p>
                         <p className="text-xs text-[#6B7280]">Next Business Day</p>
                       </div>
-                      <span className="text-sm font-bold text-[#374151] group-hover:text-[#01AC28] transition-colors">$15.00</span>
+                      <span className="text-sm font-bold text-[#374151] group-hover:text-[#01AC28] transition-colors">Rs. 15.00</span>
                     </label>
                   </div>
                 </div>
@@ -277,7 +277,7 @@ export default function CheckoutPage() {
                           <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
                             {item.variation} • {item.quantity} • Qty: {item.qty}
                           </span>
-                          <span className="text-sm font-bold">${(item.price * item.qty).toFixed(2)}</span>
+                          <span className="text-sm font-bold">Rs. {(item.price * item.qty).toFixed(2)}</span>
                         </div>
                         {item.requiresPrescription && (
                           <div className="mt-1">
@@ -304,11 +304,11 @@ export default function CheckoutPage() {
                 <div className="space-y-4 pt-6 border-t border-white/10 mb-8">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Subtotal</span>
-                    <span className="font-bold">${subtotal.toFixed(2)}</span>
+                    <span className="font-bold">Rs. {subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Tax (15%)</span>
-                    <span className="font-bold">${tax.toFixed(2)}</span>
+                    <span className="font-bold">Rs. {tax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Shipping Fee</span>
@@ -316,7 +316,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="pt-4 border-t border-white/20 flex justify-between items-center">
                     <span className="text-lg font-bold">Total</span>
-                    <span className="text-2xl font-black text-[#01AC28]">${total.toFixed(2)}</span>
+                    <span className="text-2xl font-black text-[#01AC28]">Rs. {total.toFixed(2)}</span>
                   </div>
                 </div>
 

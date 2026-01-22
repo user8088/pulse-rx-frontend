@@ -94,7 +94,11 @@ export function ProductTableRow({
         </td>
 
         <td className="hidden md:table-cell px-3 py-4 sm:px-5">
-          {/* API does not return retail price yet */}
+          <span className="text-sm font-bold text-gray-700">
+            {product.retail_price && product.retail_price.trim() !== ""
+              ? `Rs. ${Number.parseFloat(product.retail_price).toFixed(2)}`
+              : "—"}
+          </span>
         </td>
 
         <td className="px-3 py-4 sm:px-5">
@@ -230,6 +234,26 @@ export function ProductTableRow({
                         min={0}
                         step={1}
                         defaultValue={product.low_stock_threshold}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+                        Retail Price
+                      </label>
+                      <Input
+                        name="retail_price"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        defaultValue={
+                          product.retail_price && product.retail_price.trim() !== ""
+                            ? Number.parseFloat(product.retail_price)
+                            : ""
+                        }
+                        placeholder="0.00"
                       />
                     </div>
                   </div>

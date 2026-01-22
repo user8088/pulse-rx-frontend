@@ -120,13 +120,13 @@ export default function CartPage() {
 
                     {/* Price */}
                     <div className="col-span-1 md:col-span-2 text-center hidden md:block">
-                      <span className="text-base font-bold text-[#374151]">${item.price.toFixed(2)}</span>
+                      <span className="text-base font-bold text-[#374151]">Rs. {item.price.toFixed(2)}</span>
                     </div>
 
                     {/* Item Total */}
                     <div className="col-span-1 md:col-span-2 text-right">
                       <span className="text-lg font-bold text-[#01AC28] md:text-[#374151] md:group-hover:text-[#01AC28] transition-colors">
-                        ${(item.price * item.qty).toFixed(2)}
+                        Rs. {(item.price * item.qty).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -148,24 +148,24 @@ export default function CartPage() {
                   <div className="space-y-4 mb-8">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Subtotal</span>
-                      <span className="text-[#374151] font-bold">${subtotal.toFixed(2)}</span>
+                      <span className="text-[#374151] font-bold">Rs. {subtotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Tax (15%)</span>
-                      <span className="text-[#374151] font-bold">${tax.toFixed(2)}</span>
+                      <span className="text-[#374151] font-bold">Rs. {tax.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Shipping Fee</span>
                       <span className={`${shipping === 0 ? 'text-[#01AC28]' : 'text-[#374151]'} font-bold`}>
-                        {shipping === 0 ? 'FREE' : `$${shipping.toFixed(2)}`}
+                        {shipping === 0 ? 'FREE' : `Rs. ${shipping.toFixed(2)}`}
                       </span>
                     </div>
                     {shipping > 0 && (
-                      <p className="text-[10px] text-[#6B7280] italic">Add ${(199 - subtotal).toFixed(2)} more for FREE shipping</p>
+                      <p className="text-[10px] text-[#6B7280] italic">Add Rs. {(199 - subtotal).toFixed(2)} more for FREE shipping</p>
                     )}
                     <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
                       <span className="text-lg font-bold text-[#374151]">Total</span>
-                      <span className="text-2xl font-black text-[#01AC28]">${total.toFixed(2)}</span>
+                      <span className="text-2xl font-black text-[#01AC28]">Rs. {total.toFixed(2)}</span>
                     </div>
                   </div>
 

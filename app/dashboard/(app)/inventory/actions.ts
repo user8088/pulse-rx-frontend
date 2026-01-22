@@ -25,6 +25,15 @@ function toBool(value: FormDataEntryValue | null): boolean | undefined {
   return s === "true" || s === "1" || s === "on" || s === "yes";
 }
 
+function toFloatOrUndefined(value: FormDataEntryValue | null): number | undefined {
+  if (value === null) return undefined;
+  const s = String(value).trim();
+  if (!s) return undefined;
+  const n = Number.parseFloat(s);
+  if (!Number.isFinite(n) || Number.isNaN(n)) return undefined;
+  return n;
+}
+
 export async function createProduct(formData: FormData) {
   const item_id = String(formData.get("item_id") ?? "").trim();
   const item_name = String(formData.get("item_name") ?? "").trim();
@@ -32,6 +41,7 @@ export async function createProduct(formData: FormData) {
   const category_id_raw = String(formData.get("category_id") ?? "").trim();
   const stock_qty = toIntOrUndefined(formData.get("stock_qty"));
   const low_stock_threshold = toIntOrUndefined(formData.get("low_stock_threshold"));
+  const retail_price = toFloatOrUndefined(formData.get("retail_price"));
 
   if (!item_id || !item_name) {
     return redirect(
@@ -51,6 +61,7 @@ export async function createProduct(formData: FormData) {
   }
   if (typeof stock_qty === "number") body.stock_qty = stock_qty;
   if (typeof low_stock_threshold === "number") body.low_stock_threshold = low_stock_threshold;
+  if (typeof retail_price === "number") body.retail_price = retail_price;
 
   let res: Response;
   try {
@@ -82,6 +93,7 @@ export async function updateProduct(formData: FormData) {
   const category_id_raw = String(formData.get("category_id") ?? "").trim();
   const stock_qty = toIntOrUndefined(formData.get("stock_qty"));
   const low_stock_threshold = toIntOrUndefined(formData.get("low_stock_threshold"));
+  const retail_price = toFloatOrUndefined(formData.get("retail_price"));
 
   if (!id) {
     return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
@@ -102,6 +114,7 @@ export async function updateProduct(formData: FormData) {
 
   if (typeof stock_qty === "number") body.stock_qty = stock_qty;
   if (typeof low_stock_threshold === "number") body.low_stock_threshold = low_stock_threshold;
+  if (typeof retail_price === "number") body.retail_price = retail_price;
 
   let res: Response;
   try {

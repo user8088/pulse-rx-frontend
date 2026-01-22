@@ -74,15 +74,15 @@ export default function ProductGrid({ products }: ProductGridProps) {
               {product.originalPrice && product.originalPrice > product.price ? (
                 <>
                   <span className="text-xs md:text-sm text-[#9CA3AF] line-through">
-                    ${product.originalPrice.toFixed(2)}
+                    Rs. {product.originalPrice.toFixed(2)}
                   </span>
                   <span className="text-sm md:text-base font-bold text-[#01AC28]">
-                    ${product.price.toFixed(2)}
+                    Rs. {product.price.toFixed(2)}
                   </span>
                 </>
               ) : (
                 <span className="text-sm md:text-base font-bold text-[#01AC28]">
-                  ${product.price.toFixed(2)}
+                  Rs. {product.price.toFixed(2)}
                 </span>
               )}
             </div>

@@ -19,6 +19,7 @@ export interface Product {
   stock_qty: number;
   low_stock_threshold: number;
   in_stock: boolean;
+  retail_price: string;
   created_at: string;
   updated_at: string;
   category?: Category | null;

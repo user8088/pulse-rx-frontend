@@ -94,7 +94,7 @@ export default function OrdersPage() {
               <div className="flex items-center gap-8 justify-between md:justify-end">
                 <div className="text-right">
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Amount</p>
-                  <p className="text-xl font-black text-[#374151]">${order.total.toFixed(2)}</p>
+                  <p className="text-xl font-black text-[#374151]">Rs. {order.total.toFixed(2)}</p>
                 </div>
                 <button className="flex items-center gap-2 bg-[#EFEFEF] hover:bg-[#374151] hover:text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all">
                   Details <ExternalLink className="w-3.5 h-3.5" />

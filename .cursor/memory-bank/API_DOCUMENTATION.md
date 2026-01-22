@@ -501,12 +501,47 @@ All product endpoints exist in two variants:
 - **low_stock_threshold**: integer (defaults to 0)
 - **in_stock**: boolean
   - Automatically recomputed on save: `in_stock = (stock_qty > 0)`
+- **retail_price**: decimal (2 decimal places), default 0
+  - Returned as string in JSON (e.g. `"19.99"`) via `decimal:2` cast
+- **product_group_id**: nullable string (max 64)
+  - Logical group for variations (e.g. `SEVLA`). Same value across all variations of one product.
+- **variation_type**: nullable string (max 64)
+  - What dimension varies: e.g. `Strength`, `Size`, `Volume`.
+- **variation_value**: nullable string (max 128)
+  - The specific value: e.g. `400mg`, `1L`, `50ml`.
 - **created_at**, **updated_at**: timestamps
 
 Relationships:
 
 - **category**: `belongsTo(Category)` (nullable)
 - **images**: `hasMany(ProductImage)`
+
+**API responses:** All product endpoints (list, show, create, update) return the full product payload, including `retail_price` and variation fields (`product_group_id`, `variation_type`, `variation_value`) when present.
+
+#### Product response shape (single object)
+
+Every product in list/show/create/update responses includes these fields. Variation fields are `null` for standalone products.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| **id** | integer | Primary key |
+| **item_id** | string | Unique SKU (e.g. from Excel) |
+| **product_group_id** | string \| null | Variation group (e.g. `SEVLA`). Same across all variants. |
+| **variation_type** | string \| null | What varies: `Strength`, `Size`, `Volume`, etc. |
+| **variation_value** | string \| null | Specific value: `400mg`, `1L`, `50ml`, etc. |
+| **item_name** | string | Display name |
+| **category_id** | integer \| null | FK to categories |
+| **brand** | string \| null | Manufacturer / brand |
+| **stock_qty** | integer | On-hand quantity |
+| **low_stock_threshold** | integer | Reorder trigger |
+| **in_stock** | boolean | `stock_qty > 0` |
+| **retail_price** | string | Decimal as string (e.g. `"49.00"`) |
+| **created_at** | string | ISO 8601 |
+| **updated_at** | string | ISO 8601 |
+| **category** | object \| null | Eager-loaded when included |
+| **images** | array | Eager-loaded when included (list, show) |
+
+**Variations:** Use `product_group_id` to group variants (e.g. Sevla 400mg / 800mg). Filter with `?product_group_id=SEVLA` to fetch all variants. Each variant has its own `item_id`, price, stock, and images.
 
 ---
 
@@ -521,6 +556,7 @@ Relationships:
 
 - `page` (optional): page number
 - `per_page` (optional): integer 1..100 (default 15)
+- `product_group_id` (optional): filter by variation group (exact match). Use to fetch all variations of a product (e.g. `?product_group_id=SEVLA`).
 - `q` (optional): full-dataset search string
   - If `q` is missing/empty: returns the normal paginated list
   - If `q` is present: filters server-side using a case-insensitive “contains” match across:
@@ -531,20 +567,97 @@ Relationships:
 
 #### Success response (200) — paginated
 
-Includes eager-loaded `category` and `images` for each product.
-
-#### Frontend usage (required change)
-
-- Use `q` to search server-side instead of fetching all pages and filtering client-side.
-- Reset to `page=1` whenever `q` changes.
-- Debounce typing (recommended ~250–400ms) and cancel in-flight requests when the user keeps typing.
+Paginator with `data` = array of products. Each product includes eager-loaded `category` and `images`, plus `retail_price` and variation fields (`product_group_id`, `variation_type`, `variation_value`).
 
 Example:
 
 - `GET /products?page=1&per_page=15&q=mask`
+- `GET /products?product_group_id=SEVLA` — all variants in that group
 - `GET /dashboard/products?page=2&q=ibuprofen`
 
-Response shape is unchanged (standard Laravel paginator JSON).
+Response shape (paginator):
+
+```json
+{
+  "current_page": 1,
+  "data": [
+    {
+      "id": 101,
+      "item_id": "2112486",
+      "product_group_id": "SEVLA",
+      "variation_type": "Strength",
+      "variation_value": "400mg",
+      "item_name": "Sevla 400mg",
+      "category_id": 5,
+      "brand": "IMPORTED",
+      "stock_qty": 60,
+      "low_stock_threshold": 0,
+      "in_stock": true,
+      "retail_price": "49.00",
+      "created_at": "2026-01-19T12:00:00.000000Z",
+      "updated_at": "2026-01-19T12:00:00.000000Z",
+      "category": {
+        "id": 5,
+        "category_name": "Medicines",
+        "alias": "MED",
+        "serial_id": "MED001",
+        "created_at": "2026-01-19T11:00:00.000000Z",
+        "updated_at": "2026-01-19T11:00:00.000000Z"
+      },
+      "images": [
+        {
+          "id": 1,
+          "product_id": 101,
+          "object_key": "tenants/1/products/2112486/images/1.png",
+          "sort_order": 1,
+          "is_primary": true,
+          "created_at": "2026-01-19T12:05:00.000000Z",
+          "updated_at": "2026-01-19T12:05:00.000000Z"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "item_id": "2118298",
+      "product_group_id": null,
+      "variation_type": null,
+      "variation_value": null,
+      "item_name": "Uv-Lite Spf-60 Sunblock Medium Tinted Cream",
+      "category_id": null,
+      "brand": "CRYSTOLITE",
+      "stock_qty": 3,
+      "low_stock_threshold": 0,
+      "in_stock": true,
+      "retail_price": "2990.05",
+      "created_at": "2026-01-19T12:00:00.000000Z",
+      "updated_at": "2026-01-19T12:00:00.000000Z",
+      "category": null,
+      "images": []
+    }
+  ],
+  "first_page_url": "http://localhost:8000/api/products?page=1",
+  "from": 1,
+  "last_page": 1,
+  "last_page_url": "http://localhost:8000/api/products?page=1",
+  "links": [],
+  "next_page_url": null,
+  "path": "http://localhost:8000/api/products",
+  "per_page": 15,
+  "prev_page_url": null,
+  "to": 2,
+  "total": 2
+}
+```
+
+- First item: product **with variations** (`product_group_id`, `variation_type`, `variation_value` set; `category` and `images` present).
+- Second item: **standalone** product (variation fields `null`, `category` null, `images` empty).
+
+#### Frontend usage (required change)
+
+- Use `q` to search server-side instead of fetching all pages and filtering client-side.
+- Use `product_group_id` to load all variants of a product (e.g. for a product detail page with size/strength options).
+- Reset to `page=1` whenever `q` or `product_group_id` changes.
+- Debounce typing (recommended ~250–400ms) and cancel in-flight requests when the user keeps typing.
 
 ---
 
@@ -561,12 +674,16 @@ Validation rules:
 
 - **item_id**: required, string, unique in `products.item_id`
 - **item_name**: required, string, max 255
+- **product_group_id**: optional, string, max 64 (variation group)
+- **variation_type**: optional, string, max 64
+- **variation_value**: optional, string, max 128
 - **category_id**: nullable, must exist in `categories.id` if provided
 - **brand**: nullable, string, max 255
 - **stock_qty**: optional, integer, min 0
 - **low_stock_threshold**: optional, integer, min 0
+- **retail_price**: optional, numeric, min 0 (defaults to 0 if omitted)
 
-Example:
+Example (standalone product):
 
 ```json
 {
@@ -575,7 +692,25 @@ Example:
   "category_id": 1,
   "brand": "HealthSafe",
   "stock_qty": 100,
-  "low_stock_threshold": 10
+  "low_stock_threshold": 10,
+  "retail_price": 19.99
+}
+```
+
+Example (product with variations):
+
+```json
+{
+  "item_id": "2112486",
+  "item_name": "Sevla 400mg",
+  "product_group_id": "SEVLA",
+  "variation_type": "Strength",
+  "variation_value": "400mg",
+  "category_id": 5,
+  "brand": "IMPORTED",
+  "stock_qty": 60,
+  "low_stock_threshold": 10,
+  "retail_price": 49
 }
 ```
 
@@ -583,10 +718,42 @@ Notes:
 
 - Do **not** send `null` for `stock_qty` / `low_stock_threshold` (they are not `nullable`); omit them or send an integer.
 - `in_stock` is computed automatically from `stock_qty`.
+- `retail_price` is included in all product API responses (list, show, create, update).
 
 #### Success response (201)
 
-Returns the created product with `category` loaded.
+Returns the created product with `category` loaded (no `images`). Includes all product fields and variation fields.
+
+Example (product with variations):
+
+```json
+{
+  "id": 103,
+  "item_id": "V001",
+  "product_group_id": "SEVLA",
+  "variation_type": "Strength",
+  "variation_value": "400mg",
+  "item_name": "Sevla 400mg",
+  "category_id": 5,
+  "brand": "IMPORTED",
+  "stock_qty": 60,
+  "low_stock_threshold": 10,
+  "in_stock": true,
+  "retail_price": "49.00",
+  "created_at": "2026-01-22T10:00:00.000000Z",
+  "updated_at": "2026-01-22T10:00:00.000000Z",
+  "category": {
+    "id": 5,
+    "category_name": "Medicines",
+    "alias": "MED",
+    "serial_id": "MED001",
+    "created_at": "2026-01-19T11:00:00.000000Z",
+    "updated_at": "2026-01-19T11:00:00.000000Z"
+  }
+}
+```
+
+Standalone product: `product_group_id`, `variation_type`, and `variation_value` are `null`.
 
 ---
 
@@ -603,7 +770,49 @@ Returns the created product with `category` loaded.
 
 #### Success response (200)
 
-Returns the product with `category` and `images` loaded.
+Returns the product with `category` and `images` loaded. Includes `retail_price` and variation fields.
+
+Example (product with variations and images):
+
+```json
+{
+  "id": 101,
+  "item_id": "2112486",
+  "product_group_id": "SEVLA",
+  "variation_type": "Strength",
+  "variation_value": "400mg",
+  "item_name": "Sevla 400mg",
+  "category_id": 5,
+  "brand": "IMPORTED",
+  "stock_qty": 60,
+  "low_stock_threshold": 0,
+  "in_stock": true,
+  "retail_price": "49.00",
+  "created_at": "2026-01-19T12:00:00.000000Z",
+  "updated_at": "2026-01-19T12:00:00.000000Z",
+  "category": {
+    "id": 5,
+    "category_name": "Medicines",
+    "alias": "MED",
+    "serial_id": "MED001",
+    "created_at": "2026-01-19T11:00:00.000000Z",
+    "updated_at": "2026-01-19T11:00:00.000000Z"
+  },
+  "images": [
+    {
+      "id": 1,
+      "product_id": 101,
+      "object_key": "tenants/1/products/2112486/images/1.png",
+      "sort_order": 1,
+      "is_primary": true,
+      "created_at": "2026-01-19T12:05:00.000000Z",
+      "updated_at": "2026-01-19T12:05:00.000000Z"
+    }
+  ]
+}
+```
+
+Standalone product: `product_group_id`, `variation_type`, `variation_value` are `null`; `images` may be `[]`.
 
 ---
 
@@ -620,26 +829,60 @@ Validation rules:
 
 - **item_id**: optional, but if provided must be unique in `products.item_id` excluding current product
 - **item_name**: optional, string, max 255
+- **product_group_id**: optional, nullable, string, max 64
+- **variation_type**: optional, nullable, string, max 64
+- **variation_value**: optional, nullable, string, max 128
 - **category_id**: optional; if provided may be null; if non-null must exist in `categories.id`
 - **brand**: optional; may be null; if non-null must be string, max 255
 - **stock_qty**: optional integer, min 0
 - **low_stock_threshold**: optional integer, min 0
+- **retail_price**: optional, numeric, min 0
 
 Example:
 
 ```json
 {
-  "stock_qty": 0
+  "stock_qty": 0,
+  "retail_price": 24.50
 }
 ```
 
 Notes:
 
 - `in_stock` will be recomputed on save.
+- `retail_price` is returned in the response.
+- You may set `product_group_id`, `variation_type`, `variation_value` to `null` to convert a variant into a standalone product (or clear variation metadata).
 
 #### Success response (200)
 
-Returns the updated product with `category` loaded.
+Returns the updated product with `category` loaded (no `images`). Same shape as **Create (201)** — all product fields including `retail_price` and variation fields. Example:
+
+```json
+{
+  "id": 101,
+  "item_id": "2112486",
+  "product_group_id": "SEVLA",
+  "variation_type": "Strength",
+  "variation_value": "400mg",
+  "item_name": "Sevla 400mg",
+  "category_id": 5,
+  "brand": "IMPORTED",
+  "stock_qty": 0,
+  "low_stock_threshold": 10,
+  "in_stock": false,
+  "retail_price": "24.50",
+  "created_at": "2026-01-19T12:00:00.000000Z",
+  "updated_at": "2026-01-22T14:30:00.000000Z",
+  "category": {
+    "id": 5,
+    "category_name": "Medicines",
+    "alias": "MED",
+    "serial_id": "MED001",
+    "created_at": "2026-01-19T11:00:00.000000Z",
+    "updated_at": "2026-01-19T11:00:00.000000Z"
+  }
+}
+```
 
 ---
 
@@ -796,15 +1039,21 @@ curl -X POST "http://localhost:8000/api/products/import" \
 - Only these headers are recognized:
   - **Item Id** → `item_id` (required)
   - **Item Name** → `item_name` (required)
-  - **Category** → category name lookup (optional)
+  - **Retail Value** → `retail_price` (required)
+  - **Product Group Id** → `product_group_id` (optional; same value for all variants of one product, e.g. `SEVLA`)
+  - **Variation Type** → `variation_type` (optional; e.g. `Strength`, `Size`, `Volume`)
+  - **Variation Value** → `variation_value` (optional; e.g. `400mg`, `1L`, `50ml`)
+  - **Category** → category name lookup (optional; creates category if missing)
   - **Manufacturer** → `brand` (optional)
   - **Available Qty.** → `stock_qty` (optional, cast to int, default 0)
   - **Re-Ordering level** → `low_stock_threshold` (optional, cast to int, default 0)
 
+See **`EXCEL_VARIATIONS_SCHEMA.md`** for full variation + images design.
+
 ### Category handling
 
-- If **Category** is present and non-empty, it must exactly match an existing `categories.category_name` (after `trim()`).
-- If no match is found, the row is **skipped** with reason `unknown_category`.
+- If **Category** is present and non-empty, the backend looks up `categories.category_name` (case-insensitive, after `trim()`).
+- If no match is found, a new category is created with that name.
 
 ### Upsert behavior (important)
 
@@ -826,42 +1075,55 @@ curl -X POST "http://localhost:8000/api/products/import" \
     {
       "row": 45,
       "item_id": null,
-      "reason": "missing_item_id",
-      "message": "Item Id is required.",
+      "reason": "missing_required_fields",
+      "message": "Item Id, Item Name, and Retail Price are required.",
       "data": {
         "item_id": null,
         "item_name": "Face Mask",
+        "product_group_id": null,
+        "variation_type": null,
+        "variation_value": null,
         "category": "Medical Supplies",
         "brand": "HealthSafe",
         "stock_qty": "100",
-        "low_stock_threshold": "10"
+        "low_stock_threshold": "10",
+        "retail_price": null
       }
     },
     {
       "row": 102,
       "item_id": "2115296",
-      "reason": "unknown_category",
-      "message": "Category 'Unknown Cat' not found in system.",
+      "reason": "exception",
+      "message": "...",
       "data": {
         "item_id": "2115296",
         "item_name": "Some Item",
+        "product_group_id": "SEVLA",
+        "variation_type": "Strength",
+        "variation_value": "400mg",
         "category": "Unknown Cat",
         "brand": "ACME",
         "stock_qty": "0",
-        "low_stock_threshold": "0"
+        "low_stock_threshold": "0",
+        "retail_price": "19.99"
       }
     },
     {
       "row": 250,
+      "item_id": "2119999",
       "reason": "exception",
       "message": "...",
       "data": {
         "item_id": "2119999",
         "item_name": "Some Item",
+        "product_group_id": null,
+        "variation_type": null,
+        "variation_value": null,
         "category": "Medical Supplies",
         "brand": null,
         "stock_qty": "10",
-        "low_stock_threshold": "0"
+        "low_stock_threshold": "0",
+        "retail_price": "5.00"
       }
     }
   ]

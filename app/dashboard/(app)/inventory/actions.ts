@@ -230,7 +230,7 @@ export async function uploadProductImage(formData: FormData) {
 
   const payload = new FormData();
   payload.set("file", file);
-  if (typeof is_primary === "boolean") payload.set("is_primary", String(is_primary));
+  payload.set("is_primary", is_primary ? "1" : "0");
 
   let res: Response;
   try {

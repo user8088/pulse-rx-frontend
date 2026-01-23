@@ -19,7 +19,7 @@ export default async function DashboardSignInPage({
         <div className="mb-8">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-xs font-extrabold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-[0.2em]"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-widest"
           >
             ← Back to Store
           </Link>
@@ -27,7 +27,7 @@ export default async function DashboardSignInPage({
 
         <div className="rounded-3xl border border-gray-200 bg-white shadow-sm shadow-gray-100 overflow-hidden">
           <div className="p-7 border-b border-gray-100">
-            <div className="text-xs font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+            <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
               Dashboard Access
             </div>
             <h1 className="mt-2 text-2xl font-black text-[#374151]">Sign in</h1>
@@ -59,14 +59,14 @@ export default async function DashboardSignInPage({
               <input type="hidden" name="next" value={next} />
 
               <div className="space-y-2">
-                <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+                <label className="ml-1 text-[10px] font-semibold text-[#374151] uppercase tracking-widest">
                   Email
                 </label>
                 <Input name="email" type="email" placeholder="admin@pulserxpharmacy.com" required />
               </div>
 
               <div className="space-y-2">
-                <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+                <label className="ml-1 text-[10px] font-semibold text-[#374151] uppercase tracking-widest">
                   Password
                 </label>
                 <Input name="password" type="password" placeholder="••••••••" required />

@@ -3,21 +3,25 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
-
-const categories = [
-  "Pain Relief",
-  "Cold & Flu",
-  "Diabetes",
-  "Child Care",
-  "Skin Care",
-  "Optics"
-];
+import { getCategories } from "@/lib/api/categories";
+import type { Category } from "@/types/category";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await getCategories({ per_page: 6 });
+        setCategories(data.data);
+      } catch (error) {
+        console.error("Failed to fetch categories:", error);
+      }
+    };
+    fetchCategories();
+
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
@@ -44,12 +48,12 @@ export default function Navbar() {
             </Link>
           </li>
           {categories.map((category) => (
-            <li key={category}>
+            <li key={category.id}>
               <Link
-                href={`/category/${category.toLowerCase().replace(/\s+/g, '-')}`}
+                href={`/category/${category.alias.toLowerCase()}`}
                 className="text-sm font-semibold text-[#374151] hover:text-[#01AC28] transition-colors"
               >
-                {category}
+                {category.category_name}
               </Link>
             </li>
           ))}
@@ -85,13 +89,13 @@ export default function Navbar() {
                 </Link>
               </li>
               {categories.map((category) => (
-                <li key={category} className="border-b border-gray-100 last:border-b-0">
+                <li key={category.id} className="border-b border-gray-100 last:border-b-0">
                   <Link
-                    href={`/category/${category.toLowerCase().replace(/\s+/g, '-')}`}
+                    href={`/category/${category.alias.toLowerCase()}`}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="block px-4 py-3 text-sm font-semibold text-[#374151] hover:text-[#01AC28] hover:bg-[#EFEFEF] transition-colors"
                   >
-                    {category}
+                    {category.category_name}
                   </Link>
                 </li>
               ))}

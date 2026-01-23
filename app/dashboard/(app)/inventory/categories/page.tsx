@@ -45,7 +45,7 @@ export default async function CategoriesPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
             Inventory
           </div>
           <h2 className="mt-1 text-2xl font-black text-[#374151]">Categories</h2>
@@ -77,7 +77,7 @@ export default async function CategoriesPage({
             <CardContent>
               <form action={createCategory} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+                  <label className="ml-1 text-[10px] font-semibold text-[#374151] uppercase tracking-widest">
                     Category Name
                   </label>
                   <Input
@@ -104,7 +104,7 @@ export default async function CategoriesPage({
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
                   <thead className="bg-gray-50">
-                    <tr className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+                    <tr className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
                       <th className="px-5 py-3">Name</th>
                       <th className="px-5 py-3">Alias / ID</th>
                       <th className="px-5 py-3 text-right">Actions</th>

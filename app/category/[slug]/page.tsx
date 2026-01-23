@@ -6,40 +6,11 @@ import FilterSidebar from "@/components/FilterSidebar";
 import { OfferBanner, FlashSaleBanner, DeliveryBanner, ProcedureBanner } from "@/components/CategoryPromoBanner";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-
-// Category mapping - will be replaced with API data later
-const categoryMap: Record<string, string> = {
-  'pain-relief': 'Pain Relief',
-  'cold-flu': 'Cold & Flu',
-  'diabetes': 'Diabetes',
-  'child-care': 'Child Care',
-  'skin-care': 'Skin Care',
-  'optics': 'Optics',
-};
-
-// Placeholder product data - will be replaced with API data later
-// In a real app, this would be fetched based on the category slug
-const getProductsByCategory = (categorySlug: string) => {
-  // Generate sample products for each category
-  const productImages = [
-    '/assets/home/product-1.png',
-    '/assets/home/product-2.png',
-    '/assets/home/product-3.png',
-    '/assets/home/product-4.png',
-    '/assets/home/product-5.png',
-    '/assets/home/product-6.png',
-    '/assets/home/product-7.png',
-  ];
-
-  return Array.from({ length: 20 }, (_, i) => ({
-    id: i + 1,
-    name: `${categoryMap[categorySlug] || 'Product'} Item ${i + 1} - Premium Quality Medicine`,
-    price: Math.round((Math.random() * 50 + 10) * 100) / 100,
-    originalPrice: Math.random() > 0.5 ? Math.round((Math.random() * 60 + 15) * 100) / 100 : undefined,
-    rating: 5,
-    image: productImages[i % productImages.length],
-  }));
-};
+import { getCategories } from "@/lib/api/categories";
+import { getProducts } from "@/lib/api/products";
+import { bucketUrl } from "@/lib/bucketUrl";
+import type { Product as BackendProduct, PaginatedProducts } from "@/types/product";
+import type { Category } from "@/types/category";
 
 interface CategoryPageProps {
   params: Promise<{
@@ -49,9 +20,55 @@ interface CategoryPageProps {
 
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params;
-  const categorySlug = slug || '';
-  const categoryName = categoryMap[categorySlug] || (categorySlug ? categorySlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Category');
-  const products = getProductsByCategory(categorySlug);
+  const categoryAlias = (slug || '').toUpperCase();
+
+  // 1. Fetch categories to find the ID for this alias
+  let category: Category | undefined = undefined;
+  try {
+    const categoriesRes = await getCategories({ per_page: 100 });
+    category = categoriesRes.data.find(c => c.alias.toUpperCase() === categoryAlias);
+  } catch (error) {
+    console.error("Failed to fetch categories:", error);
+  }
+
+  if (!category) {
+    return (
+      <main className="min-h-screen bg-white">
+        <Header />
+        <Navbar />
+        <div className="container mx-auto py-20 text-center">
+          <h1 className="text-2xl font-bold">Category not found</h1>
+          <Link href="/" className="text-[#01AC28] hover:underline mt-4 inline-block">Return to Home</Link>
+        </div>
+        <Footer />
+      </main>
+    );
+  }
+
+  // 2. Fetch products for this category
+  let productsData: PaginatedProducts = { 
+    data: [], 
+    total: 0, 
+    per_page: 20, 
+    current_page: 1, 
+    last_page: 1, 
+    from: null, 
+    to: null 
+  };
+  try {
+    productsData = await getProducts({ category_id: category.id, per_page: 20 });
+  } catch (error) {
+    console.error("Failed to fetch products:", error);
+  }
+
+  // 3. Map backend products to the interface expected by ProductGrid
+  const mappedProducts = productsData.data.map((p: BackendProduct) => ({
+    id: p.id,
+    name: p.item_name,
+    price: parseFloat(p.retail_price),
+    rating: 5,
+    image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
+  }));
 
   return (
     <main className="min-h-screen bg-white">
@@ -66,7 +83,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               Home
             </Link>
             <ChevronRight className="w-4 h-4 text-[#6B7280]" />
-            <span className="text-[#374151] font-semibold">{categoryName}</span>
+            <span className="text-[#374151] font-semibold">{category.category_name}</span>
           </nav>
         </div>
       </div>
@@ -77,10 +94,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-8">
             <div>
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#374151] mb-2">
-                {categoryName}
+                {category.category_name}
               </h1>
               <p className="text-[#6B7280] text-sm md:text-base">
-                {products.length} products found
+                {productsData.total} products found
               </p>
             </div>
             
@@ -106,7 +123,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               </div>
 
               {/* Products Grid - First Batch */}
-              <ProductGrid products={products.slice(0, 10)} />
+              <ProductGrid products={mappedProducts.slice(0, 10)} />
 
               {/* Mid-section Promotional Banners */}
               <div className="my-12 md:my-16 space-y-6">
@@ -117,7 +134,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               </div>
 
               {/* Products Grid - Second Batch */}
-              <ProductGrid products={products.slice(10)} />
+              <ProductGrid products={mappedProducts.slice(10)} />
 
               {/* Bottom Promotional Banner */}
               <div className="mt-12 md:mt-16">
@@ -125,11 +142,13 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               </div>
 
               {/* Load More / Pagination */}
-              <div className="mt-12 md:mt-16 text-center">
-                <button className="bg-[#01AC28] hover:bg-[#044644] text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-                  Load More Products
-                </button>
-              </div>
+              {productsData.total > 20 && (
+                <div className="mt-12 md:mt-16 text-center">
+                  <button className="bg-[#01AC28] hover:bg-[#044644] text-white px-8 py-3 rounded-lg font-semibold transition-colors">
+                    Load More Products
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

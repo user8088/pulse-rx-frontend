@@ -31,7 +31,7 @@ export function CategoryEditCell({ category }: { category: Category }) {
           <PendingSubmitButton
             variant="primary"
             size="sm"
-            className="h-8 w-8 p-0 bg-green-600 hover:bg-green-700"
+            className="h-8 w-8 p-0 bg-emerald-600 hover:bg-emerald-700 rounded-lg"
             pendingText=""
           >
             <Check className="h-4 w-4" />
@@ -39,7 +39,7 @@ export function CategoryEditCell({ category }: { category: Category }) {
           <button
             type="button"
             onClick={() => setIsEditing(false)}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -50,13 +50,13 @@ export function CategoryEditCell({ category }: { category: Category }) {
 
   return (
     <div className="flex items-center gap-2 group/cell">
-      <div className="font-bold text-[#111827]">{category.category_name}</div>
+      <div className="font-semibold text-gray-900">{category.category_name}</div>
       <button
         onClick={() => setIsEditing(true)}
-        className="opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-[#01AC28] transition-all"
+        className="opacity-0 group-hover/cell:opacity-100 p-1 text-gray-400 hover:text-gray-900 transition-all"
         title="Edit name"
       >
-        <div className="flex items-center gap-1 text-[10px] font-extrabold uppercase tracking-wider">
+        <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-widest">
           <Edit2 className="h-3 w-3" />
         </div>
       </button>

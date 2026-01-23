@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
 @theme {
-  --font-nunito: var(--font-nunito-sans);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
   
   /* Brand Palette */
   --color-brand-primary: #01AC28;
@@ -18,17 +19,19 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #111827;
   --brand-primary: #01AC28;
   --brand-dark: #044644;
   --brand-light: #5C9D40;
-  --ui-gray-light: #EFEFEF;
+  --ui-gray-light: #f9fafb;
 }
 
 @layer base {
   body {
-    @apply bg-white text-ui-black;
-    font-family: var(--font-nunito-sans), sans-serif;
+    @apply bg-white text-gray-900;
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

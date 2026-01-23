@@ -124,7 +124,7 @@ export function InventoryToolbar({
         </Button>
       </div>
 
-      <div className="text-xs text-gray-500">
+      <div className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">
         This page: <span className="font-bold text-gray-700">{exportStats.total}</span> · Low:{" "}
         <span className="font-bold text-gray-700">{exportStats.low}</span> · Out:{" "}
         <span className="font-bold text-gray-700">{exportStats.out}</span>
@@ -139,13 +139,13 @@ export function InventoryToolbar({
         <form action={createProductAction} className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Item ID
               </label>
               <Input name="item_id" placeholder="e.g. 23223232" required />
             </div>
             <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Item Name
               </label>
               <Input name="item_name" placeholder="e.g. Face Mask" required />
@@ -154,18 +154,18 @@ export function InventoryToolbar({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Brand (optional)
               </label>
               <Input name="brand" placeholder="e.g. HealthSafe" />
             </div>
             <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Category
               </label>
               <select
                 name="category_id"
-                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#01AC28] focus:ring-offset-2"
+                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition-all"
                 defaultValue=""
               >
                 <option value="">— None —</option>
@@ -180,13 +180,13 @@ export function InventoryToolbar({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Stock Qty
               </label>
               <Input name="stock_qty" type="number" min={0} step={1} defaultValue={0} />
             </div>
             <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Re-order level
               </label>
               <Input name="low_stock_threshold" type="number" min={0} step={1} defaultValue={0} />

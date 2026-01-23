@@ -11,7 +11,7 @@ const apiClient = axios.create({
   timeout: 10000, // 10 seconds
 });
 
-// Add token to all requests
+// Add token and tenant ID to all requests
 apiClient.interceptors.request.use(
   (config) => {
     // Skip request if baseURL is invalid (production without proper env var)
@@ -20,6 +20,11 @@ apiClient.interceptors.request.use(
         new Error('API URL is not configured. Please set NEXT_PUBLIC_API_URL environment variable.')
       );
     }
+    
+    // Always include the Tenant ID header for backend schema resolution
+    // This is required even for dashboard users when calling public list routes
+    const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || '2';
+    config.headers['X-Tenant-Id'] = tenantId;
     
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem('auth_token');

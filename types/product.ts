@@ -14,6 +14,9 @@ export interface Product {
   id: number;
   item_id: string;
   item_name: string;
+  product_group_id: string | null;
+  variation_type: string | null;
+  variation_value: string | null;
   category_id: number | null;
   brand: string | null;
   stock_qty: number;

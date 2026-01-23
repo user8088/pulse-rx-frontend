@@ -58,7 +58,7 @@ export function Modal({
         >
           <div className="flex items-start justify-between gap-4 border-b border-gray-100 p-5">
             <div className="min-w-0">
-              <div className="text-sm font-extrabold text-[#374151]">{title}</div>
+              <div className="text-sm font-semibold text-[#374151]">{title}</div>
               {description ? <div className="mt-1 text-xs text-gray-500">{description}</div> : null}
             </div>
             <button

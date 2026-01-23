@@ -25,7 +25,7 @@ export default async function ImportLogsPage({
     <div className="flex h-full flex-col gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
             Inventory
           </div>
           <h2 className="mt-1 text-2xl font-black text-[#374151]">Import logs</h2>
@@ -83,7 +83,7 @@ export default async function ImportLogsPage({
                       <div className="flex items-center gap-3">
                         <Link
                           href={`/dashboard/inventory/import-logs/${encodeURIComponent(log.import_uuid)}`}
-                          className="text-xs font-extrabold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-[0.2em]"
+                          className="text-xs font-semibold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-widest"
                         >
                           View log →
                         </Link>

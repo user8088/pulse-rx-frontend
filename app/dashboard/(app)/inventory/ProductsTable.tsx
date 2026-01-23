@@ -38,14 +38,14 @@ export function ProductsTable({
     if (typeof total === "number") {
       return (
         <>
-          Showing <span className="font-bold text-gray-700">{products.length}</span> of{" "}
-          <span className="font-bold text-gray-700">{total}</span>
+          Showing <span className="font-semibold text-gray-900">{products.length}</span> of{" "}
+          <span className="font-semibold text-gray-900">{total}</span>
         </>
       );
     }
     return (
       <>
-        Showing <span className="font-bold text-gray-700">{products.length}</span>
+        Showing <span className="font-semibold text-gray-900">{products.length}</span>
       </>
     );
   }, [products.length, total]);
@@ -127,8 +127,8 @@ export function ProductsTable({
       <CardContent className="p-0 flex-1 min-h-0">
         <div className="overflow-auto flex-1 min-h-0">
           <table className="min-w-full text-left">
-            <thead className="sticky top-0 z-10 bg-gray-50">
-              <tr className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+            <thead className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-sm">
+              <tr className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest border-b border-gray-100">
                 <th className="px-3 py-3 sm:px-5">Item</th>
                 <th className="hidden lg:table-cell px-3 py-3 sm:px-5">Item ID</th>
                 <th className="hidden xl:table-cell px-3 py-3 sm:px-5">Category</th>

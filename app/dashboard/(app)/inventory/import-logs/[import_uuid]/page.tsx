@@ -24,7 +24,7 @@ export default async function ImportLogDetailPage({
     <div className="flex h-full flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
             Import logs
           </div>
           <h2 className="mt-1 text-2xl font-black text-[#374151]">Import run</h2>
@@ -35,7 +35,7 @@ export default async function ImportLogDetailPage({
 
         <Link
           href="/dashboard/inventory/import-logs"
-          className="text-xs font-extrabold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-[0.2em]"
+          className="text-xs font-semibold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-widest"
         >
           ← Back
         </Link>
@@ -82,7 +82,7 @@ export default async function ImportLogDetailPage({
 
           <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
             <div className="border-b border-gray-100 px-4 py-3">
-              <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
                 Rejected rows / issues
               </div>
               <div className="mt-1 text-sm text-gray-600">
@@ -100,7 +100,7 @@ export default async function ImportLogDetailPage({
                     <div key={key} className="px-4 py-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
-                          <div className="text-xs font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+                          <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
                             Row {e.row}
                           </div>
                           <div className="mt-1 text-sm font-bold text-[#374151]">{e.message}</div>

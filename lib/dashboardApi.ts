@@ -25,6 +25,11 @@ export async function dashboardFetch(path: string, init?: RequestInit) {
   const url = path.startsWith("http") ? path : `${baseUrl}${path.startsWith("/") ? "" : "/"}${path}`;
 
   const headers = new Headers(init?.headers);
+  
+  // Include Tenant ID for schema resolution (required for the new backend architecture)
+  const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || '1';
+  headers.set("X-Tenant-Id", tenantId);
+
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }

@@ -84,13 +84,13 @@ export default async function InventoryPage({
 
   return (
     <div className="flex h-full flex-col gap-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-1 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+          <div className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">
             Inventory
           </div>
-          <h2 className="mt-1 text-2xl font-black text-[#374151]">Products</h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <h2 className="mt-0.5 text-2xl font-bold text-gray-900">Products</h2>
+          <p className="mt-1 text-sm text-gray-500">
             Manage products, upload images, and import from Excel.
           </p>
         </div>
@@ -98,7 +98,7 @@ export default async function InventoryPage({
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/inventory/categories"
-            className="text-xs font-extrabold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-[0.2em]"
+            className="text-xs font-semibold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-wider"
           >
             Manage categories →
           </Link>
@@ -107,7 +107,7 @@ export default async function InventoryPage({
 
       {(message || error) && (
         <div
-          className={`rounded-2xl border px-4 py-3 text-sm ${
+          className={`rounded-xl border px-4 py-3 text-sm font-medium ${
             error ? "border-red-100 bg-red-50 text-red-700" : "border-green-100 bg-green-50 text-green-700"
           }`}
         >
@@ -116,32 +116,32 @@ export default async function InventoryPage({
       )}
 
       {/* Cards (top) */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <Card className="hover:shadow-md border-none bg-gray-50/50 shadow-none">
+          <CardContent className="p-5">
+            <div className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
               Total products
             </div>
-            <div className="mt-1 text-3xl font-black text-[#111827]">{total}</div>
-            <div className="mt-1 text-xs text-gray-500">Across all pages</div>
+            <div className="mt-2 text-3xl font-bold text-gray-900">{total}</div>
+            <div className="mt-1 text-[11px] text-gray-400 font-medium">Across all pages</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+        <Card className="hover:shadow-md border-none bg-gray-50/50 shadow-none">
+          <CardContent className="p-5">
+            <div className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
               Low stock
             </div>
-            <div className="mt-1 text-3xl font-black text-[#111827]">{low}</div>
-            <div className="mt-1 text-xs text-gray-500">On this page</div>
+            <div className="mt-2 text-3xl font-bold text-gray-900">{low}</div>
+            <div className="mt-1 text-[11px] text-gray-400 font-medium">On this page</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+        <Card className="hover:shadow-md border-none bg-gray-50/50 shadow-none">
+          <CardContent className="p-5">
+            <div className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
               Out of stock
             </div>
-            <div className="mt-1 text-3xl font-black text-[#111827]">{out}</div>
-            <div className="mt-1 text-xs text-gray-500">On this page</div>
+            <div className="mt-2 text-3xl font-bold text-gray-900">{out}</div>
+            <div className="mt-1 text-[11px] text-gray-400 font-medium">On this page</div>
           </CardContent>
         </Card>
       </div>
@@ -177,28 +177,28 @@ export default async function InventoryPage({
       ) : null}
 
       {lastImport ? (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+        <div className="rounded-xl border border-gray-100 bg-gray-50/30 p-5">
+          <div className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">
             Last import
           </div>
           <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm font-bold text-[#374151]">
+            <div className="text-sm font-semibold text-gray-700">
               {lastImport.created_count} created · {lastImport.updated_count} updated · {lastImport.skipped_count}{" "}
               skipped
             </div>
             {lastImport.import_uuid ? (
               <Link
                 href={`/dashboard/inventory/import-logs/${encodeURIComponent(lastImport.import_uuid)}`}
-                className="text-xs font-extrabold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-[0.2em]"
+                className="text-xs font-semibold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-wider"
               >
                 View full log →
               </Link>
             ) : null}
           </div>
           {lastImport.errors?.length ? (
-            <div className="mt-2 text-xs text-gray-600">Issues: {lastImport.errors.length} (showing first)</div>
+            <div className="mt-2 text-xs text-gray-500 font-medium">Issues: {lastImport.errors.length} (showing first)</div>
           ) : (
-            <div className="mt-2 text-xs text-gray-600">No issues reported.</div>
+            <div className="mt-2 text-xs text-gray-500 font-medium">No issues reported.</div>
           )}
         </div>
       ) : null}

@@ -1,6 +1,6 @@
 'use client';
 
-import { ShoppingBag, ChevronRight, Search, Filter, ExternalLink } from 'lucide-react';
+import { ShoppingBag, Search, Filter, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 
 const orders = [
@@ -102,7 +102,6 @@ export default function OrdersPage() {
               </div>
             </div>
 
-            {/* Preview Items */}
             <div className="bg-gray-50/50 px-6 md:px-8 py-4 border-t border-gray-50 flex gap-4 overflow-x-auto scrollbar-hide">
               {order.items.map((item, i) => (
                 <div key={i} className="flex items-center gap-3 bg-white border border-gray-100 rounded-xl p-2 pr-4 flex-shrink-0">

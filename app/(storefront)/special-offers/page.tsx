@@ -6,7 +6,6 @@ import FilterSidebar from "@/components/FilterSidebar";
 import Link from "next/link";
 import { ChevronRight, Tag } from "lucide-react";
 
-// Get products with offers/discounts - will be replaced with API data later
 const getSpecialOfferProducts = () => {
   const productImages = [
     '/assets/home/product-1.png',
@@ -18,10 +17,9 @@ const getSpecialOfferProducts = () => {
     '/assets/home/product-7.png',
   ];
 
-  // Generate products with discounts
   return Array.from({ length: 24 }, (_, i) => {
     const originalPrice = Math.round((Math.random() * 60 + 20) * 100) / 100;
-    const discountPercent = Math.floor(Math.random() * 30 + 10); // 10-40% discount
+    const discountPercent = Math.floor(Math.random() * 30 + 10);
     const discountedPrice = Math.round((originalPrice * (1 - discountPercent / 100)) * 100) / 100;
     
     return {
@@ -44,7 +42,6 @@ export default function SpecialOffersPage() {
       <Header />
       <Navbar />
       
-      {/* Breadcrumb */}
       <div className="bg-[#EFEFEF] py-4 md:py-6">
         <div className="container mx-auto px-4 md:px-6 lg:px-12">
           <nav className="flex items-center gap-2 text-sm md:text-base">
@@ -57,7 +54,6 @@ export default function SpecialOffersPage() {
         </div>
       </div>
 
-      {/* Special Offers Header */}
       <section className="py-8 md:py-12 px-4 md:px-6 lg:px-12">
         <div className="container mx-auto max-w-7xl">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-8">
@@ -75,22 +71,17 @@ export default function SpecialOffersPage() {
               </div>
             </div>
             
-            {/* Filter Button - Mobile */}
             <div className="lg:hidden">
               <FilterSidebar showCategoryFilter={true} />
             </div>
           </div>
 
-          {/* Main Content with Sidebar */}
           <div className="flex gap-6 lg:gap-8">
-            {/* Filter Sidebar - Desktop */}
             <div className="hidden lg:block w-56 flex-shrink-0">
               <FilterSidebar showCategoryFilter={true} />
             </div>
 
-            {/* Products Section */}
             <div className="flex-1">
-              {/* Promotional Banner */}
               <div className="mb-8 md:mb-12 bg-gradient-to-r from-[#01AC28] to-[#5C9D40] rounded-2xl p-6 md:p-8 text-white">
                 <div className="flex flex-col md:flex-row items-center justify-between gap-4">
                   <div>
@@ -98,7 +89,7 @@ export default function SpecialOffersPage() {
                       Limited Time Offers
                     </h2>
                     <p className="text-white/90 text-sm md:text-base">
-                      Save up to 40% on selected products. Don't miss out on these amazing deals!
+                      Save up to 40% on selected products. Don&apos;t miss out on these amazing deals!
                     </p>
                   </div>
                   <div className="text-center md:text-right">
@@ -108,10 +99,8 @@ export default function SpecialOffersPage() {
                 </div>
               </div>
 
-              {/* Products Grid */}
               <ProductGrid products={products} />
 
-              {/* Load More / Pagination */}
               <div className="mt-12 md:mt-16 text-center">
                 <button className="bg-[#01AC28] hover:bg-[#044644] text-white px-8 py-3 rounded-lg font-semibold transition-colors">
                   Load More Products

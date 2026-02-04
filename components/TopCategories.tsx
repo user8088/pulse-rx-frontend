@@ -2,24 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getCategories } from "@/lib/api/categories";
-import type { Category } from "@/types/category";
 
 export default function TopCategories() {
-  const [categories, setCategories] = useState<Category[]>([]);
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const data = await getCategories({ per_page: 3 });
-        setCategories(data.data);
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
-      }
-    };
-    fetchCategories();
-  }, []);
+  const { data } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => getCategories({ per_page: 20 }),
+    staleTime: 60 * 1000,
+  });
+  const categories = (data?.data ?? []).slice(0, 3);
 
   return (
     <section className="w-full bg-white py-8 md:py-12 lg:py-16 px-4 md:px-6 lg:px-12">

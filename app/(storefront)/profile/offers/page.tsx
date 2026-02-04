@@ -89,7 +89,6 @@ export default function OffersPage() {
           </div>
         ))}
 
-        {/* Milestone Card */}
         <div className="bg-gradient-to-br from-[#044644] to-[#01AC28] rounded-3xl p-8 md:p-10 shadow-lg text-white relative overflow-hidden flex flex-col justify-center items-center text-center">
           <div className="absolute top-0 left-0 w-full h-full">
             <div className="absolute top-10 right-10 w-32 h-32 bg-white/10 rounded-full blur-3xl" />

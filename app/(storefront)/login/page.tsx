@@ -43,7 +43,6 @@ export default function LoginPage() {
       <Navbar />
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-140px)]">
-        {/* Left Side - Hero Image/Text */}
         <div className="hidden lg:flex lg:w-1/2 bg-[#044644] relative overflow-hidden items-center justify-center p-12">
           <div className="absolute inset-0 z-0">
             <div className="absolute inset-0 bg-gradient-to-br from-[#044644] via-[#044644] to-[#5C9D40] opacity-90" />
@@ -71,7 +70,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Right Side - Login Form */}
         <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 lg:p-20 bg-gray-50/50">
           <div className="w-full max-w-md">
             <div className="mb-10">

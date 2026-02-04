@@ -11,7 +11,7 @@ import Footer from '@/components/Footer';
 
 export default function SignUpPage() {
   const router = useRouter();
-  const { register } = useAuth(); // Assuming register is added to AuthContext
+  const { register } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +35,13 @@ export default function SignUpPage() {
     setError(null);
 
     try {
-      // In a real app, this would use the register method
-      // For now, we'll simulate it or use the context method if implemented
       if (register) {
         await register(formData);
       }
       router.push('/profile');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Something went wrong. Please try again.');
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      setError(errorObj.response?.data?.message || errorObj.message || 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -54,7 +53,6 @@ export default function SignUpPage() {
       <Navbar />
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-140px)]">
-        {/* Left Side - Hero Image/Text */}
         <div className="hidden lg:flex lg:w-1/2 bg-[#044644] relative overflow-hidden items-center justify-center p-12 order-2">
           <div className="absolute inset-0 z-0">
             <div className="absolute inset-0 bg-gradient-to-br from-[#5C9D40] via-[#044644] to-[#044644] opacity-90" />
@@ -88,7 +86,6 @@ export default function SignUpPage() {
           </div>
         </div>
 
-        {/* Right Side - Signup Form */}
         <div className="w-full lg:w-1/2 flex items-center justify-center p-6 md:p-12 lg:p-20 bg-gray-50/50 order-1">
           <div className="w-full max-w-md">
             <div className="mb-10">

@@ -1,13 +1,11 @@
-
 'use client';
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
 import { Star, ShoppingCart } from "lucide-react";
 import { getProducts } from "@/lib/api/products";
 import { bucketUrl } from "@/lib/bucketUrl";
-import type { Product } from "@/types/product";
 import type { Category } from "@/types/category";
 
 interface CategoryProductSectionProps {
@@ -15,27 +13,14 @@ interface CategoryProductSectionProps {
 }
 
 export default function CategoryProductSection({ category }: CategoryProductSectionProps) {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useQuery({
+    queryKey: ["products", { category: category.category_name, per_page: 8 }],
+    queryFn: () => getProducts({ q: category.category_name, per_page: 8 }),
+    staleTime: 60 * 1000,
+  });
+  const products = data?.data ?? [];
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const data = await getProducts({ 
-          category_id: category.id,
-          per_page: 8 
-        });
-        setProducts(data.data);
-      } catch (error) {
-        console.error(`Failed to fetch products for category ${category.category_name}:`, error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchProducts();
-  }, [category.id, category.category_name]);
-
-  if (!loading && products.length === 0) return null;
+  if (!isLoading && products.length === 0) return null;
 
   return (
     <section className="w-full bg-white py-12 md:py-16 px-4 md:px-6 lg:px-12">
@@ -55,7 +40,7 @@ export default function CategoryProductSection({ category }: CategoryProductSect
 
         {/* Products Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
-          {loading ? (
+          {isLoading ? (
             // Skeleton loader
             Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="animate-pulse bg-gray-50 rounded-2xl aspect-[3/4]" />

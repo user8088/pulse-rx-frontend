@@ -46,6 +46,8 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   }
 
   // 2. Fetch products for this category
+  // The products API doesn't support direct `category_id` filtering;
+  // instead we use the full-text `q` search which also matches `categories.category_name`.
   let productsData: PaginatedProducts = { 
     data: [], 
     total: 0, 
@@ -56,7 +58,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     to: null 
   };
   try {
-    productsData = await getProducts({ category_id: category.id, per_page: 20 });
+    productsData = await getProducts({ q: category.category_name, per_page: 20 });
   } catch (error) {
     console.error("Failed to fetch products:", error);
   }

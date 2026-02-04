@@ -227,7 +227,6 @@ export default function CheckoutPage() {
                       </label>
                       <label className="flex items-center p-4 border border-gray-100 bg-gray-50/50 rounded-xl cursor-pointer hover:border-[#01AC28] transition-all group">
                         <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm grayscale group-hover:grayscale-0 transition-all">
-                          {/* PayPal placeholder */}
                           <div className="w-6 h-6 bg-[#003087] rounded-sm" />
                         </div>
                         <span className="text-sm font-bold text-[#374151] group-hover:text-[#01AC28]">PayPal</span>
@@ -264,7 +263,6 @@ export default function CheckoutPage() {
               <div className="bg-[#374151] rounded-3xl p-6 md:p-8 text-white sticky top-[150px] shadow-2xl">
                 <h2 className="text-xl md:text-2xl font-bold mb-8">Order Summary</h2>
                 
-                {/* Product List */}
                 <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex gap-4 items-center">
@@ -300,7 +298,6 @@ export default function CheckoutPage() {
                   ))}
                 </div>
 
-                {/* Calculation */}
                 <div className="space-y-4 pt-6 border-t border-white/10 mb-8">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Subtotal</span>
@@ -364,7 +361,6 @@ export default function CheckoutPage() {
         </div>
       </section>
 
-      {/* Recommended Products */}
       <section className="py-16 md:py-24 bg-gray-50 px-4 md:px-6 lg:px-12">
         <div className="container mx-auto max-w-7xl">
           <div className="flex items-center justify-between mb-8 md:mb-12">

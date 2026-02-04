@@ -58,10 +58,8 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
 
         <div className="container mx-auto px-4 md:px-6 lg:px-12 py-8 md:py-12">
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* Sidebar */}
             <aside className="w-full lg:w-80 flex-shrink-0">
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden sticky top-[100px]">
-                {/* User Info Header */}
                 <div className="p-6 md:p-8 bg-[#044644] text-white">
                   <div className="flex items-center gap-4 mb-4">
                     <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border-2 border-white/30 text-2xl font-black">
@@ -81,7 +79,6 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
                   </div>
                 </div>
 
-                {/* Navigation */}
                 <nav className="p-4">
                   <ul className="space-y-1">
                     {navItems.map((item) => {
@@ -121,7 +118,6 @@ export default function ProfileLayout({ children }: { children: React.ReactNode 
               </div>
             </aside>
 
-            {/* Main Content */}
             <section className="flex-1 min-w-0">
               {children}
             </section>

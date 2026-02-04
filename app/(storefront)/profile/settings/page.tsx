@@ -22,7 +22,6 @@ export default function SettingsPage() {
       </div>
 
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col md:flex-row">
-        {/* Tabs Sidebar */}
         <div className="w-full md:w-64 bg-gray-50/50 border-r border-gray-50 p-4">
           <div className="space-y-1">
             {tabs.map((tab) => {
@@ -45,7 +44,6 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Form Content */}
         <div className="flex-1 p-8 md:p-10">
           {activeTab === 'profile' && (
             <div className="space-y-8 animate-in fade-in duration-300">

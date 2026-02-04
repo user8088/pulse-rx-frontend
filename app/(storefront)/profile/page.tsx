@@ -6,17 +6,14 @@ import {
   Tag, 
   Clock, 
   ChevronRight,
-  TrendingUp,
   Package,
   Calendar
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 
 export default function ProfileOverview() {
   const { user } = useAuth();
 
-  // Mock data for dashboard
   const stats = [
     { label: 'Total Orders', value: '12', icon: Package, color: 'bg-blue-500' },
     { label: 'Pending Prescriptions', value: '2', icon: Clock, color: 'bg-amber-500' },
@@ -31,7 +28,6 @@ export default function ProfileOverview() {
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Welcome Section */}
       <div className="bg-white rounded-3xl border border-gray-100 p-8 md:p-10 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#01AC28]/5 rounded-full -translate-y-1/2 translate-x-1/2" />
         <div className="relative z-10">
@@ -42,7 +38,6 @@ export default function ProfileOverview() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {stats.map((stat, i) => {
           const Icon = stat.icon;
@@ -63,7 +58,6 @@ export default function ProfileOverview() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-        {/* Recent Orders */}
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="p-6 md:p-8 border-b border-gray-50 flex items-center justify-between">
             <h2 className="text-xl font-bold text-[#374151]">Recent Orders</h2>
@@ -96,7 +90,6 @@ export default function ProfileOverview() {
           </div>
         </div>
 
-        {/* Exclusive Offer Card */}
         <div className="bg-[#044644] rounded-3xl p-8 md:p-10 shadow-lg relative overflow-hidden text-white flex flex-col justify-between group">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-110 transition-transform duration-700" />
           <div className="relative z-10">

@@ -2,32 +2,27 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Menu, X } from "lucide-react";
 import { getCategories } from "@/lib/api/categories";
-import type { Category } from "@/types/category";
 
 export default function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [categories, setCategories] = useState<Category[]>([]);
+
+  const { data } = useQuery({
+    queryKey: ["categories"],
+    queryFn: () => getCategories({ per_page: 20 }),
+    staleTime: 60 * 1000,
+  });
+  const categories = data?.data ?? [];
 
   useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const data = await getCategories({ per_page: 6 });
-        setCategories(data.data);
-      } catch (error) {
-        console.error("Failed to fetch categories:", error);
-      }
-    };
-    fetchCategories();
-
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 10);
     };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (

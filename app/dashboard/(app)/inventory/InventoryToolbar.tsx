@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { Modal } from "@/components/ui/Modal";
 import { useFormStatus } from "react-dom";
+import { SubcategorySelect } from "./SubcategorySelect";
 
 function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
@@ -22,7 +23,6 @@ function downloadTextFile(filename: string, content: string, mime = "text/plain;
 
 function toCsvCell(value: unknown) {
   const s = value === null || value === undefined ? "" : String(value);
-  // Escape double quotes by doubling them, wrap in quotes if needed.
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
@@ -32,10 +32,15 @@ function productsToCsv(products: Product[]) {
     "id",
     "item_id",
     "item_name",
+    "generic_name",
     "brand",
     "category",
-    "stock_qty",
-    "low_stock_threshold",
+    "retail_price_unit",
+    "retail_price_strip",
+    "retail_price_box",
+    "availability",
+    "cold_chain_needed",
+    "item_discount",
   ];
   const lines = [
     headers.join(","),
@@ -44,10 +49,15 @@ function productsToCsv(products: Product[]) {
         p.id,
         p.item_id,
         p.item_name,
+        p.generic_name ?? "",
         p.brand ?? "",
         p.category?.category_name ?? "",
-        p.stock_qty,
-        p.low_stock_threshold,
+        p.retail_price_unit,
+        p.retail_price_strip,
+        p.retail_price_box,
+        p.availability,
+        p.cold_chain_needed ? "YES" : "NO",
+        p.item_discount,
       ]
         .map(toCsvCell)
         .join(",")
@@ -78,15 +88,16 @@ export function InventoryToolbar({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [createCategoryId, setCreateCategoryId] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hiddenSubmitRef = useRef<HTMLButtonElement | null>(null);
 
   const exportStats = useMemo(() => {
     const total = products.length;
-    const low = products.filter((p) => p.stock_qty > 0 && p.stock_qty <= p.low_stock_threshold).length;
-    const out = products.filter((p) => p.stock_qty <= 0).length;
-    return { total, low, out };
+    const short = products.filter((p) => p.availability === "short").length;
+    const unavailable = products.filter((p) => p.availability === "no").length;
+    return { total, short, unavailable };
   }, [products]);
 
   return (
@@ -96,12 +107,10 @@ export function InventoryToolbar({
           Create product
         </Button>
 
-        {/* Import: ONLY a button (file input is hidden) */}
         <form
           action={importProductsAction}
           className="inline-flex"
           onSubmit={() => {
-            // Keep the UI responsive even if the OS file picker is slow.
             fileInputRef.current?.blur();
           }}
         >
@@ -125,9 +134,9 @@ export function InventoryToolbar({
       </div>
 
       <div className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">
-        This page: <span className="font-bold text-gray-700">{exportStats.total}</span> · Low:{" "}
-        <span className="font-bold text-gray-700">{exportStats.low}</span> · Out:{" "}
-        <span className="font-bold text-gray-700">{exportStats.out}</span>
+        This page: <span className="font-bold text-gray-700">{exportStats.total}</span> · Short:{" "}
+        <span className="font-bold text-gray-700">{exportStats.short}</span> · Unavailable:{" "}
+        <span className="font-bold text-gray-700">{exportStats.unavailable}</span>
       </div>
 
       <Modal
@@ -161,12 +170,22 @@ export function InventoryToolbar({
             </div>
             <div className="space-y-2">
               <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+                Generic Name (optional)
+              </label>
+              <Input name="generic_name" placeholder="e.g. Paracetamol" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
                 Category
               </label>
               <select
                 name="category_id"
                 className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition-all"
-                defaultValue=""
+                value={createCategoryId}
+                onChange={(e) => setCreateCategoryId(e.target.value)}
               >
                 <option value="">— None —</option>
                 {categories.map((c) => (
@@ -176,20 +195,47 @@ export function InventoryToolbar({
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Stock Qty
+                Availability
               </label>
-              <Input name="stock_qty" type="number" min={0} step={1} defaultValue={0} />
+              <select
+                name="availability"
+                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition-all"
+                defaultValue="yes"
+              >
+                <option value="yes">Available</option>
+                <option value="short">Short supply</option>
+                <option value="no">Unavailable</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+              Subcategories
+            </label>
+            <SubcategorySelect categoryId={createCategoryId || null} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+                Price (Unit)
+              </label>
+              <Input name="retail_price_unit" type="number" min={0} step="0.01" placeholder="0.00" />
             </div>
             <div className="space-y-2">
               <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Re-order level
+                Price (Strip)
               </label>
-              <Input name="low_stock_threshold" type="number" min={0} step={1} defaultValue={0} />
+              <Input name="retail_price_strip" type="number" min={0} step="0.01" placeholder="0.00" />
+            </div>
+            <div className="space-y-2">
+              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+                Price (Box)
+              </label>
+              <Input name="retail_price_box" type="number" min={0} step="0.01" placeholder="0.00" />
             </div>
           </div>
 
@@ -210,7 +256,7 @@ export function InventoryToolbar({
       >
         <div className="space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-            Export includes: item id, name, brand, category, stock qty, and reorder level.
+            Export includes: item id, name, generic name, brand, category, prices (unit/strip/box), availability, cold chain, and discount.
           </div>
 
           <div className="flex items-center justify-end gap-2">
@@ -234,4 +280,3 @@ export function InventoryToolbar({
     </div>
   );
 }
-

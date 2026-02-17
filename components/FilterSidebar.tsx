@@ -1,10 +1,15 @@
 'use client';
 
 import { useState } from "react";
+import Link from "next/link";
 import { X, ChevronDown, ChevronUp } from "lucide-react";
+import type { Subcategory } from "@/types/category";
 
 interface FilterSidebarProps {
   showCategoryFilter?: boolean;
+  subcategories?: Subcategory[];
+  categoryAlias?: string;
+  activeSubcategoryId?: number | null;
   onFilterChange?: (filters: FilterState) => void;
 }
 
@@ -15,7 +20,6 @@ interface FilterState {
   priceRange: [number, number] | null;
 }
 
-// Placeholder data - will be replaced with API data later
 const brands = [
   "Pfizer",
   "Johnson & Johnson",
@@ -25,15 +29,6 @@ const brands = [
   "GSK",
   "Sanofi",
   "AstraZeneca",
-];
-
-const categories = [
-  "Pain Relief",
-  "Cold & Flu",
-  "Diabetes",
-  "Child Care",
-  "Skin Care",
-  "Optics",
 ];
 
 const medicalCriteria = [
@@ -47,11 +42,17 @@ const medicalCriteria = [
   "Gluten Free",
 ];
 
-export default function FilterSidebar({ showCategoryFilter = false, onFilterChange }: FilterSidebarProps) {
+export default function FilterSidebar({
+  showCategoryFilter = false,
+  subcategories = [],
+  categoryAlias,
+  activeSubcategoryId,
+  onFilterChange,
+}: FilterSidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    subcategory: true,
     brand: true,
-    category: true,
     medical: true,
     price: true,
   });
@@ -162,6 +163,52 @@ export default function FilterSidebar({ showCategoryFilter = false, onFilterChan
             </div>
           </div>
 
+          {/* Subcategory Filter */}
+          {subcategories.length > 0 && categoryAlias && (
+            <div className="mb-4 pb-4 border-b border-gray-200">
+              <button
+                onClick={() => toggleSection('subcategory')}
+                className="w-full flex items-center justify-between mb-3"
+              >
+                <h3 className="text-sm md:text-base font-semibold text-[#374151]">Subcategory</h3>
+                {expandedSections.subcategory ? (
+                  <ChevronUp className="w-5 h-5 text-[#6B7280]" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-[#6B7280]" />
+                )}
+              </button>
+              {expandedSections.subcategory && (
+                <div className="space-y-1">
+                  <Link
+                    href={`/category/${categoryAlias}`}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded text-xs md:text-sm ${
+                      activeSubcategoryId == null
+                        ? "text-[#01AC28] font-semibold"
+                        : "text-[#374151]"
+                    }`}
+                  >
+                    All
+                  </Link>
+                  {subcategories.map((sub) => (
+                    <Link
+                      key={sub.id}
+                      href={`/category/${categoryAlias}?sub=${sub.id}`}
+                      onClick={() => setIsOpen(false)}
+                      className={`flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded text-xs md:text-sm ${
+                        activeSubcategoryId === sub.id
+                          ? "text-[#01AC28] font-semibold"
+                          : "text-[#374151]"
+                      }`}
+                    >
+                      {sub.subcategory_name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Category Filter - Only for Special Offers */}
           {showCategoryFilter && (
             <div className="mb-4 pb-4 border-b border-gray-200">
@@ -176,24 +223,6 @@ export default function FilterSidebar({ showCategoryFilter = false, onFilterChan
                   <ChevronDown className="w-5 h-5 text-[#6B7280]" />
                 )}
               </button>
-              {expandedSections.category && (
-                <div className="space-y-1">
-                  {categories.map((category) => (
-                    <label
-                      key={category}
-                      className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1.5 rounded"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={filters.categories.includes(category)}
-                        onChange={() => toggleFilter('categories', category)}
-                        className="w-4 h-4 text-[#01AC28] border-gray-300 rounded focus:ring-[#01AC28]"
-                      />
-                      <span className="text-xs md:text-sm text-[#374151]">{category}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 

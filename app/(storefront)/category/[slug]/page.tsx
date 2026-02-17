@@ -4,25 +4,30 @@ import Footer from "@/components/Footer";
 import ProductGrid from "@/components/ProductGrid";
 import FilterSidebar from "@/components/FilterSidebar";
 import { OfferBanner, FlashSaleBanner, DeliveryBanner, ProcedureBanner } from "@/components/CategoryPromoBanner";
+import SubcategoryChips from "@/components/SubcategoryChips";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
-import { getCategories } from "@/lib/api/categories";
+import { getCategories, getSubcategories } from "@/lib/api/categories";
 import { getProducts } from "@/lib/api/products";
 import { bucketUrl } from "@/lib/bucketUrl";
 import type { Product as BackendProduct, PaginatedProducts } from "@/types/product";
-import type { Category } from "@/types/category";
+import type { Category, Subcategory } from "@/types/category";
 
 interface CategoryPageProps {
   params: Promise<{
     slug: string;
   }>;
+  searchParams: Promise<{
+    sub?: string;
+  }>;
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
+export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const { slug } = await params;
+  const sp = await searchParams;
+  const subFilter = sp.sub ? Number.parseInt(sp.sub, 10) : null;
   const categoryAlias = (slug || '').toUpperCase();
 
-  // 1. Fetch categories to find the ID for this alias
   let category: Category | undefined = undefined;
   try {
     const categoriesRes = await getCategories({ per_page: 100 });
@@ -45,29 +50,49 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
     );
   }
 
-  // 2. Fetch products for this category
-  // The products API doesn't support direct `category_id` filtering;
-  // instead we use the full-text `q` search which also matches `categories.category_name`.
+  let subcategories: Subcategory[] = [];
+  try {
+    const subRes = await getSubcategories(category.id, { per_page: 50 });
+    subcategories = subRes.data;
+  } catch (error) {
+    console.error("Failed to fetch subcategories:", error);
+  }
+
+  const activeSubcategory = subFilter
+    ? subcategories.find((s) => s.id === subFilter)
+    : null;
+
   let productsData: PaginatedProducts = { 
     data: [], 
     total: 0, 
-    per_page: 20, 
+    per_page: 100, 
     current_page: 1, 
     last_page: 1, 
     from: null, 
     to: null 
   };
   try {
-    productsData = await getProducts({ q: category.category_name, per_page: 20 });
+    productsData = await getProducts({ q: category.category_name, per_page: 100 });
   } catch (error) {
     console.error("Failed to fetch products:", error);
   }
 
-  // 3. Map backend products to the interface expected by ProductGrid
-  const mappedProducts = productsData.data.map((p: BackendProduct) => ({
+  // Filter to only products that actually belong to this category
+  const categoryProducts = productsData.data.filter(
+    (p: BackendProduct) => p.category_id === category.id
+  );
+
+  // Then further filter by subcategory if one is selected
+  const filteredProducts = activeSubcategory
+    ? categoryProducts.filter((p: BackendProduct) =>
+        p.subcategories?.some((s) => s.id === activeSubcategory.id)
+      )
+    : categoryProducts;
+
+  const mappedProducts = filteredProducts.map((p: BackendProduct) => ({
     id: p.id,
     name: p.item_name,
-    price: parseFloat(p.retail_price),
+    price: parseFloat(p.retail_price_unit),
     rating: 5,
     image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
   }));
@@ -85,7 +110,22 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               Home
             </Link>
             <ChevronRight className="w-4 h-4 text-[#6B7280]" />
-            <span className="text-[#374151] font-semibold">{category.category_name}</span>
+            {activeSubcategory ? (
+              <>
+                <Link
+                  href={`/category/${slug}`}
+                  className="text-[#6B7280] hover:text-[#01AC28] transition-colors"
+                >
+                  {category.category_name}
+                </Link>
+                <ChevronRight className="w-4 h-4 text-[#6B7280]" />
+                <span className="text-[#374151] font-semibold">
+                  {activeSubcategory.subcategory_name}
+                </span>
+              </>
+            ) : (
+              <span className="text-[#374151] font-semibold">{category.category_name}</span>
+            )}
           </nav>
         </div>
       </div>
@@ -93,27 +133,46 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
       {/* Category Header */}
       <section className="py-8 md:py-12 px-4 md:px-6 lg:px-12">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-8">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-6">
             <div>
               <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#374151] mb-2">
-                {category.category_name}
+                {activeSubcategory ? activeSubcategory.subcategory_name : category.category_name}
               </h1>
               <p className="text-[#6B7280] text-sm md:text-base">
-                {productsData.total} products found
+                {mappedProducts.length} products found
               </p>
             </div>
             
             {/* Filter Button - Mobile */}
             <div className="lg:hidden">
-              <FilterSidebar showCategoryFilter={false} />
+              <FilterSidebar
+                showCategoryFilter={false}
+                subcategories={subcategories}
+                categoryAlias={slug}
+                activeSubcategoryId={subFilter}
+              />
             </div>
           </div>
 
+          {/* Subcategory Chips */}
+          {subcategories.length > 0 && (
+            <SubcategoryChips
+              subcategories={subcategories}
+              categoryAlias={slug}
+              activeSubcategoryId={subFilter}
+            />
+          )}
+
           {/* Main Content with Sidebar */}
-          <div className="flex gap-6 lg:gap-8">
+          <div className="flex gap-6 lg:gap-8 mt-8">
             {/* Filter Sidebar - Desktop */}
             <div className="hidden lg:block w-56 flex-shrink-0">
-              <FilterSidebar showCategoryFilter={false} />
+              <FilterSidebar
+                showCategoryFilter={false}
+                subcategories={subcategories}
+                categoryAlias={slug}
+                activeSubcategoryId={subFilter}
+              />
             </div>
 
             {/* Products Section */}
@@ -128,27 +187,37 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               <ProductGrid products={mappedProducts.slice(0, 10)} />
 
               {/* Mid-section Promotional Banners */}
-              <div className="my-12 md:my-16 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <FlashSaleBanner />
-                  <DeliveryBanner />
+              {mappedProducts.length > 10 && (
+                <div className="my-12 md:my-16 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FlashSaleBanner />
+                    <DeliveryBanner />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Products Grid - Second Batch */}
-              <ProductGrid products={mappedProducts.slice(10)} />
+              {mappedProducts.length > 10 && (
+                <ProductGrid products={mappedProducts.slice(10)} />
+              )}
 
               {/* Bottom Promotional Banner */}
               <div className="mt-12 md:mt-16">
                 <ProcedureBanner />
               </div>
 
-              {/* Load More / Pagination */}
-              {productsData.total > 20 && (
-                <div className="mt-12 md:mt-16 text-center">
-                  <button className="bg-[#01AC28] hover:bg-[#044644] text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-                    Load More Products
-                  </button>
+              {/* Empty state */}
+              {mappedProducts.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg">No products found in this category.</p>
+                  {activeSubcategory && (
+                    <Link
+                      href={`/category/${slug}`}
+                      className="mt-4 inline-block text-[#01AC28] hover:underline font-semibold"
+                    >
+                      View all {category.category_name} products
+                    </Link>
+                  )}
                 </div>
               )}
             </div>

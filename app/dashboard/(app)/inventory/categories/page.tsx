@@ -1,6 +1,6 @@
 import React from "react";
 import { dashboardFetch } from "@/lib/dashboardApi";
-import { PaginatedCategories } from "@/types";
+import { PaginatedCategories, PaginatedSubcategories, Subcategory } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
@@ -9,6 +9,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { createCategory, updateCategory, deleteCategory } from "./actions";
 import { Trash2 } from "lucide-react";
 import { CategoryEditCell } from "./CategoryEditCell";
+import { SubcategorySection } from "./SubcategorySection";
 
 async function getCategories({
   page,
@@ -28,6 +29,17 @@ async function getCategories({
   }
 }
 
+async function getSubcategoriesForCategory(categoryId: number): Promise<Subcategory[]> {
+  try {
+    const res = await dashboardFetch(`/categories/${categoryId}/subcategories?per_page=100`);
+    if (!res.ok) return [];
+    const data: PaginatedSubcategories = await res.json();
+    return data.data;
+  } catch {
+    return [];
+  }
+}
+
 export default async function CategoriesPage({
   searchParams,
 }: {
@@ -40,6 +52,14 @@ export default async function CategoriesPage({
 
   const categoriesData = await getCategories({ page });
   const categories = categoriesData?.data ?? [];
+
+  const subcategoriesMap = new Map<number, Subcategory[]>();
+  await Promise.all(
+    categories.map(async (cat) => {
+      const subs = await getSubcategoriesForCategory(cat.id);
+      subcategoriesMap.set(cat.id, subs);
+    })
+  );
 
   return (
     <div className="space-y-6">
@@ -122,6 +142,10 @@ export default async function CategoriesPage({
                         <tr key={category.id} className="group hover:bg-gray-50/60 transition-colors">
                           <td className="px-5 py-4">
                             <CategoryEditCell category={category} />
+                            <SubcategorySection
+                              categoryId={category.id}
+                              subcategories={subcategoriesMap.get(category.id) ?? []}
+                            />
                           </td>
                           <td className="px-5 py-4">
                             <div className="text-sm font-bold text-gray-700">

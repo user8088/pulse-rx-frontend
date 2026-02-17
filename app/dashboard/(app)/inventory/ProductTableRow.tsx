@@ -15,8 +15,9 @@ import {
   updateProductImageMetadata,
   uploadProductImage,
 } from "./actions";
-import { Check, Edit2, ImagePlus, Star, Trash2, X } from "lucide-react";
+import { Edit2, ImagePlus, Star, Trash2, X } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { SubcategorySelect } from "./SubcategorySelect";
 
 function pickPrimaryImage(images: ProductImage[] | undefined) {
   const list = Array.isArray(images) ? images : [];
@@ -26,10 +27,22 @@ function pickPrimaryImage(images: ProductImage[] | undefined) {
   return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0] ?? null;
 }
 
-function stockVariant(product: Product): { label: string; variant: "success" | "warning" | "danger" } {
-  if (product.stock_qty <= 0) return { label: "Out of stock", variant: "danger" };
-  if (product.stock_qty <= product.low_stock_threshold) return { label: "Low stock", variant: "warning" };
-  return { label: "In stock", variant: "success" };
+function availabilityBadge(availability: string): { label: string; variant: "success" | "warning" | "danger" } {
+  switch (availability) {
+    case "no":
+      return { label: "Unavailable", variant: "danger" };
+    case "short":
+      return { label: "Short supply", variant: "warning" };
+    default:
+      return { label: "Available", variant: "success" };
+  }
+}
+
+function formatPrice(value: string | undefined | null): string {
+  if (!value || value.trim() === "" || value.trim() === "0" || value.trim() === "0.00") return "—";
+  const n = Number.parseFloat(value);
+  if (!Number.isFinite(n) || n === 0) return "—";
+  return `Rs. ${n.toFixed(2)}`;
 }
 
 export function ProductTableRow({
@@ -40,9 +53,12 @@ export function ProductTableRow({
   categories: Category[];
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [editCategoryId, setEditCategoryId] = useState<string>(
+    product.category_id != null ? String(product.category_id) : ""
+  );
 
   const categoryName = product.category?.category_name ?? "";
-  const status = stockVariant(product);
+  const status = availabilityBadge(product.availability);
 
   const primaryImage = useMemo(() => pickPrimaryImage(product.images), [product.images]);
   const primaryUrl = useMemo(
@@ -77,6 +93,7 @@ export function ProductTableRow({
                 <span className="lg:hidden text-[10px] font-mono text-gray-400">{product.item_id}</span>
                 {product.brand ? <span className="font-medium">{product.brand}</span> : "No brand"}
                 {categoryName ? <span className="text-gray-400">· {categoryName}</span> : null}
+                {product.generic_name ? <span className="text-gray-400">· {product.generic_name}</span> : null}
                 <span className="sm:hidden">
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </span>
@@ -96,31 +113,11 @@ export function ProductTableRow({
 
         <td className="hidden md:table-cell px-3 py-4 sm:px-5">
           <span className="text-sm font-semibold text-gray-700">
-            {product.retail_price && product.retail_price.trim() !== ""
-              ? `Rs. ${Number.parseFloat(product.retail_price).toFixed(2)}`
-              : "—"}
+            {formatPrice(product.retail_price_unit)}
           </span>
         </td>
 
         <td className="px-3 py-4 sm:px-5">
-          <span
-            className={
-              product.stock_qty <= 0
-                ? "text-sm font-semibold text-red-600"
-                : product.stock_qty <= product.low_stock_threshold
-                  ? "text-sm font-semibold text-amber-600"
-                  : "text-sm font-semibold text-emerald-600"
-            }
-          >
-            {product.stock_qty}
-          </span>
-        </td>
-
-        <td className="hidden md:table-cell px-3 py-4 sm:px-5">
-          <span className="text-sm font-medium text-gray-500">{product.low_stock_threshold}</span>
-        </td>
-
-        <td className="hidden sm:table-cell px-3 py-4 sm:px-5">
           <Badge variant={status.variant}>{status.label}</Badge>
         </td>
 
@@ -156,7 +153,7 @@ export function ProductTableRow({
 
       {isEditing ? (
         <tr>
-          <td colSpan={8} className="px-5 pb-8">
+          <td colSpan={6} className="px-5 pb-8">
             <div className="mt-2 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
               <div className="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
                 <div>
@@ -204,11 +201,21 @@ export function ProductTableRow({
 
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Generic Name (optional)
+                      </label>
+                      <Input name="generic_name" defaultValue={product.generic_name ?? ""} placeholder="e.g. Paracetamol" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
                         Category
                       </label>
                       <select
                         name="category_id"
-                        defaultValue={product.category_id ?? ""}
+                        value={editCategoryId}
+                        onChange={(e) => setEditCategoryId(e.target.value)}
                         className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-100 focus:border-gray-300 transition-all"
                       >
                         <option value="">— None —</option>
@@ -219,52 +226,146 @@ export function ProductTableRow({
                         ))}
                       </select>
                     </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Availability
+                      </label>
+                      <select
+                        name="availability"
+                        defaultValue={product.availability ?? "yes"}
+                        className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-100 focus:border-gray-300 transition-all"
+                      >
+                        <option value="yes">Available</option>
+                        <option value="short">Short supply</option>
+                        <option value="no">Unavailable</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                      Subcategories
+                    </label>
+                    <SubcategorySelect
+                      categoryId={editCategoryId || null}
+                      selectedIds={product.subcategories?.map((s) => s.id) ?? []}
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="space-y-1.5">
                       <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
-                        Stock Qty
+                        Price (Unit)
                       </label>
                       <Input
-                        name="stock_qty"
-                        type="number"
-                        min={0}
-                        step={1}
-                        defaultValue={product.stock_qty}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
-                        Re-order level
-                      </label>
-                      <Input
-                        name="low_stock_threshold"
-                        type="number"
-                        min={0}
-                        step={1}
-                        defaultValue={product.low_stock_threshold}
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
-                        Retail Price
-                      </label>
-                      <Input
-                        name="retail_price"
+                        name="retail_price_unit"
                         type="number"
                         min={0}
                         step="0.01"
                         defaultValue={
-                          product.retail_price && product.retail_price.trim() !== ""
-                            ? Number.parseFloat(product.retail_price)
+                          product.retail_price_unit && product.retail_price_unit.trim() !== ""
+                            ? Number.parseFloat(product.retail_price_unit)
                             : ""
                         }
                         placeholder="0.00"
                       />
                     </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Price (Strip)
+                      </label>
+                      <Input
+                        name="retail_price_strip"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        defaultValue={
+                          product.retail_price_strip && product.retail_price_strip.trim() !== ""
+                            ? Number.parseFloat(product.retail_price_strip)
+                            : ""
+                        }
+                        placeholder="0.00"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Price (Box)
+                      </label>
+                      <Input
+                        name="retail_price_box"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        defaultValue={
+                          product.retail_price_box && product.retail_price_box.trim() !== ""
+                            ? Number.parseFloat(product.retail_price_box)
+                            : ""
+                        }
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Pack Qty
+                      </label>
+                      <Input
+                        name="pack_qty"
+                        type="number"
+                        min={0}
+                        step={1}
+                        defaultValue={product.pack_qty ?? ""}
+                        placeholder="—"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Strip Qty
+                      </label>
+                      <Input
+                        name="strip_qty"
+                        type="number"
+                        min={0}
+                        step={1}
+                        defaultValue={product.strip_qty ?? ""}
+                        placeholder="—"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-1">
+                        Discount
+                      </label>
+                      <Input
+                        name="item_discount"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        defaultValue={
+                          product.item_discount && product.item_discount.trim() !== ""
+                            ? Number.parseFloat(product.item_discount)
+                            : ""
+                        }
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <label className="flex items-center gap-2 text-[11px] font-medium text-gray-600 cursor-pointer">
+                      <input name="is_narcotic" type="checkbox" value="true" defaultChecked={product.is_narcotic} className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                      Narcotic
+                    </label>
+                    <label className="flex items-center gap-2 text-[11px] font-medium text-gray-600 cursor-pointer">
+                      <input name="cold_chain_needed" type="checkbox" value="true" defaultChecked={product.cold_chain_needed} className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                      Cold chain needed
+                    </label>
                   </div>
 
                   <div className="flex items-center gap-3 pt-4 border-t border-gray-50">
@@ -415,4 +516,3 @@ export function ProductTableRow({
     </>
   );
 }
-

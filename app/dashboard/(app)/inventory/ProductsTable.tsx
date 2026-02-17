@@ -132,17 +132,15 @@ export function ProductsTable({
                 <th className="px-3 py-3 sm:px-5">Item</th>
                 <th className="hidden lg:table-cell px-3 py-3 sm:px-5">Item ID</th>
                 <th className="hidden xl:table-cell px-3 py-3 sm:px-5">Category</th>
-                <th className="hidden md:table-cell px-3 py-3 sm:px-5">Retail Price</th>
-                <th className="px-3 py-3 sm:px-5">Stock</th>
-                <th className="hidden md:table-cell px-3 py-3 sm:px-5">Reorder</th>
-                <th className="hidden sm:table-cell px-3 py-3 sm:px-5">Status</th>
+                <th className="hidden md:table-cell px-3 py-3 sm:px-5">Price (Unit)</th>
+                <th className="px-3 py-3 sm:px-5">Availability</th>
                 <th className="px-3 py-3 sm:px-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {products.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-500">
                     {(query ?? "").trim() ? "No products match your search." : "No products found."}
                   </td>
                 </tr>

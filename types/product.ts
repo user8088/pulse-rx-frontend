@@ -1,4 +1,4 @@
-import type { Category } from "./category";
+import type { Category, Subcategory } from "./category";
 
 export interface ProductImage {
   id: number;
@@ -17,15 +17,22 @@ export interface Product {
   product_group_id: string | null;
   variation_type: string | null;
   variation_value: string | null;
+  generic_name: string | null;
+  is_narcotic: boolean;
   category_id: number | null;
   brand: string | null;
-  stock_qty: number;
-  low_stock_threshold: number;
-  in_stock: boolean;
-  retail_price: string;
+  retail_price_unit: string;
+  retail_price_strip: string;
+  retail_price_box: string;
+  pack_qty: number | null;
+  strip_qty: number | null;
+  availability: "yes" | "no" | "short";
+  cold_chain_needed: boolean;
+  item_discount: string;
   created_at: string;
   updated_at: string;
   category?: Category | null;
+  subcategories?: Subcategory[];
   images?: ProductImage[];
 }
 

@@ -59,7 +59,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       name: selectedVariation.item_name,
       variation: selectedVariation.variation_value || "",
       quantity: "1", // Default quantity string
-      price: parseFloat(selectedVariation.retail_price),
+      price: parseFloat(selectedVariation.retail_price_unit),
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
       requiresPrescription: false // Set based on business logic if needed
@@ -154,9 +154,27 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                       {selectedVariation.item_name}
                     </h1>
                   </div>
+                  {/* Subcategory Badges */}
+                  {selectedVariation.subcategories && selectedVariation.subcategories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {selectedVariation.subcategories.map((sub) => (
+                        <Link
+                          key={sub.id}
+                          href={
+                            selectedVariation.category?.alias
+                              ? `/category/${selectedVariation.category.alias.toLowerCase()}?sub=${sub.id}`
+                              : "#"
+                          }
+                          className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-[#374151] hover:bg-[#01AC28] hover:text-white transition-all"
+                        >
+                          {sub.subcategory_name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <span className="text-xl md:text-2xl font-bold text-[#374151] pt-2">
-                  Rs. {parseFloat(selectedVariation.retail_price).toFixed(2)}
+                  Rs. {parseFloat(selectedVariation.retail_price_unit).toFixed(2)}
                 </span>
               </div>
 
@@ -241,9 +259,9 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-gray-50 rounded-3xl p-8">
-              <h3 className="text-xl font-bold text-[#374151] mb-4">Stock Status:</h3>
-              <p className={`text-sm font-semibold ${selectedVariation.in_stock ? 'text-green-600' : 'text-red-600'}`}>
-                {selectedVariation.in_stock ? `In Stock (${selectedVariation.stock_qty} available)` : 'Out of Stock'}
+              <h3 className="text-xl font-bold text-[#374151] mb-4">Availability:</h3>
+              <p className={`text-sm font-semibold ${selectedVariation.availability === "yes" ? 'text-green-600' : selectedVariation.availability === "short" ? 'text-amber-600' : 'text-red-600'}`}>
+                {selectedVariation.availability === "yes" ? 'Available' : selectedVariation.availability === "short" ? 'Short Supply' : 'Unavailable'}
               </p>
             </div>
             <div className="bg-gray-50 rounded-3xl p-8">

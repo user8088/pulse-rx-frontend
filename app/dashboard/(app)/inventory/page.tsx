@@ -79,8 +79,8 @@ export default async function InventoryPage({
   })();
 
   const total = productsData?.total ?? products.length;
-  const low = products.filter((p) => p.stock_qty > 0 && p.stock_qty <= p.low_stock_threshold).length;
-  const out = products.filter((p) => p.stock_qty <= 0).length;
+  const short = products.filter((p) => p.availability === "short").length;
+  const unavailable = products.filter((p) => p.availability === "no").length;
 
   return (
     <div className="flex h-full flex-col gap-6">
@@ -129,18 +129,18 @@ export default async function InventoryPage({
         <Card className="hover:shadow-md border-none bg-gray-50/50 shadow-none">
           <CardContent className="p-5">
             <div className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
-              Low stock
+              Short supply
             </div>
-            <div className="mt-2 text-3xl font-bold text-gray-900">{low}</div>
+            <div className="mt-2 text-3xl font-bold text-gray-900">{short}</div>
             <div className="mt-1 text-[11px] text-gray-400 font-medium">On this page</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md border-none bg-gray-50/50 shadow-none">
           <CardContent className="p-5">
             <div className="text-[10px] font-medium text-gray-500 uppercase tracking-widest">
-              Out of stock
+              Unavailable
             </div>
-            <div className="mt-2 text-3xl font-bold text-gray-900">{out}</div>
+            <div className="mt-2 text-3xl font-bold text-gray-900">{unavailable}</div>
             <div className="mt-1 text-[11px] text-gray-400 font-medium">On this page</div>
           </CardContent>
         </Card>

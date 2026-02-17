@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { Star, ShoppingCart } from "lucide-react";
 import { getProducts } from "@/lib/api/products";
+import { getSubcategories } from "@/lib/api/categories";
 import { bucketUrl } from "@/lib/bucketUrl";
 import type { Category } from "@/types/category";
 
@@ -14,11 +15,21 @@ interface CategoryProductSectionProps {
 
 export default function CategoryProductSection({ category }: CategoryProductSectionProps) {
   const { data, isLoading } = useQuery({
-    queryKey: ["products", { category: category.category_name, per_page: 8 }],
-    queryFn: () => getProducts({ q: category.category_name, per_page: 8 }),
+    queryKey: ["products", { category: category.category_name, per_page: 30 }],
+    queryFn: () => getProducts({ q: category.category_name, per_page: 30 }),
     staleTime: 60 * 1000,
   });
-  const products = data?.data ?? [];
+  // Filter to only products that actually belong to this category, then take first 8
+  const products = (data?.data ?? [])
+    .filter((p) => p.category_id === category.id)
+    .slice(0, 8);
+
+  const { data: subcategoriesData } = useQuery({
+    queryKey: ["subcategories", category.id],
+    queryFn: () => getSubcategories(category.id, { per_page: 50 }),
+    staleTime: 60 * 1000,
+  });
+  const subcategories = subcategoriesData?.data ?? [];
 
   if (!isLoading && products.length === 0) return null;
 
@@ -26,16 +37,31 @@ export default function CategoryProductSection({ category }: CategoryProductSect
     <section className="w-full bg-white py-12 md:py-16 px-4 md:px-6 lg:px-12">
       <div className="container mx-auto max-w-7xl">
         {/* Section Header */}
-        <div className="flex items-center justify-between mb-8 md:mb-12">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#374151]">
-            {category.category_name}
-          </h2>
-          <Link
-            href={`/category/${category.alias.toLowerCase()}`}
-            className="text-[#01AC28] font-semibold text-sm md:text-base hover:underline flex items-center gap-1"
-          >
-            View All <span className="text-lg">→</span>
-          </Link>
+        <div className="flex flex-col gap-3 mb-8 md:mb-12">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#374151]">
+              {category.category_name}
+            </h2>
+            <Link
+              href={`/category/${category.alias.toLowerCase()}`}
+              className="text-[#01AC28] font-semibold text-sm md:text-base hover:underline flex items-center gap-1"
+            >
+              View All <span className="text-lg">→</span>
+            </Link>
+          </div>
+          {subcategories.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {subcategories.map((sub) => (
+                <Link
+                  key={sub.id}
+                  href={`/category/${category.alias.toLowerCase()}?sub=${sub.id}`}
+                  className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-[#6B7280] hover:bg-[#01AC28] hover:text-white transition-all"
+                >
+                  {sub.subcategory_name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Products Grid */}
@@ -101,7 +127,7 @@ export default function CategoryProductSection({ category }: CategoryProductSect
                     {/* Price */}
                     <div className="flex items-center gap-2 mt-auto">
                       <span className="text-sm md:text-base font-bold text-[#01AC28]">
-                        Rs. {parseFloat(product.retail_price).toFixed(2)}
+                        Rs. {parseFloat(product.retail_price_unit).toFixed(2)}
                       </span>
                     </div>
                   </div>

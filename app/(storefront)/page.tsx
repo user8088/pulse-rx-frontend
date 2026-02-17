@@ -26,13 +26,13 @@ export default async function Home() {
 
   const queryClient = new QueryClient();
   const productsPerCategory = await Promise.all(
-    categories.map((c) => getProducts({ q: c.category_name, per_page: 8 }))
+    categories.map((c) => getProducts({ q: c.category_name, per_page: 30 }))
   );
   productsPerCategory.forEach((paginated, i) => {
     const categoryName = categories[i]?.category_name;
     if (categoryName) {
       queryClient.setQueryData(
-        ["products", { category: categoryName, per_page: 8 }],
+        ["products", { category: categoryName, per_page: 30 }],
         paginated
       );
     }

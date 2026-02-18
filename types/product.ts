@@ -22,10 +22,15 @@ export interface Product {
   category_id: number | null;
   brand: string | null;
   retail_price_unit: string;
-  retail_price_strip: string;
+  retail_price_secondary: string;
   retail_price_box: string;
   pack_qty: number | null;
   strip_qty: number | null;
+  description?: string | null;
+  usage_instructions?: string | null;
+  can_sell_secondary?: boolean;
+  can_sell_box?: boolean;
+  secondary_unit_label?: string;
   availability: "yes" | "no" | "short";
   cold_chain_needed: boolean;
   item_discount: string;

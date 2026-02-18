@@ -42,8 +42,11 @@ export async function createProduct(formData: FormData) {
   const generic_name_raw = String(formData.get("generic_name") ?? "").trim();
   const is_narcotic = toBool(formData.get("is_narcotic"));
   const retail_price_unit = toFloatOrUndefined(formData.get("retail_price_unit"));
-  const retail_price_strip = toFloatOrUndefined(formData.get("retail_price_strip"));
+  const retail_price_secondary = toFloatOrUndefined(formData.get("retail_price_secondary"));
   const retail_price_box = toFloatOrUndefined(formData.get("retail_price_box"));
+  const can_sell_secondary = toBool(formData.get("can_sell_secondary"));
+  const can_sell_box = toBool(formData.get("can_sell_box"));
+  const secondary_unit_label_raw = String(formData.get("secondary_unit_label") ?? "").trim();
   const pack_qty = toIntOrUndefined(formData.get("pack_qty"));
   const strip_qty = toIntOrUndefined(formData.get("strip_qty"));
   const availability_raw = String(formData.get("availability") ?? "").trim().toLowerCase();
@@ -69,8 +72,11 @@ export async function createProduct(formData: FormData) {
   }
   if (typeof is_narcotic === "boolean") body.is_narcotic = is_narcotic;
   if (typeof retail_price_unit === "number") body.retail_price_unit = retail_price_unit;
-  if (typeof retail_price_strip === "number") body.retail_price_strip = retail_price_strip;
+  if (typeof retail_price_secondary === "number") body.retail_price_secondary = retail_price_secondary;
   if (typeof retail_price_box === "number") body.retail_price_box = retail_price_box;
+  if (typeof can_sell_secondary === "boolean") body.can_sell_secondary = can_sell_secondary;
+  if (typeof can_sell_box === "boolean") body.can_sell_box = can_sell_box;
+  if (secondary_unit_label_raw) body.secondary_unit_label = secondary_unit_label_raw;
   if (typeof pack_qty === "number") body.pack_qty = pack_qty;
   if (typeof strip_qty === "number") body.strip_qty = strip_qty;
   if (availability_raw && ["yes", "no", "short"].includes(availability_raw)) {
@@ -117,8 +123,11 @@ export async function updateProduct(formData: FormData) {
   const generic_name_raw = String(formData.get("generic_name") ?? "");
   const is_narcotic = toBool(formData.get("is_narcotic"));
   const retail_price_unit = toFloatOrUndefined(formData.get("retail_price_unit"));
-  const retail_price_strip = toFloatOrUndefined(formData.get("retail_price_strip"));
+  const retail_price_secondary = toFloatOrUndefined(formData.get("retail_price_secondary"));
   const retail_price_box = toFloatOrUndefined(formData.get("retail_price_box"));
+  const can_sell_secondary = toBool(formData.get("can_sell_secondary"));
+  const can_sell_box = toBool(formData.get("can_sell_box"));
+  const secondary_unit_label_raw = String(formData.get("secondary_unit_label") ?? "");
   const pack_qty = toIntOrUndefined(formData.get("pack_qty"));
   const strip_qty = toIntOrUndefined(formData.get("strip_qty"));
   const availability_raw = String(formData.get("availability") ?? "").trim().toLowerCase();
@@ -148,8 +157,11 @@ export async function updateProduct(formData: FormData) {
 
   if (typeof is_narcotic === "boolean") body.is_narcotic = is_narcotic;
   if (typeof retail_price_unit === "number") body.retail_price_unit = retail_price_unit;
-  if (typeof retail_price_strip === "number") body.retail_price_strip = retail_price_strip;
+  if (typeof retail_price_secondary === "number") body.retail_price_secondary = retail_price_secondary;
   if (typeof retail_price_box === "number") body.retail_price_box = retail_price_box;
+  if (typeof can_sell_secondary === "boolean") body.can_sell_secondary = can_sell_secondary;
+  if (typeof can_sell_box === "boolean") body.can_sell_box = can_sell_box;
+  if (secondary_unit_label_raw.trim()) body.secondary_unit_label = secondary_unit_label_raw.trim();
   if (typeof pack_qty === "number") body.pack_qty = pack_qty;
   if (typeof strip_qty === "number") body.strip_qty = strip_qty;
   if (availability_raw && ["yes", "no", "short"].includes(availability_raw)) {

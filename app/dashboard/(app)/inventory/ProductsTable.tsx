@@ -132,7 +132,7 @@ export function ProductsTable({
                 <th className="px-3 py-3 sm:px-5">Item</th>
                 <th className="hidden lg:table-cell px-3 py-3 sm:px-5">Item ID</th>
                 <th className="hidden xl:table-cell px-3 py-3 sm:px-5">Category</th>
-                <th className="hidden md:table-cell px-3 py-3 sm:px-5">Price (Unit)</th>
+                <th className="hidden md:table-cell px-3 py-3 sm:px-5">Price</th>
                 <th className="px-3 py-3 sm:px-5">Availability</th>
                 <th className="px-3 py-3 sm:px-5 text-right">Actions</th>
               </tr>

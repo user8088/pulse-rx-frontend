@@ -17,10 +17,12 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<Product[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<Product | null>(null);
+  const [unitType, setUnitType] = useState<"secondary" | "box">("secondary");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [expandedFaq, setExpandedFaq] = useState<number | null>(1);
+  const [infoTab, setInfoTab] = useState<"description" | "usage" | "ingredients" | "reviews">("description");
   const { addItem } = useCart();
 
   useEffect(() => {
@@ -30,6 +32,11 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
         const productData = await getProduct(productId);
         setProduct(productData);
         setSelectedVariation(productData);
+
+        const canSellSecondary = !!productData.can_sell_secondary;
+        const canSellBox = !!productData.can_sell_box;
+        if (canSellSecondary) setUnitType("secondary");
+        else if (canSellBox) setUnitType("box");
 
         if (productData.product_group_id) {
           const variants = await getProductVariations(productData.product_group_id);
@@ -47,19 +54,39 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
 
   const handleVariationChange = (variant: Product) => {
     setSelectedVariation(variant);
+    const canSellSecondary = !!variant.can_sell_secondary;
+    const canSellBox = !!variant.can_sell_box;
+    if (canSellSecondary) setUnitType("secondary");
+    else if (canSellBox) setUnitType("box");
     // You might want to update the URL here if each variant has its own page
     // window.history.pushState({}, '', `/products/${variant.id}`);
   };
 
   const handleAddToCart = () => {
     if (!selectedVariation) return;
+    const canSellSecondary = !!selectedVariation.can_sell_secondary;
+    const canSellBox = !!selectedVariation.can_sell_box;
+    if (!canSellSecondary && !canSellBox) return;
+
+    const secondaryPrice = Number.parseFloat(
+      (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
+    );
+    const boxPrice = Number.parseFloat(
+      (selectedVariation.retail_price_box as unknown as string) ?? "0"
+    );
+
+    const effectiveType = unitType === "box" && canSellBox ? "box" : "secondary";
+    const priceSource = effectiveType === "box" ? boxPrice : secondaryPrice;
+    const safePrice = Number.isFinite(priceSource) ? priceSource : 0;
+    const secondaryLabel =
+      (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
 
     addItem({
       id: selectedVariation.id,
       name: selectedVariation.item_name,
       variation: selectedVariation.variation_value || "",
-      quantity: "1", // Default quantity string
-      price: parseFloat(selectedVariation.retail_price_unit),
+      quantity: effectiveType === "box" ? "Per Box" : `Per ${secondaryLabel}`,
+      price: safePrice,
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
       requiresPrescription: false // Set based on business logic if needed
@@ -87,6 +114,32 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const images = selectedVariation.images || [];
   const primaryImage = images.find(img => img.is_primary) || images[0];
   const mainImageUrl = primaryImage ? bucketUrl(primaryImage.object_key) : "/assets/home/product-1.png";
+
+  const canSellSecondary = !!selectedVariation.can_sell_secondary;
+  const canSellBox = !!selectedVariation.can_sell_box;
+  const isInStock =
+    selectedVariation.availability === "yes" ||
+    selectedVariation.availability === "short";
+  const descriptionRaw = selectedVariation.description ?? null;
+  const usageRaw = selectedVariation.usage_instructions ?? null;
+  const descriptionText =
+    typeof descriptionRaw === "string" && descriptionRaw.trim().length > 0
+      ? descriptionRaw.trim()
+      : "Not available";
+  const usageText =
+    typeof usageRaw === "string" && usageRaw.trim().length > 0
+      ? usageRaw.trim()
+      : "Not available";
+  const secondaryLabel =
+    (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+  const secondaryPrice = Number.parseFloat(
+    (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
+  );
+  const boxPrice = Number.parseFloat(
+    (selectedVariation.retail_price_box as unknown as string) ?? "0"
+  );
+  const selectedPrice =
+    unitType === "box" && canSellBox ? boxPrice : secondaryPrice;
 
   return (
     <div className="w-full">
@@ -154,6 +207,15 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                       {selectedVariation.item_name}
                     </h1>
                   </div>
+                <div className="mt-2">
+                  <span
+                    className={`text-xs font-semibold ${
+                      isInStock ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    {isInStock ? "In stock" : "Out of stock"}
+                  </span>
+                </div>
                   {/* Subcategory Badges */}
                   {selectedVariation.subcategories && selectedVariation.subcategories.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
@@ -174,7 +236,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                   )}
                 </div>
                 <span className="text-xl md:text-2xl font-bold text-[#374151] pt-2">
-                  Rs. {parseFloat(selectedVariation.retail_price_unit).toFixed(2)}
+                  Rs. {Number.isFinite(selectedPrice) ? selectedPrice.toFixed(2) : "0.00"}
                 </span>
               </div>
 
@@ -207,6 +269,41 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                   </div>
                 </div>
               )}
+
+              {/* Purchase options */}
+              <div className="mb-8">
+                <span className="text-xs font-bold text-[#374151] block uppercase tracking-wider mb-3">
+                  HOW DO YOU WANT TO BUY?
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setUnitType("secondary")}
+                      className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                        unitType === "secondary"
+                          ? "bg-[#374151] text-white border-[#374151]"
+                          : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                      }`}
+                    >
+                      Per {secondaryLabel} · Rs. {secondaryPrice.toFixed(2)}
+                    </button>
+                  )}
+                  {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setUnitType("box")}
+                      className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                        unitType === "box"
+                          ? "bg-[#374151] text-white border-[#374151]"
+                          : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                      }`}
+                    >
+                      Per Box · Rs. {boxPrice.toFixed(2)}
+                    </button>
+                  )}
+                </div>
+              </div>
 
               {/* Quantity Selector */}
               <div className="flex items-center mb-8">
@@ -250,25 +347,68 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
         </div>
       </section>
 
-      {/* FAQs Section Placeholder */}
+      {/* Product info tabs */}
       <section className="py-16 px-4 md:px-6 lg:px-12 border-t border-gray-100">
         <div className="container mx-auto max-w-7xl">
-          <div className="mb-12">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">PRODUCT INFO</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-[#374151]">Details & Usage</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gray-50 rounded-3xl p-8">
-              <h3 className="text-xl font-bold text-[#374151] mb-4">Availability:</h3>
-              <p className={`text-sm font-semibold ${selectedVariation.availability === "yes" ? 'text-green-600' : selectedVariation.availability === "short" ? 'text-amber-600' : 'text-red-600'}`}>
-                {selectedVariation.availability === "yes" ? 'Available' : selectedVariation.availability === "short" ? 'Short Supply' : 'Unavailable'}
-              </p>
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100">
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100 px-6 pt-4">
+              {[
+                { id: "description", label: "Description" },
+                { id: "usage", label: "Usage" },
+                { id: "ingredients", label: "Ingredients" },
+                { id: "reviews", label: "Reviews" },
+              ].map((tab) => {
+                const active = infoTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setInfoTab(tab.id as typeof infoTab)}
+                    className={`relative px-4 pb-3 pt-2 text-sm font-medium transition-colors ${
+                      active
+                        ? "text-[#059669]"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {tab.label}
+                    {active && (
+                      <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#059669] rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
-            <div className="bg-gray-50 rounded-3xl p-8">
-              <h3 className="text-xl font-bold text-[#374151] mb-4">Brand Information:</h3>
-              <p className="text-sm text-gray-500">
-                {selectedVariation.brand || "This product is supplied by one of our trusted manufacturers."}
-              </p>
+
+            {/* Tab content */}
+            <div className="px-6 py-6">
+              {infoTab === "description" && (
+                <p className="text-sm text-gray-600">
+                  {descriptionText !== "Not available"
+                    ? descriptionText
+                    : "No description added yet"}
+                </p>
+              )}
+
+              {infoTab === "usage" && (
+                <p className="text-sm text-gray-600">
+                  {usageText !== "Not available"
+                    ? usageText
+                    : "No usage information added yet"}
+                </p>
+              )}
+
+              {infoTab === "ingredients" && (
+                <p className="text-sm text-gray-600">
+                  No ingredients added yet.
+                </p>
+              )}
+
+              {infoTab === "reviews" && (
+                <p className="text-sm text-gray-600">
+                  No reviews added yet.
+                </p>
+              )}
             </div>
           </div>
         </div>

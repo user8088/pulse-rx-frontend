@@ -26,11 +26,22 @@ export default async function Home() {
 
   const queryClient = new QueryClient();
   const productsPerCategory = await Promise.all(
-    categories.map((c) => getProducts({ q: c.category_name, per_page: 30 }))
+    categories.map(async (c) => {
+      try {
+        return await getProducts({ q: c.category_name, per_page: 30 });
+      } catch (error) {
+        console.error(
+          "Failed to fetch products for category on home page:",
+          c.category_name,
+          error
+        );
+        return null;
+      }
+    })
   );
   productsPerCategory.forEach((paginated, i) => {
     const categoryName = categories[i]?.category_name;
-    if (categoryName) {
+    if (categoryName && paginated) {
       queryClient.setQueryData(
         ["products", { category: categoryName, per_page: 30 }],
         paginated

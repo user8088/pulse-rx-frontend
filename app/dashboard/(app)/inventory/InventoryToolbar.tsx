@@ -72,6 +72,47 @@ function productsToCsv(products: Product[]) {
   return lines.join("\n");
 }
 
+const selectClass =
+  "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-100 focus:border-gray-300 transition-all";
+
+function SectionBadge({ n }: { n: number }) {
+  return (
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">
+      {n}
+    </span>
+  );
+}
+
+function PriceField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string | number | "";
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <div className="relative">
+        <Input
+          name={name}
+          type="number"
+          min={0}
+          step="0.01"
+          className="pr-10"
+          defaultValue={defaultValue}
+          placeholder="0.00"
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
+          Rs.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ImportInner({ onPick }: { onPick: () => void }) {
   const { pending } = useFormStatus();
   return (
@@ -95,6 +136,9 @@ export function InventoryToolbar({
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [createCategoryId, setCreateCategoryId] = useState<string>("");
+  const [canSellSecondary, setCanSellSecondary] = useState(false);
+  const [canSellBox, setCanSellBox] = useState(false);
+  const [secondaryLabel, setSecondaryLabel] = useState("Pack");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hiddenSubmitRef = useRef<HTMLButtonElement | null>(null);
@@ -105,6 +149,14 @@ export function InventoryToolbar({
     const unavailable = products.filter((p) => p.availability === "no").length;
     return { total, short, unavailable };
   }, [products]);
+
+  const resetCreateState = () => {
+    setCreateOpen(false);
+    setCreateCategoryId("");
+    setCanSellSecondary(false);
+    setCanSellBox(false);
+    setSecondaryLabel("Pack");
+  };
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -147,179 +199,174 @@ export function InventoryToolbar({
 
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={resetCreateState}
         title="Create product"
         description="Quickly add a new product to your inventory."
       >
-        <form action={createProductAction} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Item ID
-              </label>
-              <Input name="item_id" placeholder="e.g. 23223232" required />
-            </div>
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Item Name
-              </label>
-              <Input name="item_name" placeholder="e.g. Face Mask" required />
-            </div>
-          </div>
+        <form action={createProductAction} className="space-y-5">
+          <input type="hidden" name="can_sell_secondary" value={canSellSecondary ? "true" : "false"} />
+          <input type="hidden" name="can_sell_box" value={canSellBox ? "true" : "false"} />
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Brand (optional)
-              </label>
-              <Input name="brand" placeholder="e.g. HealthSafe" />
-            </div>
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Generic Name (optional)
-              </label>
-              <Input name="generic_name" placeholder="e.g. Paracetamol" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Category
-              </label>
-              <select
-                name="category_id"
-                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition-all"
-                value={createCategoryId}
-                onChange={(e) => setCreateCategoryId(e.target.value)}
-              >
-                <option value="">— None —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.category_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Availability
-              </label>
-              <select
-                name="availability"
-                className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-200 focus:ring-offset-2 transition-all"
-                defaultValue="yes"
-              >
-                <option value="yes">Available</option>
-                <option value="short">Short supply</option>
-                <option value="no">Unavailable</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-              Subcategories
-            </label>
-            <SubcategorySelect categoryId={createCategoryId || null} />
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                Supplier price (unit, internal)
-              </label>
-              <p className="ml-1 text-[11px] text-gray-500">
-                Used for margin calculations. This is <span className="font-semibold">never</span> shown to customers.
-              </p>
-              <Input name="retail_price_unit" type="number" min={0} step="0.01" placeholder="0.00" />
+          {/* SECTION 1: Basic Information */}
+          <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <SectionBadge n={1} />
+              <span className="text-sm font-bold text-gray-900">Basic Information</span>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                      Secondary selling tier
-                    </div>
-                    <p className="ml-1 mt-0.5 text-[11px] text-gray-500">
-                      Customer-facing label and price (e.g. Strip, Pack, Piece).
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="can_sell_secondary"
-                      value="true"
-                      className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>Sell secondary</span>
-                  </label>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <div className="space-y-1">
-                    <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                      Secondary label
-                    </label>
-                    <Input
-                      name="secondary_unit_label"
-                      placeholder="e.g. Strip, Pack, Piece"
-                      defaultValue="Pack"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                      Price per secondary unit
-                    </label>
-                    <Input
-                      name="retail_price_secondary"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                      Box selling tier
-                    </div>
-                    <p className="ml-1 mt-0.5 text-[11px] text-gray-500">
-                      Full box price offered to customers.
-                    </p>
-                  </div>
-                  <label className="flex items-center gap-1.5 text-[10px] font-medium text-gray-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="can_sell_box"
-                      value="true"
-                      className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
-                    />
-                    <span>Sell box</span>
-                  </label>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Item ID</label>
+                  <Input name="item_id" placeholder="e.g. 23223232" required />
                 </div>
                 <div className="space-y-1">
-                  <label className="ml-1 text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
-                    Price per box
-                  </label>
-                  <Input
-                    name="retail_price_box"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                  />
+                  <label className="text-xs font-medium text-gray-600">Item Name</label>
+                  <Input name="item_name" placeholder="e.g. Face Mask" required />
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Brand (optional)</label>
+                  <Input name="brand" placeholder="e.g. HealthSafe" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Generic Name (optional)</label>
+                  <Input name="generic_name" placeholder="e.g. Paracetamol" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Category</label>
+                  <select
+                    name="category_id"
+                    className={selectClass}
+                    value={createCategoryId}
+                    onChange={(e) => setCreateCategoryId(e.target.value)}
+                  >
+                    <option value="">— None —</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Availability</label>
+                  <select name="availability" defaultValue="yes" className={selectClass}>
+                    <option value="yes">Available</option>
+                    <option value="short">Short supply</option>
+                    <option value="no">Unavailable</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Subcategories</label>
+                <SubcategorySelect categoryId={createCategoryId || null} />
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 2: Pricing Options */}
+          <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <SectionBadge n={2} />
+              <span className="text-sm font-bold text-gray-900">Pricing Options</span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Supplier Price (Unit, Internal)</label>
+                <Input
+                  name="retail_price_unit"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Used for margin calculations only. This is <span className="font-semibold">never</span> shown to
+                  customers.
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-amber-50/80 border border-amber-200/60 px-4 py-3 space-y-2.5">
+                <p className="text-sm font-semibold text-gray-800">How will you sell this?</p>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canSellSecondary}
+                      onChange={(e) => setCanSellSecondary(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell individually (single items)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canSellBox}
+                      onChange={(e) => setCanSellBox(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell in boxes
+                  </label>
+                </div>
+              </div>
+
+              {(canSellSecondary || canSellBox) ? (
+                <div className="space-y-3">
+                  {canSellBox ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">Unit Name</label>
+                          <Input
+                            name="secondary_unit_label"
+                            value={secondaryLabel}
+                            onChange={(e) => setSecondaryLabel(e.target.value)}
+                            placeholder="e.g. Strip, Pack, Piece"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">Units Per Box</label>
+                          <Input
+                            name="pack_qty"
+                            type="number"
+                            min={0}
+                            step={1}
+                            placeholder="e.g. 24"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <PriceField label="Price per Unit" name="retail_price_secondary" defaultValue="" />
+                        <PriceField label="Price Per Box" name="retail_price_box" defaultValue="" />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <PriceField label="Price (single item)" name="retail_price_secondary" defaultValue="" />
+                      <p className="text-[11px] text-gray-400">
+                        Customers will see a single price for this product. Use this when you only sell individual items.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-3">
+                  Select at least one selling option to configure pricing.
+                </p>
+              )}
             </div>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+            <Button type="button" variant="secondary" onClick={resetCreateState}>
               Cancel
             </Button>
             <PendingSubmitButton pendingText="Creating…">Create</PendingSubmitButton>

@@ -285,8 +285,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                           ? "bg-[#374151] text-white border-[#374151]"
                           : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
                       }`}
-                    >
-                      Per {secondaryLabel} · Rs. {secondaryPrice.toFixed(2)}
+                      >
+                      {secondaryLabel} · Rs. {secondaryPrice.toFixed(2)}
                     </button>
                   )}
                   {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (
@@ -298,8 +298,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                           ? "bg-[#374151] text-white border-[#374151]"
                           : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
                       }`}
-                    >
-                      Per Box · Rs. {boxPrice.toFixed(2)}
+                      >
+                      Box · Rs. {boxPrice.toFixed(2)}
                     </button>
                   )}
                 </div>

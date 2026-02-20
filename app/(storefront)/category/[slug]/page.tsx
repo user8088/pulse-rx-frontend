@@ -89,13 +89,21 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       )
     : categoryProducts;
 
-  const mappedProducts = filteredProducts.map((p: BackendProduct) => ({
-    id: p.id,
-    name: p.item_name,
-    price: parseFloat(p.retail_price_unit),
-    rating: 5,
-    image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
-  }));
+  const mappedProducts = filteredProducts.map((p: BackendProduct) => {
+    const canSellBox = !!p.can_sell_box;
+    const boxPrice = Number.parseFloat((p.retail_price_box as unknown as string) ?? "0");
+    const secondaryPrice = Number.parseFloat((p.retail_price_secondary as unknown as string) ?? "0");
+    const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
+    const displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
+
+    return {
+      id: p.id,
+      name: p.item_name,
+      price: displayPrice,
+      rating: 5,
+      image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
+    };
+  });
 
   return (
     <main className="min-h-screen bg-white">

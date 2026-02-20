@@ -331,7 +331,7 @@ export function ProductTableRow({
                             onChange={(e) => setCanSellSecondary(e.target.checked)}
                             className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                           />
-                          Sell individually
+                          Sell individually (single items)
                         </label>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
                           <input
@@ -378,17 +378,11 @@ export function ProductTableRow({
                             </div>
                           </>
                         ) : (
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div className="space-y-1">
-                              <label className="text-xs font-medium text-gray-600">Unit Name</label>
-                              <Input
-                                name="secondary_unit_label"
-                                value={secondaryLabel}
-                                onChange={(e) => setSecondaryLabel(e.target.value)}
-                                placeholder="e.g. Strip, Pack, Piece"
-                              />
-                            </div>
-                            <PriceField label="Price per Unit" name="retail_price_secondary" defaultValue={secondaryPriceDefault} />
+                          <div className="space-y-2">
+                            <PriceField label="Price (single item)" name="retail_price_secondary" defaultValue={secondaryPriceDefault} />
+                            <p className="text-[11px] text-gray-400">
+                              Customers will see a single price for this product. Use this when you only sell individual items.
+                            </p>
                           </div>
                         )}
                       </div>

@@ -12,14 +12,15 @@ interface SubcategorySelectProps {
 
 export function SubcategorySelect({
   categoryId,
-  selectedIds = [],
+  selectedIds,
   name = "subcategory_ids[]",
 }: SubcategorySelectProps) {
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<Set<number>>(new Set(selectedIds));
+  const [selected, setSelected] = useState<Set<number>>(new Set(selectedIds ?? []));
 
   useEffect(() => {
+    if (!selectedIds) return;
     setSelected(new Set(selectedIds));
   }, [selectedIds]);
 

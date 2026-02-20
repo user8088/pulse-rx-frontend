@@ -75,6 +75,11 @@ export default function CategoryProductSection({ category }: CategoryProductSect
             products.map((product) => {
               const primaryImage = product.images?.find(img => img.is_primary) || product.images?.[0];
               const imageUrl = primaryImage ? bucketUrl(primaryImage.object_key) : "/assets/home/product-1.png"; // Fallback image
+              const canSellBox = !!product.can_sell_box;
+              const boxPrice = Number.parseFloat((product.retail_price_box as unknown as string) ?? "0");
+              const secondaryPrice = Number.parseFloat((product.retail_price_secondary as unknown as string) ?? "0");
+              const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
+              const displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
 
               return (
                 <Link
@@ -127,7 +132,7 @@ export default function CategoryProductSection({ category }: CategoryProductSect
                     {/* Price */}
                     <div className="flex items-center gap-2 mt-auto">
                       <span className="text-sm md:text-base font-bold text-[#01AC28]">
-                        Rs. {parseFloat(product.retail_price_unit).toFixed(2)}
+                        Rs. {Number.isFinite(displayPrice) ? displayPrice.toFixed(2) : "0.00"}
                       </span>
                     </div>
                   </div>

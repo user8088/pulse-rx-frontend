@@ -651,23 +651,62 @@ All product endpoints exist in two variants:
 | **is_narcotic** | boolean | Whether the product is a narcotic (default false) |
 | **category_id** | integer \| null | FK to categories |
 | **brand** | string \| null | Manufacturer / brand |
-| **retail_price_unit** | string | Price per unit as decimal string (e.g. `"49.00"`) |
-| **retail_price_strip** | string | Price per strip as decimal string (e.g. `"325.00"`) |
-| **retail_price_box** | string | Price per box as decimal string (e.g. `"1990.04"`) |
-| **pack_qty** | integer \| null | How many units in a box/pack (informational) |
-| **strip_qty** | integer \| null | How many units in a strip (informational) |
+| **retail_price_unit** | string | Supplier/cost reference price as decimal string (e.g. `"49.00"`). Internal only, not customer-facing. |
+| **retail_price_secondary** | string | Price per secondary unit as decimal string (e.g. `"325.00"`). Customer-facing when `can_sell_secondary` is true. |
+| **retail_price_box** | string | Price per box as decimal string (e.g. `"1990.04"`). Customer-facing when `can_sell_box` is true. |
+| **pack_qty** | integer \| null | How many secondary units in a box (informational) |
+| **strip_qty** | integer \| null | How many items in one secondary unit (informational) |
 | **availability** | string | `yes`, `no`, or `short` (default `yes`) |
 | **cold_chain_needed** | boolean | Whether cold storage is required (default false) |
 | **item_discount** | string | Discount amount as decimal string (e.g. `"5.00"`, default `"0.00"`) |
+| **can_sell_secondary** | boolean | Whether the product can be sold per secondary unit (default false) |
+| **can_sell_box** | boolean | Whether the product can be sold per box (default false) |
+| **secondary_unit_label** | string | Admin-defined label for the secondary tier (e.g. `"Pack"`, `"Strip"`, `"Sachet"`; default `"Pack"`) |
+| **box_unit_label** | string | Admin-defined label for the top/box tier (e.g. `"Box"`, `"Pack"`, `"Carton"`; default `"Box"`) |
+| **base_unit_label** | string \| null | Label for the base unit (e.g. `"Tablet"`, `"Capsule"`, `"Bottle"`). Defaults to `"Unit"` in display when null. |
 | **created_at** | string | ISO 8601 |
 | **updated_at** | string | ISO 8601 |
 | **category** | object \| null | Eager-loaded when included |
 | **subcategories** | array | Eager-loaded when included (list, show, create, update) |
 | **images** | array | Eager-loaded when included (list, show) |
+| **packaging_display** | object | Computed. Contains `base_unit` (string) and `options` (array of sellable tiers for the "Select Pack Size" UI). See below. |
 
-**Removed fields** (no longer present): `stock_qty`, `low_stock_threshold`, `in_stock`, `retail_price`.
+**Removed fields** (no longer present): `stock_qty`, `low_stock_threshold`, `in_stock`, `retail_price`, `retail_price_strip`, `can_sell_unit`, `can_sell_strip`.
 
 **Variations:** Use `product_group_id` to group variants (e.g. Sevla 400mg / 800mg). Filter with `?product_group_id=SEVLA` to fetch all variants. Each variant has its own `item_id`, prices, and images.
+
+#### packaging_display (computed, appended)
+
+Every product response includes a computed `packaging_display` object. It contains only the **sellable** tiers so the frontend can render a "Select Pack Size" UI directly.
+
+```json
+{
+  "packaging_display": {
+    "base_unit": "Tablet",
+    "options": [
+      {
+        "tier": "box",
+        "label": "Pack",
+        "description": "1 Pack = 10 Strips",
+        "price": "135.00"
+      },
+      {
+        "tier": "secondary",
+        "label": "Strip",
+        "description": "1 Strip = 10 Tablets",
+        "price": "13.50"
+      }
+    ]
+  }
+}
+```
+
+- `base_unit`: human label for the smallest unit (from `base_unit_label`, defaults to `"Unit"`).
+- `options[]`: only tiers where the corresponding `can_sell_*` flag is `true`.
+  - `tier`: `"box"` or `"secondary"` (used as identifier for cart/order).
+  - `label`: display name of the tier (from `box_unit_label` or `secondary_unit_label`).
+  - `description`: formatted string like `"1 Pack = 10 Strips"`. Uses `pack_qty`/`strip_qty`. If qty is null, shows just `"1 Pack"`.
+  - `price`: retail price as decimal string.
 
 ---
 
@@ -720,15 +759,24 @@ Response shape (paginator):
       "category_id": 5,
       "brand": "CRYSTOLITE PHARMACEUTICALS",
       "retail_price_unit": "220.00",
-      "retail_price_strip": "0.00",
+      "retail_price_secondary": "0.00",
       "retail_price_box": "0.00",
       "pack_qty": null,
       "strip_qty": null,
       "availability": "yes",
       "cold_chain_needed": false,
       "item_discount": "0.00",
+      "can_sell_secondary": false,
+      "can_sell_box": false,
+      "secondary_unit_label": "Pack",
+      "box_unit_label": "Box",
+      "base_unit_label": null,
       "created_at": "2026-01-19T12:00:00.000000Z",
       "updated_at": "2026-01-19T12:00:00.000000Z",
+      "packaging_display": {
+        "base_unit": "Unit",
+        "options": []
+      },
       "category": {
         "id": 5,
         "category_name": "Consumer",
@@ -792,14 +840,19 @@ Validation rules:
 - **variation_value**: optional, string, max 128
 - **category_id**: nullable, must exist in `categories.id` if provided
 - **brand**: nullable, string, max 255
-- **retail_price_unit**: optional, numeric, min 0 (defaults to 0 if omitted)
-- **retail_price_strip**: optional, numeric, min 0 (defaults to 0 if omitted)
-- **retail_price_box**: optional, numeric, min 0 (defaults to 0 if omitted)
+- **retail_price_unit**: optional, numeric, min 0 (internal/supplier price, defaults to 0 if omitted)
+- **retail_price_secondary**: optional, numeric, min 0 (must be > 0 when `can_sell_secondary` is true; defaults to 0)
+- **retail_price_box**: optional, numeric, min 0 (must be > 0 when `can_sell_box` is true; defaults to 0)
 - **pack_qty**: nullable, integer, min 0
 - **strip_qty**: nullable, integer, min 0
 - **availability**: optional, string, one of `yes`, `no`, `short` (defaults to `yes`)
 - **cold_chain_needed**: optional, boolean (defaults to false)
 - **item_discount**: optional, numeric, min 0 (defaults to 0)
+- **can_sell_secondary**: optional, boolean (defaults to false)
+- **can_sell_box**: optional, boolean (defaults to false)
+- **secondary_unit_label**: optional, string, max 50 (defaults to `"Pack"`)
+- **box_unit_label**: optional, string, max 50 (defaults to `"Box"`)
+- **base_unit_label**: nullable, string, max 50 (e.g. `"Tablet"`, `"Capsule"`)
 - **subcategory_ids**: optional, array of subcategory IDs (each must exist in `subcategories.id`)
 
 Example:
@@ -813,8 +866,11 @@ Example:
   "category_id": 1,
   "brand": "A- Crystolite",
   "retail_price_unit": 650.00,
-  "retail_price_strip": 0,
-  "retail_price_box": 0,
+  "retail_price_secondary": 50.00,
+  "retail_price_box": 550.00,
+  "can_sell_secondary": true,
+  "can_sell_box": true,
+  "secondary_unit_label": "Strip",
   "availability": "yes",
   "cold_chain_needed": false,
   "item_discount": 5,
@@ -865,14 +921,19 @@ Validation rules:
 - **variation_value**: optional, nullable, string, max 128
 - **category_id**: optional; if provided may be null; if non-null must exist in `categories.id`
 - **brand**: optional; may be null; if non-null must be string, max 255
-- **retail_price_unit**: optional, numeric, min 0
-- **retail_price_strip**: optional, numeric, min 0
-- **retail_price_box**: optional, numeric, min 0
+- **retail_price_unit**: optional, numeric, min 0 (internal/supplier price)
+- **retail_price_secondary**: optional, numeric, min 0 (must be > 0 when `can_sell_secondary` is true)
+- **retail_price_box**: optional, numeric, min 0 (must be > 0 when `can_sell_box` is true)
 - **pack_qty**: nullable, integer, min 0
 - **strip_qty**: nullable, integer, min 0
 - **availability**: optional, string, one of `yes`, `no`, `short`
 - **cold_chain_needed**: optional, boolean
 - **item_discount**: optional, numeric, min 0
+- **can_sell_secondary**: optional, boolean
+- **can_sell_box**: optional, boolean
+- **secondary_unit_label**: optional, string, max 50
+- **box_unit_label**: optional, string, max 50
+- **base_unit_label**: nullable, string, max 50
 - **subcategory_ids**: optional, array of subcategory IDs (replaces current subcategories via sync)
 
 Example:
@@ -1054,7 +1115,7 @@ curl -X POST "http://localhost:8000/api/products/import" \
 | **Sub Category II** | subcategory 2 lookup (creates under category) | No |
 | **Manufacturer** | `brand` | No |
 | **Retail Price (Unit)** | `retail_price_unit` | No |
-| **Retail Price (Strip)** | `retail_price_strip` | No |
+| **Retail Price (Strip)** | `retail_price_secondary` | No |
 | **Retail Price (Box)** | `retail_price_box` | No |
 | **Pack Qty.** | `pack_qty` (cast to int) | No |
 | **Strip Qty.** | `strip_qty` (cast to int) | No |
@@ -1064,6 +1125,8 @@ curl -X POST "http://localhost:8000/api/products/import" \
 | **Product Group Id** | `product_group_id` (legacy/future) | No |
 | **Variation Type** | `variation_type` (legacy/future) | No |
 | **Variation Value** | `variation_value` (legacy/future) | No |
+| **Box Unit Label** | `box_unit_label` (e.g. "Pack", "Box") | No |
+| **Base Unit Label** | `base_unit_label` (e.g. "Tablet", "Capsule") | No |
 
 ### Category handling
 
@@ -1112,7 +1175,7 @@ curl -X POST "http://localhost:8000/api/products/import" \
         "sub_category_2": null,
         "brand": "HealthSafe",
         "retail_price_unit": "100",
-        "retail_price_strip": null,
+        "retail_price_secondary": null,
         "retail_price_box": null,
         "pack_qty": null,
         "strip_qty": null,

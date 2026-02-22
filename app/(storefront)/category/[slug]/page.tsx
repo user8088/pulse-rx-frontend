@@ -89,11 +89,24 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     : categoryProducts;
 
   const mappedProducts = filteredProducts.map((p: BackendProduct) => {
-    const canSellBox = !!p.can_sell_box;
-    const boxPrice = Number.parseFloat((p.retail_price_box as unknown as string) ?? "0");
-    const secondaryPrice = Number.parseFloat((p.retail_price_secondary as unknown as string) ?? "0");
-    const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
-    const displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
+    const opts = p.packaging_display?.options ?? [];
+    const usePackagingDisplay = opts.length > 0;
+
+    let displayPrice: number;
+    let quantityLabel: string;
+
+    if (usePackagingDisplay) {
+      const first = opts[0];
+      displayPrice = Number.parseFloat(first?.price ?? "0") || 0;
+      quantityLabel = first?.label ? `1 ${first.label}` : "1 Unit";
+    } else {
+      const canSellBox = !!p.can_sell_box;
+      const boxPrice = Number.parseFloat((p.retail_price_box as unknown as string) ?? "0");
+      const secondaryPrice = Number.parseFloat((p.retail_price_secondary as unknown as string) ?? "0");
+      const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
+      displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
+      quantityLabel = p.secondary_unit_label ? `1 ${p.secondary_unit_label}` : "1 Unit";
+    }
 
     const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
     const originalPrice = discount > 0 ? displayPrice + discount : undefined;
@@ -110,7 +123,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       discountPercent,
       image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
       variation: p.variation_value ?? p.secondary_unit_label ?? "",
-      quantity: p.secondary_unit_label ? `1 ${p.secondary_unit_label}` : "1 Unit",
+      quantity: quantityLabel,
     };
   });
 

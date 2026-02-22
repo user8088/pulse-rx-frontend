@@ -31,6 +31,17 @@ export interface Product {
   can_sell_secondary?: boolean;
   can_sell_box?: boolean;
   secondary_unit_label?: string;
+  box_unit_label?: string;
+  base_unit_label?: string | null;
+  packaging_display?: {
+    base_unit: string;
+    options: Array<{
+      tier: "box" | "secondary";
+      label: string;
+      description: string;
+      price: string;
+    }>;
+  };
   availability: "yes" | "no" | "short";
   cold_chain_needed: boolean;
   item_discount: string;

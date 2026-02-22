@@ -51,14 +51,50 @@ These help the customer understand what they are buying but are not used for pri
 These flags are the **source of truth** for which purchasing options are
 available to the customer.
 
-### 2.4 Secondary unit label
+### 2.4 Tier labels
 
 | Column | Type | Default | Description |
 |--------|------|---------|-------------|
-| `secondary_unit_label` | `string(50)` | `"Pack"` | Admin-defined label for the secondary tier |
+| `secondary_unit_label` | `string(50)` | `"Pack"` | Admin-defined label for the secondary/middle tier |
+| `box_unit_label` | `string(50)` | `"Box"` | Admin-defined label for the top tier (pharmacy may use `"Pack"`) |
+| `base_unit_label` | `string(50)` | `null` | Label for the smallest unit (e.g. `"Tablet"`, `"Capsule"`). Displayed as `"Unit"` when null. |
 
-This is set per product. The frontend reads it to label the option button
-(e.g. "Per Strip", "Per Pack", "Per Sachet").
+These are set per product. The frontend reads them to build the
+Healthwire-style "Select Pack Size" UI (e.g. "1 Pack = 10 Strips",
+"1 Strip = 10 Tablets").
+
+### 2.5 Computed: `packaging_display`
+
+Every product API response includes a computed `packaging_display` attribute
+(via Eloquent `$appends`). It contains **only the sellable tiers** so the
+frontend can render the "Select Pack Size" control by iterating over
+`packaging_display.options`.
+
+```jsonc
+{
+  "packaging_display": {
+    "base_unit": "Tablet",          // from base_unit_label (or "Unit" if null)
+    "options": [
+      {
+        "tier": "box",              // identifier for cart/order
+        "label": "Pack",            // from box_unit_label
+        "description": "1 Pack = 10 Strips",  // auto-formatted from pack_qty + labels
+        "price": "135.00"           // from retail_price_box
+      },
+      {
+        "tier": "secondary",
+        "label": "Strip",           // from secondary_unit_label
+        "description": "1 Strip = 10 Tablets", // auto-formatted from strip_qty + labels
+        "price": "13.50"            // from retail_price_secondary
+      }
+    ]
+  }
+}
+```
+
+- `options` array is **empty** if neither `can_sell_secondary` nor `can_sell_box` is true.
+- If `pack_qty` or `strip_qty` is null, the description shows just the label
+  (e.g. `"1 Strip"` instead of `"1 Strip = 10 Tablets"`).
 
 ---
 
@@ -68,12 +104,12 @@ This is set per product. The frontend reads it to label the option button
 
 A product can be sold in one or both tiers:
 
-| Product | `can_sell_secondary` | `can_sell_box` | `secondary_unit_label` | Notes |
-|---------|:-:|:-:|--------|-------|
-| Lays Classic | true | true | Pack | Customer picks 1 pack or full box |
-| Paracetamol 500mg | true | true | Strip | Customer picks 1 strip or full box |
-| Cough Syrup 100ml | true | false | Bottle | Sold per bottle only |
-| Surgical Masks (50ct) | false | true | -- | Sold per box only |
+| Product | `can_sell_secondary` | `can_sell_box` | `secondary_unit_label` | `box_unit_label` | `base_unit_label` | Notes |
+|---------|:-:|:-:|--------|--------|--------|-------|
+| Arinac Forte 100 Tabs | true | true | Strip | Pack | Tablet | 1 Pack = 10 Strips, 1 Strip = 10 Tablets |
+| Lays Classic | true | true | Pack | Box | Pack | Customer picks 1 pack or full box |
+| Cough Syrup 100ml | true | false | Bottle | Box | *null* | Sold per bottle only |
+| Surgical Masks (50ct) | false | true | -- | Box | *null* | Sold per box only |
 
 ### 3.2 Unit price is internal
 
@@ -140,7 +176,9 @@ No new routes were added.
   "retail_price_box": 550.00,           // required > 0 when can_sell_box is true
   "can_sell_secondary": true,           // optional, boolean (default false)
   "can_sell_box": true,                 // optional, boolean (default false)
-  "secondary_unit_label": "Strip"       // optional, string (default "Pack")
+  "secondary_unit_label": "Strip",      // optional, string (default "Pack")
+  "box_unit_label": "Pack",             // optional, string (default "Box")
+  "base_unit_label": "Tablet"           // nullable, string (e.g. "Tablet", "Capsule")
 }
 ```
 
@@ -152,6 +190,8 @@ validating. Examples:
 - `{"can_sell_secondary": true, "retail_price_secondary": 200}` -- enable secondary selling
 - `{"can_sell_box": false}` -- disable box selling (price kept as-is)
 - `{"secondary_unit_label": "Sachet"}` -- rename the secondary tier
+- `{"box_unit_label": "Pack"}` -- rename the top tier (pharmacy convention)
+- `{"base_unit_label": "Tablet"}` -- set base unit label for packaging display
 - `{"retail_price_secondary": 0}` while `can_sell_secondary` is `true` -- **rejected 422**
 
 ### 4.4 Validation error example (422)
@@ -182,6 +222,25 @@ validating. Examples:
   "can_sell_secondary": true,
   "can_sell_box": true,
   "secondary_unit_label": "Strip",
+  "box_unit_label": "Pack",
+  "base_unit_label": "Tablet",
+  "packaging_display": {
+    "base_unit": "Tablet",
+    "options": [
+      {
+        "tier": "box",
+        "label": "Pack",
+        "description": "1 Pack = 20 Strips",
+        "price": "550.00"
+      },
+      {
+        "tier": "secondary",
+        "label": "Strip",
+        "description": "1 Strip = 10 Tablets",
+        "price": "50.00"
+      }
+    ]
+  },
   // ...rest of product fields...
 }
 ```
@@ -190,30 +249,45 @@ validating. Examples:
 
 ## 5. Frontend integration guide
 
-### 5.1 Customer-facing product page
+### 5.1 Customer-facing product page (Healthwire-style)
 
-Read the two boolean flags and only render options where the flag is `true`:
+Use the computed `packaging_display` attribute directly. It contains only
+the sellable tiers, so the frontend logic is minimal:
 
 ```
-if product.can_sell_secondary:
-    show option labeled product.secondary_unit_label with retail_price_secondary
-if product.can_sell_box:
-    show option labeled "Box" with retail_price_box
+for option in product.packaging_display.options:
+    show radio: option.description   option.price
 ```
 
 Use a radio group or segmented control so the customer selects exactly
-one option per line item.
+one option per line item. When the customer selects an option, store
+`option.tier` and `option.price` for the cart payload.
+
+Example rendered UI (Healthwire-style):
+
+```
+Select Pack Size
+○ 1 PACK = 10 STRIPS     Rs. 550.00
+● 1 STRIP = 10 TABLETS   Rs. 50.00
+[Add To Cart]
+```
 
 ### 5.2 Dashboard / admin UI
 
 Provide:
 - A text input for `secondary_unit_label` (e.g. "Pack", "Strip", "Piece")
+- A text input for `box_unit_label` (e.g. "Box", "Pack", "Carton")
+- A text input for `base_unit_label` (e.g. "Tablet", "Capsule", "Bottle")
 - Toggle switches for `can_sell_secondary` and `can_sell_box`
 - Price inputs for `retail_price_secondary` and `retail_price_box`
+- Number inputs for `pack_qty` and `strip_qty`
 - A separate read-only or editable field for `retail_price_unit` (supplier price)
 
 Grey out the price field when its flag is off. If the admin submits with
 a flag on but price empty/zero, the backend returns 422 with a clear error.
+
+`packaging_display` is computed automatically from these fields -- no admin
+input needed for it.
 
 ### 5.3 Cart / order integration (future)
 

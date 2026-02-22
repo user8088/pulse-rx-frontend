@@ -60,13 +60,15 @@ function PriceField({
   label,
   name,
   defaultValue,
+  disabled,
 }: {
   label: string;
   name: string;
   defaultValue: string | number | "";
+  disabled?: boolean;
 }) {
   return (
-    <div className="space-y-1">
+    <div className={cn("space-y-1", disabled && "opacity-60 pointer-events-none")}>
       <label className="text-xs font-medium text-gray-600">{label}</label>
       <div className="relative">
         <Input
@@ -77,6 +79,7 @@ function PriceField({
           className="pr-10"
           defaultValue={defaultValue}
           placeholder="0.00"
+          disabled={disabled}
         />
         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
           Rs.
@@ -100,6 +103,8 @@ export function ProductTableRow({
   const [canSellSecondary, setCanSellSecondary] = useState(!!product.can_sell_secondary);
   const [canSellBox, setCanSellBox] = useState(!!product.can_sell_box);
   const [secondaryLabel, setSecondaryLabel] = useState(product.secondary_unit_label ?? "Pack");
+  const [boxUnitLabel, setBoxUnitLabel] = useState(product.box_unit_label ?? "Box");
+  const [baseUnitLabel, setBaseUnitLabel] = useState(product.base_unit_label ?? "");
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const categoryName = product.category?.category_name ?? "";
@@ -247,6 +252,9 @@ export function ProductTableRow({
                   <input type="hidden" name="id" value={product.id} />
                   <input type="hidden" name="can_sell_secondary" value={canSellSecondary ? "true" : "false"} />
                   <input type="hidden" name="can_sell_box" value={canSellBox ? "true" : "false"} />
+                  <input type="hidden" name="secondary_unit_label" value={secondaryLabel} />
+                  <input type="hidden" name="box_unit_label" value={boxUnitLabel} />
+                  <input type="hidden" name="base_unit_label" value={baseUnitLabel} />
 
                   {/* ── SECTION 1 : Basic Information ── */}
                   <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
@@ -347,21 +355,45 @@ export function ProductTableRow({
 
                     {/* Dynamic pricing fields */}
                     {(canSellSecondary || canSellBox) ? (
-                      <div className="space-y-3">
-                        {canSellBox ? (
-                          <>
+                      <div className="space-y-4">
+                        {/* Secondary tier */}
+                        {canSellSecondary && (
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-gray-600">Secondary tier label</label>
+                              <Input
+                                value={secondaryLabel}
+                                onChange={(e) => setSecondaryLabel(e.target.value)}
+                                placeholder="e.g. Strip, Pack, Piece, Sachet"
+                              />
+                            </div>
+                            <PriceField
+                              label="Price per secondary unit"
+                              name="retail_price_secondary"
+                              defaultValue={secondaryPriceDefault}
+                            />
+                          </div>
+                        )}
+
+                        {/* Box tier */}
+                        {canSellBox && (
+                          <div className="space-y-3">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-gray-600">Box tier label</label>
+                              <Input
+                                value={boxUnitLabel}
+                                onChange={(e) => setBoxUnitLabel(e.target.value)}
+                                placeholder="e.g. Box, Pack, Carton"
+                              />
+                            </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <PriceField
+                                label="Price per box"
+                                name="retail_price_box"
+                                defaultValue={boxPriceDefault}
+                              />
                               <div className="space-y-1">
-                                <label className="text-xs font-medium text-gray-600">Unit Name</label>
-                                <Input
-                                  name="secondary_unit_label"
-                                  value={secondaryLabel}
-                                  onChange={(e) => setSecondaryLabel(e.target.value)}
-                                  placeholder="e.g. Strip, Pack, Piece"
-                                />
-                              </div>
-                              <div className="space-y-1">
-                                <label className="text-xs font-medium text-gray-600">Units Per Box</label>
+                                <label className="text-xs font-medium text-gray-600">Units per box (pack_qty)</label>
                                 <Input
                                   name="pack_qty"
                                   type="number"
@@ -372,19 +404,18 @@ export function ProductTableRow({
                                 />
                               </div>
                             </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                              <PriceField label="Price per Unit" name="retail_price_secondary" defaultValue={secondaryPriceDefault} />
-                              <PriceField label="Price Per Box" name="retail_price_box" defaultValue={boxPriceDefault} />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="space-y-2">
-                            <PriceField label="Price (single item)" name="retail_price_secondary" defaultValue={secondaryPriceDefault} />
-                            <p className="text-[11px] text-gray-400">
-                              Customers will see a single price for this product. Use this when you only sell individual items.
-                            </p>
                           </div>
                         )}
+
+                        {/* Base unit (optional) */}
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">Base unit label (optional)</label>
+                          <Input
+                            value={baseUnitLabel}
+                            onChange={(e) => setBaseUnitLabel(e.target.value)}
+                            placeholder="e.g. Tablet, Capsule, Bottle"
+                          />
+                        </div>
                       </div>
                     ) : (
                       <p className="text-sm text-gray-400 text-center py-3">

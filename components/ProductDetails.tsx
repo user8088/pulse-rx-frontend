@@ -18,6 +18,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const [variations, setVariations] = useState<Product[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<Product | null>(null);
   const [unitType, setUnitType] = useState<"secondary" | "box">("secondary");
+  const [selectedPackOptionIndex, setSelectedPackOptionIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -33,10 +34,15 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
         setProduct(productData);
         setSelectedVariation(productData);
 
-        const canSellSecondary = !!productData.can_sell_secondary;
-        const canSellBox = !!productData.can_sell_box;
-        if (canSellSecondary) setUnitType("secondary");
-        else if (canSellBox) setUnitType("box");
+        const opts = productData.packaging_display?.options ?? [];
+        if (opts.length > 0) {
+          setSelectedPackOptionIndex(0);
+        } else {
+          const canSellSecondary = !!productData.can_sell_secondary;
+          const canSellBox = !!productData.can_sell_box;
+          if (canSellSecondary) setUnitType("secondary");
+          else if (canSellBox) setUnitType("box");
+        }
 
         if (productData.product_group_id) {
           const variants = await getProductVariations(productData.product_group_id);
@@ -54,42 +60,56 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
 
   const handleVariationChange = (variant: Product) => {
     setSelectedVariation(variant);
-    const canSellSecondary = !!variant.can_sell_secondary;
-    const canSellBox = !!variant.can_sell_box;
-    if (canSellSecondary) setUnitType("secondary");
-    else if (canSellBox) setUnitType("box");
-    // You might want to update the URL here if each variant has its own page
-    // window.history.pushState({}, '', `/products/${variant.id}`);
+    const opts = variant.packaging_display?.options ?? [];
+    if (opts.length > 0) {
+      setSelectedPackOptionIndex(0);
+    } else {
+      const canSellSecondary = !!variant.can_sell_secondary;
+      const canSellBox = !!variant.can_sell_box;
+      if (canSellSecondary) setUnitType("secondary");
+      else if (canSellBox) setUnitType("box");
+    }
   };
 
   const handleAddToCart = () => {
     if (!selectedVariation) return;
+    const opts = selectedVariation.packaging_display?.options ?? [];
     const canSellSecondary = !!selectedVariation.can_sell_secondary;
     const canSellBox = !!selectedVariation.can_sell_box;
-    if (!canSellSecondary && !canSellBox) return;
 
-    const secondaryPrice = Number.parseFloat(
-      (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
-    );
-    const boxPrice = Number.parseFloat(
-      (selectedVariation.retail_price_box as unknown as string) ?? "0"
-    );
+    let safePrice: number;
+    let quantityLabel: string;
 
-    const effectiveType = unitType === "box" && canSellBox ? "box" : "secondary";
-    const priceSource = effectiveType === "box" ? boxPrice : secondaryPrice;
-    const safePrice = Number.isFinite(priceSource) ? priceSource : 0;
-    const secondaryLabel =
-      (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+    if (opts.length > 0) {
+      const opt = opts[selectedPackOptionIndex];
+      if (!opt) return;
+      safePrice = Number.parseFloat(opt.price) || 0;
+      quantityLabel = `1 ${opt.label}`;
+    } else {
+      if (!canSellSecondary && !canSellBox) return;
+      const secondaryPrice = Number.parseFloat(
+        (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
+      );
+      const boxPrice = Number.parseFloat(
+        (selectedVariation.retail_price_box as unknown as string) ?? "0"
+      );
+      const effectiveType = unitType === "box" && canSellBox ? "box" : "secondary";
+      const priceSource = effectiveType === "box" ? boxPrice : secondaryPrice;
+      safePrice = Number.isFinite(priceSource) ? priceSource : 0;
+      const secondaryLabel =
+        (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+      quantityLabel = effectiveType === "box" ? "Per Box" : `Per ${secondaryLabel}`;
+    }
 
     addItem({
       id: selectedVariation.id,
       name: selectedVariation.item_name,
       variation: selectedVariation.variation_value || "",
-      quantity: effectiveType === "box" ? "Per Box" : `Per ${secondaryLabel}`,
+      quantity: quantityLabel,
       price: safePrice,
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
-      requiresPrescription: false // Set based on business logic if needed
+      requiresPrescription: false
     });
   };
 
@@ -130,6 +150,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
     typeof usageRaw === "string" && usageRaw.trim().length > 0
       ? usageRaw.trim()
       : "Not available";
+  const packOptions = selectedVariation.packaging_display?.options ?? [];
+  const usePackagingDisplay = packOptions.length > 0;
   const secondaryLabel =
     (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
   const secondaryPrice = Number.parseFloat(
@@ -138,8 +160,9 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const boxPrice = Number.parseFloat(
     (selectedVariation.retail_price_box as unknown as string) ?? "0"
   );
-  const selectedPrice =
-    unitType === "box" && canSellBox ? boxPrice : secondaryPrice;
+  const selectedPrice = usePackagingDisplay
+    ? Number.parseFloat(packOptions[selectedPackOptionIndex]?.price ?? "0") || 0
+    : (unitType === "box" && canSellBox ? boxPrice : secondaryPrice);
 
   return (
     <div className="w-full">
@@ -270,40 +293,61 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                 </div>
               )}
 
-              {/* Purchase options */}
-              <div className="mb-8">
-                <span className="text-xs font-bold text-[#374151] block uppercase tracking-wider mb-3">
-                  HOW DO YOU WANT TO BUY?
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setUnitType("secondary")}
-                      className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
-                        unitType === "secondary"
-                          ? "bg-[#374151] text-white border-[#374151]"
-                          : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
-                      }`}
-                      >
-                      {secondaryLabel} · Rs. {secondaryPrice.toFixed(2)}
-                    </button>
-                  )}
-                  {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setUnitType("box")}
-                      className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
-                        unitType === "box"
-                          ? "bg-[#374151] text-white border-[#374151]"
-                          : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
-                      }`}
-                      >
-                      Box · Rs. {boxPrice.toFixed(2)}
-                    </button>
-                  )}
+              {/* Purchase options - packaging_display or fallback */}
+              {(usePackagingDisplay || canSellSecondary || canSellBox) && (
+                <div className="mb-8">
+                  <span className="text-xs font-bold text-[#374151] block uppercase tracking-wider mb-3">
+                    {usePackagingDisplay ? "Select Pack Size" : "HOW DO YOU WANT TO BUY?"}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {usePackagingDisplay ? (
+                      packOptions.map((opt, idx) => (
+                        <button
+                          key={opt.tier}
+                          type="button"
+                          onClick={() => setSelectedPackOptionIndex(idx)}
+                          className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                            selectedPackOptionIndex === idx
+                              ? "bg-[#374151] text-white border-[#374151]"
+                              : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                          }`}
+                        >
+                          {opt.description} · Rs. {opt.price}
+                        </button>
+                      ))
+                    ) : (
+                      <>
+                        {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setUnitType("secondary")}
+                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                              unitType === "secondary"
+                                ? "bg-[#374151] text-white border-[#374151]"
+                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                            }`}
+                          >
+                            {secondaryLabel} · Rs. {secondaryPrice.toFixed(2)}
+                          </button>
+                        )}
+                        {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setUnitType("box")}
+                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                              unitType === "box"
+                                ? "bg-[#374151] text-white border-[#374151]"
+                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                            }`}
+                          >
+                            Box · Rs. {boxPrice.toFixed(2)}
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Quantity Selector */}
               <div className="flex items-center mb-8">

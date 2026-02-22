@@ -14,11 +14,24 @@ function mapProductToCard(product: Product) {
   const primaryImage = product.images?.find(img => img.is_primary) || product.images?.[0];
   const imageUrl = primaryImage ? bucketUrl(primaryImage.object_key) : "/assets/home/product-1.png";
 
-  const canSellBox = !!product.can_sell_box;
-  const boxPrice = Number.parseFloat(product.retail_price_box ?? "0");
-  const secondaryPrice = Number.parseFloat(product.retail_price_secondary ?? "0");
-  const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
-  const displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
+  const opts = product.packaging_display?.options ?? [];
+  const usePackagingDisplay = opts.length > 0;
+
+  let displayPrice: number;
+  let quantityLabel: string;
+
+  if (usePackagingDisplay) {
+    const first = opts[0];
+    displayPrice = Number.parseFloat(first?.price ?? "0") || 0;
+    quantityLabel = first?.label ? `1 ${first.label}` : "1 Unit";
+  } else {
+    const canSellBox = !!product.can_sell_box;
+    const boxPrice = Number.parseFloat(product.retail_price_box ?? "0");
+    const secondaryPrice = Number.parseFloat(product.retail_price_secondary ?? "0");
+    const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
+    displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
+    quantityLabel = product.secondary_unit_label ? `1 ${product.secondary_unit_label}` : "1 Unit";
+  }
 
   const discount = Number.parseFloat(product.item_discount ?? "0");
   const originalPrice = discount > 0 ? displayPrice + discount : undefined;
@@ -35,9 +48,7 @@ function mapProductToCard(product: Product) {
     discountPercent,
     image: imageUrl,
     variation: product.variation_value ?? product.secondary_unit_label ?? "",
-    quantity: product.secondary_unit_label
-      ? `1 ${product.secondary_unit_label}`
-      : "1 Unit",
+    quantity: quantityLabel,
     href: `/products/${product.id}`,
   };
 }

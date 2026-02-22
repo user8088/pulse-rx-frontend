@@ -41,6 +41,8 @@ function productsToCsv(products: Product[]) {
     "can_sell_secondary",
     "can_sell_box",
     "secondary_unit_label",
+    "box_unit_label",
+    "base_unit_label",
     "availability",
     "cold_chain_needed",
     "item_discount",
@@ -61,6 +63,8 @@ function productsToCsv(products: Product[]) {
         typeof p.can_sell_secondary === "boolean" ? (p.can_sell_secondary ? "true" : "false") : "",
         typeof p.can_sell_box === "boolean" ? (p.can_sell_box ? "true" : "false") : "",
         p.secondary_unit_label ?? "",
+        p.box_unit_label ?? "",
+        p.base_unit_label ?? "",
         p.availability,
         p.cold_chain_needed ? "YES" : "NO",
         p.item_discount,
@@ -139,6 +143,8 @@ export function InventoryToolbar({
   const [canSellSecondary, setCanSellSecondary] = useState(false);
   const [canSellBox, setCanSellBox] = useState(false);
   const [secondaryLabel, setSecondaryLabel] = useState("Pack");
+  const [boxUnitLabel, setBoxUnitLabel] = useState("Box");
+  const [baseUnitLabel, setBaseUnitLabel] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hiddenSubmitRef = useRef<HTMLButtonElement | null>(null);
@@ -156,6 +162,8 @@ export function InventoryToolbar({
     setCanSellSecondary(false);
     setCanSellBox(false);
     setSecondaryLabel("Pack");
+    setBoxUnitLabel("Box");
+    setBaseUnitLabel("");
   };
 
   return (
@@ -206,6 +214,9 @@ export function InventoryToolbar({
         <form action={createProductAction} className="space-y-5">
           <input type="hidden" name="can_sell_secondary" value={canSellSecondary ? "true" : "false"} />
           <input type="hidden" name="can_sell_box" value={canSellBox ? "true" : "false"} />
+          <input type="hidden" name="secondary_unit_label" value={secondaryLabel} />
+          <input type="hidden" name="box_unit_label" value={boxUnitLabel} />
+          <input type="hidden" name="base_unit_label" value={baseUnitLabel} />
 
           {/* SECTION 1: Basic Information */}
           <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
@@ -319,43 +330,47 @@ export function InventoryToolbar({
               </div>
 
               {(canSellSecondary || canSellBox) ? (
-                <div className="space-y-3">
-                  {canSellBox ? (
-                    <>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-gray-600">Unit Name</label>
-                          <Input
-                            name="secondary_unit_label"
-                            value={secondaryLabel}
-                            onChange={(e) => setSecondaryLabel(e.target.value)}
-                            placeholder="e.g. Strip, Pack, Piece"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-gray-600">Units Per Box</label>
-                          <Input
-                            name="pack_qty"
-                            type="number"
-                            min={0}
-                            step={1}
-                            placeholder="e.g. 24"
-                          />
-                        </div>
+                <div className="space-y-4">
+                  {canSellSecondary && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">Secondary tier label</label>
+                        <Input
+                          value={secondaryLabel}
+                          onChange={(e) => setSecondaryLabel(e.target.value)}
+                          placeholder="e.g. Strip, Pack, Piece, Sachet"
+                        />
                       </div>
-                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <PriceField label="Price per Unit" name="retail_price_secondary" defaultValue="" />
-                        <PriceField label="Price Per Box" name="retail_price_box" defaultValue="" />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="space-y-2">
-                      <PriceField label="Price (single item)" name="retail_price_secondary" defaultValue="" />
-                      <p className="text-[11px] text-gray-400">
-                        Customers will see a single price for this product. Use this when you only sell individual items.
-                      </p>
+                      <PriceField label="Price per secondary unit" name="retail_price_secondary" defaultValue="" />
                     </div>
                   )}
+                  {canSellBox && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">Box tier label</label>
+                        <Input
+                          value={boxUnitLabel}
+                          onChange={(e) => setBoxUnitLabel(e.target.value)}
+                          placeholder="e.g. Box, Pack, Carton"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <PriceField label="Price per box" name="retail_price_box" defaultValue="" />
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">Units per box (pack_qty)</label>
+                          <Input name="pack_qty" type="number" min={0} step={1} placeholder="e.g. 24" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-600">Base unit label (optional)</label>
+                    <Input
+                      value={baseUnitLabel}
+                      onChange={(e) => setBaseUnitLabel(e.target.value)}
+                      placeholder="e.g. Tablet, Capsule, Bottle"
+                    />
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-gray-400 text-center py-3">

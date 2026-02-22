@@ -47,6 +47,8 @@ export async function createProduct(formData: FormData) {
   const can_sell_secondary = toBool(formData.get("can_sell_secondary"));
   const can_sell_box = toBool(formData.get("can_sell_box"));
   const secondary_unit_label_raw = String(formData.get("secondary_unit_label") ?? "").trim();
+  const box_unit_label_raw = String(formData.get("box_unit_label") ?? "").trim();
+  const base_unit_label_raw = String(formData.get("base_unit_label") ?? "").trim();
   const pack_qty = toIntOrUndefined(formData.get("pack_qty"));
   const strip_qty = toIntOrUndefined(formData.get("strip_qty"));
   const availability_raw = String(formData.get("availability") ?? "").trim().toLowerCase();
@@ -77,6 +79,8 @@ export async function createProduct(formData: FormData) {
   if (typeof can_sell_secondary === "boolean") body.can_sell_secondary = can_sell_secondary;
   if (typeof can_sell_box === "boolean") body.can_sell_box = can_sell_box;
   if (secondary_unit_label_raw) body.secondary_unit_label = secondary_unit_label_raw;
+  if (box_unit_label_raw) body.box_unit_label = box_unit_label_raw;
+  body.base_unit_label = base_unit_label_raw || null;
   if (typeof pack_qty === "number") body.pack_qty = pack_qty;
   if (typeof strip_qty === "number") body.strip_qty = strip_qty;
   if (availability_raw && ["yes", "no", "short"].includes(availability_raw)) {
@@ -128,6 +132,8 @@ export async function updateProduct(formData: FormData) {
   const can_sell_secondary = toBool(formData.get("can_sell_secondary"));
   const can_sell_box = toBool(formData.get("can_sell_box"));
   const secondary_unit_label_raw = String(formData.get("secondary_unit_label") ?? "");
+  const box_unit_label_raw = String(formData.get("box_unit_label") ?? "").trim();
+  const base_unit_label_raw = String(formData.get("base_unit_label") ?? "").trim();
   const pack_qty = toIntOrUndefined(formData.get("pack_qty"));
   const strip_qty = toIntOrUndefined(formData.get("strip_qty"));
   const availability_raw = String(formData.get("availability") ?? "").trim().toLowerCase();
@@ -162,6 +168,8 @@ export async function updateProduct(formData: FormData) {
   if (typeof can_sell_secondary === "boolean") body.can_sell_secondary = can_sell_secondary;
   if (typeof can_sell_box === "boolean") body.can_sell_box = can_sell_box;
   if (secondary_unit_label_raw.trim()) body.secondary_unit_label = secondary_unit_label_raw.trim();
+  if (box_unit_label_raw) body.box_unit_label = box_unit_label_raw;
+  body.base_unit_label = base_unit_label_raw || null;
   if (typeof pack_qty === "number") body.pack_qty = pack_qty;
   if (typeof strip_qty === "number") body.strip_qty = strip_qty;
   if (availability_raw && ["yes", "no", "short"].includes(availability_raw)) {

@@ -17,28 +17,24 @@ const recommendedProducts = [
     name: "Vitamin C 1000mg Immune Support",
     price: 24.99,
     originalPrice: 29.99,
-    rating: 5,
     image: "/assets/home/product-3.png",
   },
   {
     id: 102,
     name: "Zinc Picolinate 50mg Tablets",
     price: 18.50,
-    rating: 5,
     image: "/assets/home/product-4.png",
   },
   {
     id: 103,
     name: "Omega-3 Fish Oil 1200mg",
     price: 32.00,
-    rating: 5,
     image: "/assets/home/product-5.png",
   },
   {
     id: 104,
     name: "Magnesium Citrate 200mg",
     price: 15.00,
-    rating: 5,
     image: "/assets/home/product-6.png",
   }
 ];

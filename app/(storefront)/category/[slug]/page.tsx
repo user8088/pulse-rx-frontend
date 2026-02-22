@@ -96,12 +96,22 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
     const displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
 
+    const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
+    const originalPrice = discount > 0 ? displayPrice + discount : undefined;
+    const discountPercent =
+      originalPrice && originalPrice > 0
+        ? (discount / originalPrice) * 100
+        : undefined;
+
     return {
       id: p.id,
       name: p.item_name,
       price: displayPrice,
-      rating: 5,
+      originalPrice,
+      discountPercent,
       image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
+      variation: p.variation_value ?? p.secondary_unit_label ?? "",
+      quantity: p.secondary_unit_label ? `1 ${p.secondary_unit_label}` : "1 Unit",
     };
   });
 

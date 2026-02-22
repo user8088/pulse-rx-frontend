@@ -27,9 +27,8 @@ const getSpecialOfferProducts = () => {
       name: `Special Offer Product ${i + 1} - Premium Quality Medicine with ${discountPercent}% Off`,
       price: discountedPrice,
       originalPrice: originalPrice,
-      rating: 5,
+      discountPercent,
       image: productImages[i % productImages.length],
-      discount: discountPercent,
     };
   });
 };

@@ -164,6 +164,14 @@ export default function Navbar() {
               Special Offers
             </Link>
           </li>
+          <li>
+            <Link
+              href="/products"
+              className="text-sm font-semibold text-[#374151] hover:text-[#01AC28] transition-colors"
+            >
+              All Products
+            </Link>
+          </li>
           {categories.map((category) => (
             <DesktopCategoryItem
               key={category.id}
@@ -199,6 +207,15 @@ export default function Navbar() {
                   className="block px-4 py-3 text-sm font-semibold text-[#01AC28] hover:text-[#044644] hover:bg-[#EFEFEF] transition-colors"
                 >
                   Special Offers
+                </Link>
+              </li>
+              <li className="border-b border-gray-100">
+                <Link
+                  href="/products"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-4 py-3 text-sm font-semibold text-[#374151] hover:text-[#01AC28] hover:bg-[#EFEFEF] transition-colors"
+                >
+                  All Products
                 </Link>
               </li>
               {categories.map((category) => (

@@ -2,7 +2,6 @@ import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductGrid from "@/components/ProductGrid";
-import FilterSidebar from "@/components/FilterSidebar";
 import { OfferBanner, FlashSaleBanner, DeliveryBanner, ProcedureBanner } from "@/components/CategoryPromoBanner";
 import SubcategoryChips from "@/components/SubcategoryChips";
 import Link from "next/link";
@@ -151,25 +150,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       {/* Category Header */}
       <section className="py-8 md:py-12 px-4 md:px-6 lg:px-12">
         <div className="container mx-auto max-w-7xl">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 mb-6">
-            <div>
-              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#374151] mb-2">
-                {activeSubcategory ? activeSubcategory.subcategory_name : category.category_name}
-              </h1>
-              <p className="text-[#6B7280] text-sm md:text-base">
-                {mappedProducts.length} products found
-              </p>
-            </div>
-            
-            {/* Filter Button - Mobile */}
-            <div className="lg:hidden">
-              <FilterSidebar
-                showCategoryFilter={false}
-                subcategories={subcategories}
-                categoryAlias={slug}
-                activeSubcategoryId={subFilter}
-              />
-            </div>
+          <div className="mb-6">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-[#374151] mb-2">
+              {activeSubcategory ? activeSubcategory.subcategory_name : category.category_name}
+            </h1>
+            <p className="text-[#6B7280] text-sm md:text-base">
+              {mappedProducts.length} products found
+            </p>
           </div>
 
           {/* Subcategory Chips */}
@@ -181,20 +168,8 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
             />
           )}
 
-          {/* Main Content with Sidebar */}
-          <div className="flex gap-6 lg:gap-8 mt-8">
-            {/* Filter Sidebar - Desktop */}
-            <div className="hidden lg:block w-56 flex-shrink-0">
-              <FilterSidebar
-                showCategoryFilter={false}
-                subcategories={subcategories}
-                categoryAlias={slug}
-                activeSubcategoryId={subFilter}
-              />
-            </div>
-
-            {/* Products Section */}
-            <div className="flex-1">
+          {/* Products Section */}
+          <div className="mt-8">
 
               {/* Top Promotional Banner */}
               <div className="mb-8 md:mb-12">
@@ -238,7 +213,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
                   )}
                 </div>
               )}
-            </div>
           </div>
         </div>
       </section>

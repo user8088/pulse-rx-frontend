@@ -17,7 +17,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<Product[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<Product | null>(null);
-  const [unitType, setUnitType] = useState<"secondary" | "box">("secondary");
+  const [unitType, setUnitType] = useState<"item" | "secondary" | "box">("secondary");
   const [selectedPackOptionIndex, setSelectedPackOptionIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +38,11 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
         if (opts.length > 0) {
           setSelectedPackOptionIndex(0);
         } else {
+          const canSellItem = !!productData.can_sell_item;
           const canSellSecondary = !!productData.can_sell_secondary;
           const canSellBox = !!productData.can_sell_box;
-          if (canSellSecondary) setUnitType("secondary");
+          if (canSellItem) setUnitType("item");
+          else if (canSellSecondary) setUnitType("secondary");
           else if (canSellBox) setUnitType("box");
         }
 
@@ -64,9 +66,11 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
     if (opts.length > 0) {
       setSelectedPackOptionIndex(0);
     } else {
+      const canSellItem = !!variant.can_sell_item;
       const canSellSecondary = !!variant.can_sell_secondary;
       const canSellBox = !!variant.can_sell_box;
-      if (canSellSecondary) setUnitType("secondary");
+      if (canSellItem) setUnitType("item");
+      else if (canSellSecondary) setUnitType("secondary");
       else if (canSellBox) setUnitType("box");
     }
   };
@@ -86,19 +90,36 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       safePrice = Number.parseFloat(opt.price) || 0;
       quantityLabel = `1 ${opt.label}`;
     } else {
-      if (!canSellSecondary && !canSellBox) return;
+      const canSellItem = !!selectedVariation.can_sell_item;
+      if (!canSellItem && !canSellSecondary && !canSellBox) return;
+      const itemPrice = Number.parseFloat(
+        (selectedVariation.retail_price_item as unknown as string) ?? "0"
+      );
       const secondaryPrice = Number.parseFloat(
         (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
       );
       const boxPrice = Number.parseFloat(
         (selectedVariation.retail_price_box as unknown as string) ?? "0"
       );
-      const effectiveType = unitType === "box" && canSellBox ? "box" : "secondary";
-      const priceSource = effectiveType === "box" ? boxPrice : secondaryPrice;
+      let effectiveType: "item" | "secondary" | "box" = "secondary";
+      if (unitType === "item" && canSellItem) effectiveType = "item";
+      else if (unitType === "box" && canSellBox) effectiveType = "box";
+      else if (canSellSecondary) effectiveType = "secondary";
+      else if (canSellBox) effectiveType = "box";
+      else if (canSellItem) effectiveType = "item";
+      const priceSource =
+        effectiveType === "item" ? itemPrice : effectiveType === "box" ? boxPrice : secondaryPrice;
       safePrice = Number.isFinite(priceSource) ? priceSource : 0;
+      const baseLabel =
+        (selectedVariation.base_unit_label as unknown as string) || "Unit";
       const secondaryLabel =
         (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
-      quantityLabel = effectiveType === "box" ? "Per Box" : `Per ${secondaryLabel}`;
+      quantityLabel =
+        effectiveType === "item"
+          ? `1 ${baseLabel}`
+          : effectiveType === "box"
+            ? "Per Box"
+            : `Per ${secondaryLabel}`;
     }
 
     addItem({
@@ -135,6 +156,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const primaryImage = images.find(img => img.is_primary) || images[0];
   const mainImageUrl = primaryImage ? bucketUrl(primaryImage.object_key) : "/assets/home/product-1.png";
 
+  const canSellItem = !!selectedVariation.can_sell_item;
   const canSellSecondary = !!selectedVariation.can_sell_secondary;
   const canSellBox = !!selectedVariation.can_sell_box;
   const isInStock =
@@ -152,8 +174,13 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       : "Not available";
   const packOptions = selectedVariation.packaging_display?.options ?? [];
   const usePackagingDisplay = packOptions.length > 0;
+  const baseUnitLabel =
+    (selectedVariation.base_unit_label as unknown as string) || "Unit";
   const secondaryLabel =
     (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+  const itemPrice = Number.parseFloat(
+    (selectedVariation.retail_price_item as unknown as string) ?? "0"
+  );
   const secondaryPrice = Number.parseFloat(
     (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
   );
@@ -162,7 +189,11 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   );
   const selectedPrice = usePackagingDisplay
     ? Number.parseFloat(packOptions[selectedPackOptionIndex]?.price ?? "0") || 0
-    : (unitType === "box" && canSellBox ? boxPrice : secondaryPrice);
+    : unitType === "item" && canSellItem
+      ? itemPrice
+      : unitType === "box" && canSellBox
+        ? boxPrice
+        : secondaryPrice;
 
   return (
     <div className="w-full">
@@ -294,7 +325,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
               )}
 
               {/* Purchase options - packaging_display or fallback */}
-              {(usePackagingDisplay || canSellSecondary || canSellBox) && (
+              {(usePackagingDisplay || canSellItem || canSellSecondary || canSellBox) && (
                 <div className="mb-8">
                   <span className="text-xs font-bold text-[#374151] block uppercase tracking-wider mb-3">
                     {usePackagingDisplay ? "Select Pack Size" : "HOW DO YOU WANT TO BUY?"}
@@ -317,6 +348,19 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                       ))
                     ) : (
                       <>
+                        {canSellItem && Number.isFinite(itemPrice) && itemPrice > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setUnitType("item")}
+                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                              unitType === "item"
+                                ? "bg-[#374151] text-white border-[#374151]"
+                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                            }`}
+                          >
+                            {baseUnitLabel} · Rs. {itemPrice.toFixed(2)}
+                          </button>
+                        )}
                         {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (
                           <button
                             type="button"

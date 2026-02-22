@@ -36,8 +36,10 @@ function productsToCsv(products: Product[]) {
     "brand",
     "category",
     "retail_price_unit",
+    "retail_price_item",
     "retail_price_secondary",
     "retail_price_box",
+    "can_sell_item",
     "can_sell_secondary",
     "can_sell_box",
     "secondary_unit_label",
@@ -58,8 +60,10 @@ function productsToCsv(products: Product[]) {
         p.brand ?? "",
         p.category?.category_name ?? "",
         p.retail_price_unit,
+        p.retail_price_item ?? "",
         p.retail_price_secondary,
         p.retail_price_box,
+        typeof p.can_sell_item === "boolean" ? (p.can_sell_item ? "true" : "false") : "",
         typeof p.can_sell_secondary === "boolean" ? (p.can_sell_secondary ? "true" : "false") : "",
         typeof p.can_sell_box === "boolean" ? (p.can_sell_box ? "true" : "false") : "",
         p.secondary_unit_label ?? "",
@@ -140,6 +144,7 @@ export function InventoryToolbar({
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [createCategoryId, setCreateCategoryId] = useState<string>("");
+  const [canSellItem, setCanSellItem] = useState(false);
   const [canSellSecondary, setCanSellSecondary] = useState(false);
   const [canSellBox, setCanSellBox] = useState(false);
   const [secondaryLabel, setSecondaryLabel] = useState("Pack");
@@ -159,6 +164,7 @@ export function InventoryToolbar({
   const resetCreateState = () => {
     setCreateOpen(false);
     setCreateCategoryId("");
+    setCanSellItem(false);
     setCanSellSecondary(false);
     setCanSellBox(false);
     setSecondaryLabel("Pack");
@@ -212,6 +218,7 @@ export function InventoryToolbar({
         description="Quickly add a new product to your inventory."
       >
         <form action={createProductAction} className="space-y-5">
+          <input type="hidden" name="can_sell_item" value={canSellItem ? "true" : "false"} />
           <input type="hidden" name="can_sell_secondary" value={canSellSecondary ? "true" : "false"} />
           <input type="hidden" name="can_sell_box" value={canSellBox ? "true" : "false"} />
           <input type="hidden" name="secondary_unit_label" value={secondaryLabel} />
@@ -311,11 +318,20 @@ export function InventoryToolbar({
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
                     <input
                       type="checkbox"
+                      checked={canSellItem}
+                      onChange={(e) => setCanSellItem(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell per item (e.g. per tablet)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
                       checked={canSellSecondary}
                       onChange={(e) => setCanSellSecondary(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                     />
-                    Sell individually (single items)
+                    Sell per secondary unit (strip, pack)
                   </label>
                   <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
                     <input
@@ -324,13 +340,18 @@ export function InventoryToolbar({
                       onChange={(e) => setCanSellBox(e.target.checked)}
                       className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                     />
-                    Sell in boxes
+                    Sell per box
                   </label>
                 </div>
               </div>
 
-              {(canSellSecondary || canSellBox) ? (
+              {(canSellItem || canSellSecondary || canSellBox) ? (
                 <div className="space-y-4">
+                  {canSellItem && (
+                    <div className="space-y-3">
+                      <PriceField label="Price per item (e.g. per tablet)" name="retail_price_item" defaultValue="" />
+                    </div>
+                  )}
                   {canSellSecondary && (
                     <div className="space-y-3">
                       <div className="space-y-1">

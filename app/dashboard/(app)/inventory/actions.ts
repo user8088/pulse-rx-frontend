@@ -42,8 +42,10 @@ export async function createProduct(formData: FormData) {
   const generic_name_raw = String(formData.get("generic_name") ?? "").trim();
   const is_narcotic = toBool(formData.get("is_narcotic"));
   const retail_price_unit = toFloatOrUndefined(formData.get("retail_price_unit"));
+  const retail_price_item = toFloatOrUndefined(formData.get("retail_price_item"));
   const retail_price_secondary = toFloatOrUndefined(formData.get("retail_price_secondary"));
   const retail_price_box = toFloatOrUndefined(formData.get("retail_price_box"));
+  const can_sell_item = toBool(formData.get("can_sell_item"));
   const can_sell_secondary = toBool(formData.get("can_sell_secondary"));
   const can_sell_box = toBool(formData.get("can_sell_box"));
   const secondary_unit_label_raw = String(formData.get("secondary_unit_label") ?? "").trim();
@@ -74,8 +76,10 @@ export async function createProduct(formData: FormData) {
   }
   if (typeof is_narcotic === "boolean") body.is_narcotic = is_narcotic;
   if (typeof retail_price_unit === "number") body.retail_price_unit = retail_price_unit;
+  if (typeof retail_price_item === "number") body.retail_price_item = retail_price_item;
   if (typeof retail_price_secondary === "number") body.retail_price_secondary = retail_price_secondary;
   if (typeof retail_price_box === "number") body.retail_price_box = retail_price_box;
+  if (typeof can_sell_item === "boolean") body.can_sell_item = can_sell_item;
   if (typeof can_sell_secondary === "boolean") body.can_sell_secondary = can_sell_secondary;
   if (typeof can_sell_box === "boolean") body.can_sell_box = can_sell_box;
   if (secondary_unit_label_raw) body.secondary_unit_label = secondary_unit_label_raw;
@@ -127,8 +131,10 @@ export async function updateProduct(formData: FormData) {
   const generic_name_raw = String(formData.get("generic_name") ?? "");
   const is_narcotic = toBool(formData.get("is_narcotic"));
   const retail_price_unit = toFloatOrUndefined(formData.get("retail_price_unit"));
+  const retail_price_item = toFloatOrUndefined(formData.get("retail_price_item"));
   const retail_price_secondary = toFloatOrUndefined(formData.get("retail_price_secondary"));
   const retail_price_box = toFloatOrUndefined(formData.get("retail_price_box"));
+  const can_sell_item = toBool(formData.get("can_sell_item"));
   const can_sell_secondary = toBool(formData.get("can_sell_secondary"));
   const can_sell_box = toBool(formData.get("can_sell_box"));
   const secondary_unit_label_raw = String(formData.get("secondary_unit_label") ?? "");
@@ -163,8 +169,10 @@ export async function updateProduct(formData: FormData) {
 
   if (typeof is_narcotic === "boolean") body.is_narcotic = is_narcotic;
   if (typeof retail_price_unit === "number") body.retail_price_unit = retail_price_unit;
+  if (typeof retail_price_item === "number") body.retail_price_item = retail_price_item;
   if (typeof retail_price_secondary === "number") body.retail_price_secondary = retail_price_secondary;
   if (typeof retail_price_box === "number") body.retail_price_box = retail_price_box;
+  if (typeof can_sell_item === "boolean") body.can_sell_item = can_sell_item;
   if (typeof can_sell_secondary === "boolean") body.can_sell_secondary = can_sell_secondary;
   if (typeof can_sell_box === "boolean") body.can_sell_box = can_sell_box;
   if (secondary_unit_label_raw.trim()) body.secondary_unit_label = secondary_unit_label_raw.trim();

@@ -99,7 +99,7 @@ export default function ProductCard({
 
   if (href) {
     return (
-      <Link href={href} className="block h-full">
+      <Link href={href} className="block h-full" data-cursor="View Product">
         {card}
       </Link>
     );

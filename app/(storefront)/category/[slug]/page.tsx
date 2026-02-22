@@ -100,12 +100,22 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       displayPrice = Number.parseFloat(first?.price ?? "0") || 0;
       quantityLabel = first?.label ? `1 ${first.label}` : "1 Unit";
     } else {
+      const canSellItem = !!p.can_sell_item;
       const canSellBox = !!p.can_sell_box;
+      const itemPrice = Number.parseFloat(String(p.retail_price_item ?? "0"));
       const boxPrice = Number.parseFloat((p.retail_price_box as unknown as string) ?? "0");
       const secondaryPrice = Number.parseFloat((p.retail_price_secondary as unknown as string) ?? "0");
-      const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
-      displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
-      quantityLabel = p.secondary_unit_label ? `1 ${p.secondary_unit_label}` : "1 Unit";
+      const baseLabel = p.base_unit_label ?? "Unit";
+      if (canSellItem && Number.isFinite(itemPrice) && itemPrice > 0) {
+        displayPrice = itemPrice;
+        quantityLabel = `1 ${baseLabel}`;
+      } else if (canSellBox && Number.isFinite(boxPrice) && boxPrice > 0) {
+        displayPrice = boxPrice;
+        quantityLabel = p.box_unit_label ? `1 ${p.box_unit_label}` : "1 Box";
+      } else {
+        displayPrice = secondaryPrice;
+        quantityLabel = p.secondary_unit_label ? `1 ${p.secondary_unit_label}` : "1 Unit";
+      }
     }
 
     const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");

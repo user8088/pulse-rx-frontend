@@ -100,6 +100,7 @@ export function ProductTableRow({
   const [editCategoryId, setEditCategoryId] = useState<string>(
     product.category_id != null ? String(product.category_id) : ""
   );
+  const [canSellItem, setCanSellItem] = useState(!!product.can_sell_item);
   const [canSellSecondary, setCanSellSecondary] = useState(!!product.can_sell_secondary);
   const [canSellBox, setCanSellBox] = useState(!!product.can_sell_box);
   const [secondaryLabel, setSecondaryLabel] = useState(product.secondary_unit_label ?? "Pack");
@@ -124,6 +125,10 @@ export function ProductTableRow({
     });
   }, [product.images]);
 
+  const itemPriceDefault =
+    product.retail_price_item && String(product.retail_price_item).trim() !== ""
+      ? Number.parseFloat(String(product.retail_price_item))
+      : "";
   const secondaryPriceDefault =
     product.retail_price_secondary && product.retail_price_secondary.trim() !== ""
       ? Number.parseFloat(product.retail_price_secondary)
@@ -250,6 +255,7 @@ export function ProductTableRow({
                   className="space-y-5 lg:col-span-7"
                 >
                   <input type="hidden" name="id" value={product.id} />
+                  <input type="hidden" name="can_sell_item" value={canSellItem ? "true" : "false"} />
                   <input type="hidden" name="can_sell_secondary" value={canSellSecondary ? "true" : "false"} />
                   <input type="hidden" name="can_sell_box" value={canSellBox ? "true" : "false"} />
                   <input type="hidden" name="secondary_unit_label" value={secondaryLabel} />
@@ -335,11 +341,20 @@ export function ProductTableRow({
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
                           <input
                             type="checkbox"
+                            checked={canSellItem}
+                            onChange={(e) => setCanSellItem(e.target.checked)}
+                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          Sell per item (e.g. per tablet)
+                        </label>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
                             checked={canSellSecondary}
                             onChange={(e) => setCanSellSecondary(e.target.checked)}
                             className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                           />
-                          Sell individually (single items)
+                          Sell per secondary unit (strip, pack)
                         </label>
                         <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
                           <input
@@ -348,14 +363,25 @@ export function ProductTableRow({
                             onChange={(e) => setCanSellBox(e.target.checked)}
                             className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
                           />
-                          Sell in boxes
+                          Sell per box
                         </label>
                       </div>
                     </div>
 
                     {/* Dynamic pricing fields */}
-                    {(canSellSecondary || canSellBox) ? (
+                    {(canSellItem || canSellSecondary || canSellBox) ? (
                       <div className="space-y-4">
+                        {/* Item tier */}
+                        {canSellItem && (
+                          <div className="space-y-3">
+                            <PriceField
+                              label="Price per item (e.g. per tablet)"
+                              name="retail_price_item"
+                              defaultValue={itemPriceDefault}
+                            />
+                          </div>
+                        )}
+
                         {/* Secondary tier */}
                         {canSellSecondary && (
                           <div className="space-y-3">

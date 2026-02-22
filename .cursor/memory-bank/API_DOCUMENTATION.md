@@ -652,6 +652,7 @@ All product endpoints exist in two variants:
 | **category_id** | integer \| null | FK to categories |
 | **brand** | string \| null | Manufacturer / brand |
 | **retail_price_unit** | string | Supplier/cost reference price as decimal string (e.g. `"49.00"`). Internal only, not customer-facing. |
+| **retail_price_item** | string | Price per single item (e.g. `"100.00"`). Customer-facing when `can_sell_item` is true. |
 | **retail_price_secondary** | string | Price per secondary unit as decimal string (e.g. `"325.00"`). Customer-facing when `can_sell_secondary` is true. |
 | **retail_price_box** | string | Price per box as decimal string (e.g. `"1990.04"`). Customer-facing when `can_sell_box` is true. |
 | **pack_qty** | integer \| null | How many secondary units in a box (informational) |
@@ -661,6 +662,7 @@ All product endpoints exist in two variants:
 | **item_discount** | string | Discount amount as decimal string (e.g. `"5.00"`, default `"0.00"`) |
 | **can_sell_secondary** | boolean | Whether the product can be sold per secondary unit (default false) |
 | **can_sell_box** | boolean | Whether the product can be sold per box (default false) |
+| **can_sell_item** | boolean | Whether the product can be sold per individual item (default false) |
 | **secondary_unit_label** | string | Admin-defined label for the secondary tier (e.g. `"Pack"`, `"Strip"`, `"Sachet"`; default `"Pack"`) |
 | **box_unit_label** | string | Admin-defined label for the top/box tier (e.g. `"Box"`, `"Pack"`, `"Carton"`; default `"Box"`) |
 | **base_unit_label** | string \| null | Label for the base unit (e.g. `"Tablet"`, `"Capsule"`, `"Bottle"`). Defaults to `"Unit"` in display when null. |
@@ -695,6 +697,12 @@ Every product response includes a computed `packaging_display` object. It contai
         "label": "Strip",
         "description": "1 Strip = 10 Tablets",
         "price": "13.50"
+      },
+      {
+        "tier": "item",
+        "label": "Tablet",
+        "description": "1 Tablet",
+        "price": "1.35"
       }
     ]
   }
@@ -703,7 +711,7 @@ Every product response includes a computed `packaging_display` object. It contai
 
 - `base_unit`: human label for the smallest unit (from `base_unit_label`, defaults to `"Unit"`).
 - `options[]`: only tiers where the corresponding `can_sell_*` flag is `true`.
-  - `tier`: `"box"` or `"secondary"` (used as identifier for cart/order).
+  - `tier`: `"box"`, `"secondary"`, or `"item"` (used as identifier for cart/order).
   - `label`: display name of the tier (from `box_unit_label` or `secondary_unit_label`).
   - `description`: formatted string like `"1 Pack = 10 Strips"`. Uses `pack_qty`/`strip_qty`. If qty is null, shows just `"1 Pack"`.
   - `price`: retail price as decimal string.
@@ -841,6 +849,7 @@ Validation rules:
 - **category_id**: nullable, must exist in `categories.id` if provided
 - **brand**: nullable, string, max 255
 - **retail_price_unit**: optional, numeric, min 0 (internal/supplier price, defaults to 0 if omitted)
+- **retail_price_item**: optional, numeric, min 0 (must be > 0 when `can_sell_item` is true; defaults to 0)
 - **retail_price_secondary**: optional, numeric, min 0 (must be > 0 when `can_sell_secondary` is true; defaults to 0)
 - **retail_price_box**: optional, numeric, min 0 (must be > 0 when `can_sell_box` is true; defaults to 0)
 - **pack_qty**: nullable, integer, min 0
@@ -850,6 +859,7 @@ Validation rules:
 - **item_discount**: optional, numeric, min 0 (defaults to 0)
 - **can_sell_secondary**: optional, boolean (defaults to false)
 - **can_sell_box**: optional, boolean (defaults to false)
+- **can_sell_item**: optional, boolean (defaults to false)
 - **secondary_unit_label**: optional, string, max 50 (defaults to `"Pack"`)
 - **box_unit_label**: optional, string, max 50 (defaults to `"Box"`)
 - **base_unit_label**: nullable, string, max 50 (e.g. `"Tablet"`, `"Capsule"`)
@@ -922,6 +932,7 @@ Validation rules:
 - **category_id**: optional; if provided may be null; if non-null must exist in `categories.id`
 - **brand**: optional; may be null; if non-null must be string, max 255
 - **retail_price_unit**: optional, numeric, min 0 (internal/supplier price)
+- **retail_price_item**: optional, numeric, min 0 (must be > 0 when `can_sell_item` is true)
 - **retail_price_secondary**: optional, numeric, min 0 (must be > 0 when `can_sell_secondary` is true)
 - **retail_price_box**: optional, numeric, min 0 (must be > 0 when `can_sell_box` is true)
 - **pack_qty**: nullable, integer, min 0
@@ -931,6 +942,7 @@ Validation rules:
 - **item_discount**: optional, numeric, min 0
 - **can_sell_secondary**: optional, boolean
 - **can_sell_box**: optional, boolean
+- **can_sell_item**: optional, boolean
 - **secondary_unit_label**: optional, string, max 50
 - **box_unit_label**: optional, string, max 50
 - **base_unit_label**: nullable, string, max 50
@@ -1115,6 +1127,7 @@ curl -X POST "http://localhost:8000/api/products/import" \
 | **Sub Category II** | subcategory 2 lookup (creates under category) | No |
 | **Manufacturer** | `brand` | No |
 | **Retail Price (Unit)** | `retail_price_unit` | No |
+| **Retail Price (Item)** | `retail_price_item` | No |
 | **Retail Price (Strip)** | `retail_price_secondary` | No |
 | **Retail Price (Box)** | `retail_price_box` | No |
 | **Pack Qty.** | `pack_qty` (cast to int) | No |
@@ -1138,6 +1151,16 @@ curl -X POST "http://localhost:8000/api/products/import" \
 - If **Sub Category** or **Sub Category II** is present and non-empty, and a category was resolved, the backend looks up or creates a `Subcategory` under that category.
 - After upserting the product, the resolved subcategory IDs are synced to the `product_subcategory` pivot table.
 - If no category is resolved, subcategories are skipped.
+
+### Smart auto-marking (sellable tiers)
+
+The import **automatically sets** `can_sell_item`, `can_sell_secondary`, and `can_sell_box` based on which price columns have values > 0:
+
+- If **Retail Price (Item)** has a value > 0 → `can_sell_item` = true
+- If **Retail Price (Strip)** has a value > 0 → `can_sell_secondary` = true
+- If **Retail Price (Box)** has a value > 0 → `can_sell_box` = true
+
+Products with only `Retail Price (Item)` populated are sold per individual item. Products with Strip and/or Box prices get the corresponding flags enabled.
 
 ### Upsert behavior (important)
 

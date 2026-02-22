@@ -25,12 +25,22 @@ function mapProductToCard(product: Product) {
     displayPrice = Number.parseFloat(first?.price ?? "0") || 0;
     quantityLabel = first?.label ? `1 ${first.label}` : "1 Unit";
   } else {
+    const canSellItem = !!product.can_sell_item;
     const canSellBox = !!product.can_sell_box;
+    const itemPrice = Number.parseFloat(String(product.retail_price_item ?? "0"));
     const boxPrice = Number.parseFloat(product.retail_price_box ?? "0");
     const secondaryPrice = Number.parseFloat(product.retail_price_secondary ?? "0");
-    const showBoxPrice = canSellBox && Number.isFinite(boxPrice) && boxPrice > 0;
-    displayPrice = showBoxPrice ? boxPrice : secondaryPrice;
-    quantityLabel = product.secondary_unit_label ? `1 ${product.secondary_unit_label}` : "1 Unit";
+    const baseLabel = product.base_unit_label ?? "Unit";
+    if (canSellItem && Number.isFinite(itemPrice) && itemPrice > 0) {
+      displayPrice = itemPrice;
+      quantityLabel = `1 ${baseLabel}`;
+    } else if (canSellBox && Number.isFinite(boxPrice) && boxPrice > 0) {
+      displayPrice = boxPrice;
+      quantityLabel = product.box_unit_label ? `1 ${product.box_unit_label}` : "1 Box";
+    } else {
+      displayPrice = secondaryPrice;
+      quantityLabel = product.secondary_unit_label ? `1 ${product.secondary_unit_label}` : "1 Unit";
+    }
   }
 
   const discount = Number.parseFloat(product.item_discount ?? "0");

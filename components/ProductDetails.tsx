@@ -174,14 +174,6 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       : "Not available";
   const packOptions = selectedVariation.packaging_display?.options ?? [];
   const usePackagingDisplay = packOptions.length > 0;
-  const hasMultiplePackOptions =
-    usePackagingDisplay
-      ? packOptions.length > 1
-      : [
-          canSellItem && Number.isFinite(itemPrice) && itemPrice > 0,
-          canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0,
-          canSellBox && Number.isFinite(boxPrice) && boxPrice > 0,
-        ].filter(Boolean).length > 1;
   const baseUnitLabel =
     (selectedVariation.base_unit_label as unknown as string) || "Unit";
   const secondaryLabel =
@@ -195,6 +187,14 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const boxPrice = Number.parseFloat(
     (selectedVariation.retail_price_box as unknown as string) ?? "0"
   );
+  const hasMultiplePackOptions =
+    usePackagingDisplay
+      ? packOptions.length > 1
+      : [
+          canSellItem && Number.isFinite(itemPrice) && itemPrice > 0,
+          canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0,
+          canSellBox && Number.isFinite(boxPrice) && boxPrice > 0,
+        ].filter(Boolean).length > 1;
   const selectedPrice = usePackagingDisplay
     ? Number.parseFloat(packOptions[selectedPackOptionIndex]?.price ?? "0") || 0
     : unitType === "item" && canSellItem

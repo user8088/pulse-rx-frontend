@@ -158,7 +158,7 @@ purchasable.
 
 ### 3.5 Excel import and smart auto-marking
 
-The `POST /products/import` endpoint maps these Excel columns:
+The `POST /products/import` endpoint maps these Excel columns. **For "Select Pack Size" to show descriptions like "1 Box = 5 Bottles" and "1 Strip = 10 Tablets", the Excel file must have columns named exactly "Pack Qty." and "Strip Qty."** (first row headers). If these are missing or named differently, `pack_qty` and `strip_qty` stay null and the storefront shows only "1 Box", "1 Bottle" without the breakdown.
 
 | Excel Column | Database Field |
 |--------------|----------------|

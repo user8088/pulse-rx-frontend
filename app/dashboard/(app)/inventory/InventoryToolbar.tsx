@@ -143,6 +143,7 @@ export function InventoryToolbar({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [importHelpOpen, setImportHelpOpen] = useState(false);
   const [createCategoryId, setCreateCategoryId] = useState<string>("");
   const [canSellItem, setCanSellItem] = useState(false);
   const [canSellSecondary, setCanSellSecondary] = useState(false);
@@ -179,26 +180,38 @@ export function InventoryToolbar({
           Create product
         </Button>
 
-        <form
-          action={importProductsAction}
-          className="inline-flex"
-          onSubmit={() => {
-            fileInputRef.current?.blur();
-          }}
-        >
-          <input
-            ref={fileInputRef}
-            name="file"
-            type="file"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-            className="hidden"
-            onChange={() => {
-              if (fileInputRef.current?.files?.length) hiddenSubmitRef.current?.click();
+        <div className="inline-flex items-center gap-1">
+          <form
+            action={importProductsAction}
+            className="inline-flex"
+            onSubmit={() => {
+              fileInputRef.current?.blur();
             }}
-          />
-          <button ref={hiddenSubmitRef} type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
-          <ImportInner onPick={() => fileInputRef.current?.click()} />
-        </form>
+          >
+            <input
+              ref={fileInputRef}
+              name="file"
+              type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              className="hidden"
+              onChange={() => {
+                if (fileInputRef.current?.files?.length) hiddenSubmitRef.current?.click();
+              }}
+            />
+            <button ref={hiddenSubmitRef} type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+            <ImportInner onPick={() => fileInputRef.current?.click()} />
+          </form>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-gray-600 px-1.5"
+            onClick={() => setImportHelpOpen(true)}
+            title="Excel column reference"
+          >
+            ?
+          </Button>
+        </div>
 
         <Button type="button" variant="secondary" size="sm" onClick={() => setExportOpen(true)}>
           Export
@@ -408,6 +421,41 @@ export function InventoryToolbar({
             <PendingSubmitButton pendingText="Creating…">Create</PendingSubmitButton>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={importHelpOpen}
+        onClose={() => setImportHelpOpen(false)}
+        title="Excel import: column names"
+        description="Use these exact header names in the first row of your Excel file. Matching is case-insensitive."
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-sm text-gray-800">
+            <p className="font-semibold mb-1">Pack / strip quantities not showing after import?</p>
+            <p className="text-gray-700">
+              For the storefront to show &quot;1 Box = 5 Bottles&quot; (and similar), your Excel <strong>must</strong> have
+              columns named <strong>Pack Qty.</strong> and <strong>Strip Qty.</strong> (with the period). If these
+              columns are missing or named differently (e.g. &quot;Pack Qty&quot; without the period, or &quot;Pack Quantity&quot;),
+              the backend will not set pack_qty / strip_qty and only &quot;1 Box&quot;, &quot;1 Bottle&quot; will appear.
+            </p>
+          </div>
+          <div className="text-xs text-gray-600 space-y-1">
+            <p className="font-semibold text-gray-700">Recognized headers (examples):</p>
+            <ul className="list-disc list-inside space-y-0.5 ml-1">
+              <li>Item Id, Item Name (required)</li>
+              <li>Retail Price (Unit), Retail Price (Item), Retail Price (Strip), Retail Price (Box)</li>
+              <li><strong>Pack Qty.</strong> → units per box</li>
+              <li><strong>Strip Qty.</strong> → units per strip/secondary</li>
+              <li>Box Unit Label, Base Unit Label</li>
+              <li>Category, Sub Category, Manufacturer, Availability, etc.</li>
+            </ul>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" variant="secondary" onClick={() => setImportHelpOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal

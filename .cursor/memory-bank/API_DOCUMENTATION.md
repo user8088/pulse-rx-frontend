@@ -1114,7 +1114,7 @@ curl -X POST "http://localhost:8000/api/products/import" \
 
 - Reads the **active worksheet** (first/active sheet).
 - Uses the **first row as headers** and maps them case-insensitively after `trim()` + `lowercase`.
-- Only these headers are recognized:
+- Only these headers are recognized. **Note:** For pack/strip quantities to appear on the dashboard and storefront (e.g. "Select Pack Size" showing "1 Box = 5 Bottles"), the Excel file must include columns **Pack Qty.** and **Strip Qty.** Header names must match exactly (e.g. "Pack Qty." with the period). Backend implementers should consider accepting both "Pack Qty." and "Pack Qty" for robustness.
 
 | Excel Header | Maps to | Required |
 |---|---|---|
@@ -1130,8 +1130,8 @@ curl -X POST "http://localhost:8000/api/products/import" \
 | **Retail Price (Item)** | `retail_price_item` | No |
 | **Retail Price (Strip)** | `retail_price_secondary` | No |
 | **Retail Price (Box)** | `retail_price_box` | No |
-| **Pack Qty.** | `pack_qty` (cast to int) | No |
-| **Strip Qty.** | `strip_qty` (cast to int) | No |
+| **Pack Qty.** | `pack_qty` (cast to int) | No. Required for storefront to show "1 Box = N Bottles" etc. If missing or differently named, pack_qty stays null. |
+| **Strip Qty.** | `strip_qty` (cast to int) | No. Required for "1 Strip = N Tablets" etc. If missing or differently named, strip_qty stays null. |
 | **Availability** | `availability` (YES/NO/SHORT -> lowercase, default `yes`) | No |
 | **Cold Chain Needed** | `cold_chain_needed` (YES/NO -> boolean) | No |
 | **Item Discount** | `item_discount` (cast to decimal) | No |

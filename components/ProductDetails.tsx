@@ -174,6 +174,14 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       : "Not available";
   const packOptions = selectedVariation.packaging_display?.options ?? [];
   const usePackagingDisplay = packOptions.length > 0;
+  const hasMultiplePackOptions =
+    usePackagingDisplay
+      ? packOptions.length > 1
+      : [
+          canSellItem && Number.isFinite(itemPrice) && itemPrice > 0,
+          canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0,
+          canSellBox && Number.isFinite(boxPrice) && boxPrice > 0,
+        ].filter(Boolean).length > 1;
   const baseUnitLabel =
     (selectedVariation.base_unit_label as unknown as string) || "Unit";
   const secondaryLabel =
@@ -324,8 +332,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                 </div>
               )}
 
-              {/* Purchase options - packaging_display or fallback */}
-              {(usePackagingDisplay || canSellItem || canSellSecondary || canSellBox) && (
+              {/* Purchase options - only show when customer can choose between multiple pack sizes */}
+              {hasMultiplePackOptions && (
                 <div className="mb-8">
                   <span className="text-xs font-bold text-[#374151] block uppercase tracking-wider mb-3">
                     {usePackagingDisplay ? "Select Pack Size" : "HOW DO YOU WANT TO BUY?"}

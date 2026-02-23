@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Hero from "@/components/Hero";
@@ -24,11 +25,21 @@ export default async function Home() {
     console.error("Failed to fetch categories for home page:", error);
   }
 
+  const customerCity = (await cookies()).get("prx_customer_city")?.value;
+  const cityParam =
+    customerCity === "islamabad" || customerCity === "other"
+      ? { customer_city: customerCity }
+      : {};
+
   const queryClient = new QueryClient();
   const productsPerCategory = await Promise.all(
     categories.map(async (c) => {
       try {
-        return await getProducts({ q: c.category_name, per_page: 30 });
+        return await getProducts({
+          q: c.category_name,
+          per_page: 30,
+          ...cityParam,
+        });
       } catch (error) {
         console.error(
           "Failed to fetch products for category on home page:",
@@ -43,7 +54,7 @@ export default async function Home() {
     const categoryName = categories[i]?.category_name;
     if (categoryName && paginated) {
       queryClient.setQueryData(
-        ["products", { category: categoryName, per_page: 30 }],
+        ["products", { category: categoryName, per_page: 30, customer_city: customerCity ?? undefined }],
         paginated
       );
     }

@@ -7,6 +7,7 @@ import { getProducts } from "@/lib/api/products";
 import { getSubcategories } from "@/lib/api/categories";
 import { bucketUrl } from "@/lib/bucketUrl";
 import ProductCard from "@/components/shared/ProductCard";
+import { useCity } from "@/lib/context/CityContext";
 import type { Category } from "@/types/category";
 import type { Product } from "@/types/product";
 
@@ -68,9 +69,18 @@ interface CategoryProductSectionProps {
 }
 
 export default function CategoryProductSection({ category }: CategoryProductSectionProps) {
+  const { customerCity } = useCity();
   const { data, isLoading } = useQuery({
-    queryKey: ["products", { category: category.category_name, per_page: 30 }],
-    queryFn: () => getProducts({ q: category.category_name, per_page: 30 }),
+    queryKey: [
+      "products",
+      { category: category.category_name, per_page: 30, customer_city: customerCity ?? undefined },
+    ],
+    queryFn: () =>
+      getProducts({
+        q: category.category_name,
+        per_page: 30,
+        ...(customerCity ? { customer_city: customerCity } : {}),
+      }),
     staleTime: 60 * 1000,
   });
   const products = (data?.data ?? [])

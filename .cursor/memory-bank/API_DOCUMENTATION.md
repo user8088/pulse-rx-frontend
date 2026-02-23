@@ -666,6 +666,7 @@ All product endpoints exist in two variants:
 | **secondary_unit_label** | string | Admin-defined label for the secondary tier (e.g. `"Pack"`, `"Strip"`, `"Sachet"`; default `"Pack"`) |
 | **box_unit_label** | string | Admin-defined label for the top/box tier (e.g. `"Box"`, `"Pack"`, `"Carton"`; default `"Box"`) |
 | **base_unit_label** | string \| null | Label for the base unit (e.g. `"Tablet"`, `"Capsule"`, `"Bottle"`). Defaults to `"Unit"` in display when null. |
+| **in_city** | boolean | When true (Excel "In City" = YES), product is visible to all cities. When false (NO), product is Islamabad-only and hidden when `customer_city=other`. Default true. |
 | **created_at** | string | ISO 8601 |
 | **updated_at** | string | ISO 8601 |
 | **category** | object \| null | Eager-loaded when included |
@@ -730,6 +731,7 @@ Every product response includes a computed `packaging_display` object. It contai
 - `page` (optional): page number
 - `per_page` (optional): integer 1..100 (default 15)
 - `product_group_id` (optional): filter by variation group (exact match). Use to fetch all variations of a product (e.g. `?product_group_id=SEVLA`).
+- `customer_city` (optional): when set to `other`, only products with `in_city` true (deliverable outside Islamabad) are returned. When `islamabad` or omitted, all products are returned.
 - `q` (optional): full-dataset search string
   - If `q` is missing/empty: returns the normal paginated list
   - If `q` is present: filters server-side using a case-insensitive "contains" match across:
@@ -1114,7 +1116,7 @@ curl -X POST "http://localhost:8000/api/products/import" \
 
 - Reads the **active worksheet** (first/active sheet).
 - Uses the **first row as headers** and maps them case-insensitively after `trim()` + `lowercase`.
-- Only these headers are recognized. **Note:** For pack/strip quantities to appear on the dashboard and storefront (e.g. "Select Pack Size" showing "1 Box = 5 Bottles"), the Excel file must include columns **Pack Qty.** and **Strip Qty.** Header names must match exactly (e.g. "Pack Qty." with the period). Backend implementers should consider accepting both "Pack Qty." and "Pack Qty" for robustness.
+- Only these headers are recognized:
 
 | Excel Header | Maps to | Required |
 |---|---|---|
@@ -1130,8 +1132,8 @@ curl -X POST "http://localhost:8000/api/products/import" \
 | **Retail Price (Item)** | `retail_price_item` | No |
 | **Retail Price (Strip)** | `retail_price_secondary` | No |
 | **Retail Price (Box)** | `retail_price_box` | No |
-| **Pack Qty.** | `pack_qty` (cast to int) | No. Required for storefront to show "1 Box = N Bottles" etc. If missing or differently named, pack_qty stays null. |
-| **Strip Qty.** | `strip_qty` (cast to int) | No. Required for "1 Strip = N Tablets" etc. If missing or differently named, strip_qty stays null. |
+| **Pack Qty.** | `pack_qty` (cast to int) | No |
+| **Strip Qty.** | `strip_qty` (cast to int) | No |
 | **Availability** | `availability` (YES/NO/SHORT -> lowercase, default `yes`) | No |
 | **Cold Chain Needed** | `cold_chain_needed` (YES/NO -> boolean) | No |
 | **Item Discount** | `item_discount` (cast to decimal) | No |
@@ -1140,6 +1142,7 @@ curl -X POST "http://localhost:8000/api/products/import" \
 | **Variation Value** | `variation_value` (legacy/future) | No |
 | **Box Unit Label** | `box_unit_label` (e.g. "Pack", "Box") | No |
 | **Base Unit Label** | `base_unit_label` (e.g. "Tablet", "Capsule") | No |
+| **In City** | `in_city` (YES = visible to all cities, NO = Islamabad-only; default YES when empty) | No |
 
 ### Category handling
 

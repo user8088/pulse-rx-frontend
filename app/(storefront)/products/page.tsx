@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -22,6 +23,11 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const sp = await searchParams;
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const q = (sp.q ?? "").trim();
+  const customerCity = (await cookies()).get("prx_customer_city")?.value;
+  const cityParam =
+    customerCity === "islamabad" || customerCity === "other"
+      ? { customer_city: customerCity }
+      : {};
 
   let productsData: PaginatedProducts = {
     data: [],
@@ -38,6 +44,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       page,
       per_page: 24,
       ...(q ? { q } : {}),
+      ...cityParam,
     });
   } catch (error) {
     console.error("Failed to fetch products:", error);

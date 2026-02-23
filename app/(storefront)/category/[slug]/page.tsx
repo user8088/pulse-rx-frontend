@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -61,6 +62,12 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     ? subcategories.find((s) => s.id === subFilter)
     : null;
 
+  const customerCity = (await cookies()).get("prx_customer_city")?.value;
+  const cityParam =
+    customerCity === "islamabad" || customerCity === "other"
+      ? { customer_city: customerCity }
+      : {};
+
   let productsData: PaginatedProducts = { 
     data: [], 
     total: 0, 
@@ -71,7 +78,11 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     to: null 
   };
   try {
-    productsData = await getProducts({ q: category.category_name, per_page: 100 });
+    productsData = await getProducts({
+      q: category.category_name,
+      per_page: 100,
+      ...cityParam,
+    });
   } catch (error) {
     console.error("Failed to fetch products:", error);
   }

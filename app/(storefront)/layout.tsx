@@ -1,5 +1,7 @@
 import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
 import { getCategories, getSubcategories } from "@/lib/api/categories";
+import { CityProvider } from "@/lib/context/CityContext";
+import { CityModal } from "@/components/CityModal";
 
 export default async function StorefrontLayout({
   children,
@@ -35,6 +37,9 @@ export default async function StorefrontLayout({
   const dehydratedState = dehydrate(queryClient);
 
   return (
-    <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
+    <CityProvider>
+      <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
+      <CityModal />
+    </CityProvider>
   );
 }

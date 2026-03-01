@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { Modal } from "@/components/ui/Modal";
 import { useFormStatus } from "react-dom";
+import { SubcategorySelect } from "./SubcategorySelect";
 
 function downloadTextFile(filename: string, content: string, mime = "text/plain;charset=utf-8") {
   const blob = new Blob([content], { type: mime });
@@ -22,7 +23,6 @@ function downloadTextFile(filename: string, content: string, mime = "text/plain;
 
 function toCsvCell(value: unknown) {
   const s = value === null || value === undefined ? "" : String(value);
-  // Escape double quotes by doubling them, wrap in quotes if needed.
   if (/[",\n\r]/.test(s)) return `"${s.replaceAll('"', '""')}"`;
   return s;
 }
@@ -32,10 +32,22 @@ function productsToCsv(products: Product[]) {
     "id",
     "item_id",
     "item_name",
+    "generic_name",
     "brand",
     "category",
-    "stock_qty",
-    "low_stock_threshold",
+    "retail_price_unit",
+    "retail_price_item",
+    "retail_price_secondary",
+    "retail_price_box",
+    "can_sell_item",
+    "can_sell_secondary",
+    "can_sell_box",
+    "secondary_unit_label",
+    "box_unit_label",
+    "base_unit_label",
+    "availability",
+    "cold_chain_needed",
+    "item_discount",
   ];
   const lines = [
     headers.join(","),
@@ -44,16 +56,69 @@ function productsToCsv(products: Product[]) {
         p.id,
         p.item_id,
         p.item_name,
+        p.generic_name ?? "",
         p.brand ?? "",
         p.category?.category_name ?? "",
-        p.stock_qty,
-        p.low_stock_threshold,
+        p.retail_price_unit,
+        p.retail_price_item ?? "",
+        p.retail_price_secondary,
+        p.retail_price_box,
+        typeof p.can_sell_item === "boolean" ? (p.can_sell_item ? "true" : "false") : "",
+        typeof p.can_sell_secondary === "boolean" ? (p.can_sell_secondary ? "true" : "false") : "",
+        typeof p.can_sell_box === "boolean" ? (p.can_sell_box ? "true" : "false") : "",
+        p.secondary_unit_label ?? "",
+        p.box_unit_label ?? "",
+        p.base_unit_label ?? "",
+        p.availability,
+        p.cold_chain_needed ? "YES" : "NO",
+        p.item_discount,
       ]
         .map(toCsvCell)
         .join(",")
     ),
   ];
   return lines.join("\n");
+}
+
+const selectClass =
+  "h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-100 focus:border-gray-300 transition-all";
+
+function SectionBadge({ n }: { n: number }) {
+  return (
+    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[11px] font-bold text-white">
+      {n}
+    </span>
+  );
+}
+
+function PriceField({
+  label,
+  name,
+  defaultValue,
+}: {
+  label: string;
+  name: string;
+  defaultValue: string | number | "";
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-gray-600">{label}</label>
+      <div className="relative">
+        <Input
+          name={name}
+          type="number"
+          min={0}
+          step="0.01"
+          className="pr-10"
+          defaultValue={defaultValue}
+          placeholder="0.00"
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">
+          Rs.
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function ImportInner({ onPick }: { onPick: () => void }) {
@@ -78,16 +143,35 @@ export function InventoryToolbar({
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [importHelpOpen, setImportHelpOpen] = useState(false);
+  const [createCategoryId, setCreateCategoryId] = useState<string>("");
+  const [canSellItem, setCanSellItem] = useState(false);
+  const [canSellSecondary, setCanSellSecondary] = useState(false);
+  const [canSellBox, setCanSellBox] = useState(false);
+  const [secondaryLabel, setSecondaryLabel] = useState("Pack");
+  const [boxUnitLabel, setBoxUnitLabel] = useState("Box");
+  const [baseUnitLabel, setBaseUnitLabel] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const hiddenSubmitRef = useRef<HTMLButtonElement | null>(null);
 
   const exportStats = useMemo(() => {
     const total = products.length;
-    const low = products.filter((p) => p.stock_qty > 0 && p.stock_qty <= p.low_stock_threshold).length;
-    const out = products.filter((p) => p.stock_qty <= 0).length;
-    return { total, low, out };
+    const short = products.filter((p) => p.availability === "short").length;
+    const unavailable = products.filter((p) => p.availability === "no").length;
+    return { total, short, unavailable };
   }, [products]);
+
+  const resetCreateState = () => {
+    setCreateOpen(false);
+    setCreateCategoryId("");
+    setCanSellItem(false);
+    setCanSellSecondary(false);
+    setCanSellBox(false);
+    setSecondaryLabel("Pack");
+    setBoxUnitLabel("Box");
+    setBaseUnitLabel("");
+  };
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -96,110 +180,282 @@ export function InventoryToolbar({
           Create product
         </Button>
 
-        {/* Import: ONLY a button (file input is hidden) */}
-        <form
-          action={importProductsAction}
-          className="inline-flex"
-          onSubmit={() => {
-            // Keep the UI responsive even if the OS file picker is slow.
-            fileInputRef.current?.blur();
-          }}
-        >
-          <input
-            ref={fileInputRef}
-            name="file"
-            type="file"
-            accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-            className="hidden"
-            onChange={() => {
-              if (fileInputRef.current?.files?.length) hiddenSubmitRef.current?.click();
+        <div className="inline-flex items-center gap-1">
+          <form
+            action={importProductsAction}
+            className="inline-flex"
+            onSubmit={() => {
+              fileInputRef.current?.blur();
             }}
-          />
-          <button ref={hiddenSubmitRef} type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
-          <ImportInner onPick={() => fileInputRef.current?.click()} />
-        </form>
+          >
+            <input
+              ref={fileInputRef}
+              name="file"
+              type="file"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              className="hidden"
+              onChange={() => {
+                if (fileInputRef.current?.files?.length) hiddenSubmitRef.current?.click();
+              }}
+            />
+            <button ref={hiddenSubmitRef} type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+            <ImportInner onPick={() => fileInputRef.current?.click()} />
+          </form>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-gray-400 hover:text-gray-600 px-1.5"
+            onClick={() => setImportHelpOpen(true)}
+            title="Excel column reference"
+          >
+            ?
+          </Button>
+        </div>
 
         <Button type="button" variant="secondary" size="sm" onClick={() => setExportOpen(true)}>
           Export
         </Button>
       </div>
 
-      <div className="text-xs text-gray-500">
-        This page: <span className="font-bold text-gray-700">{exportStats.total}</span> · Low:{" "}
-        <span className="font-bold text-gray-700">{exportStats.low}</span> · Out:{" "}
-        <span className="font-bold text-gray-700">{exportStats.out}</span>
+      <div className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">
+        This page: <span className="font-bold text-gray-700">{exportStats.total}</span> · Short:{" "}
+        <span className="font-bold text-gray-700">{exportStats.short}</span> · Unavailable:{" "}
+        <span className="font-bold text-gray-700">{exportStats.unavailable}</span>
       </div>
 
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={resetCreateState}
         title="Create product"
         description="Quickly add a new product to your inventory."
       >
-        <form action={createProductAction} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
-                Item ID
-              </label>
-              <Input name="item_id" placeholder="e.g. 23223232" required />
+        <form action={createProductAction} className="space-y-5">
+          <input type="hidden" name="can_sell_item" value={canSellItem ? "true" : "false"} />
+          <input type="hidden" name="can_sell_secondary" value={canSellSecondary ? "true" : "false"} />
+          <input type="hidden" name="can_sell_box" value={canSellBox ? "true" : "false"} />
+          <input type="hidden" name="secondary_unit_label" value={secondaryLabel} />
+          <input type="hidden" name="box_unit_label" value={boxUnitLabel} />
+          <input type="hidden" name="base_unit_label" value={baseUnitLabel} />
+
+          {/* SECTION 1: Basic Information */}
+          <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <SectionBadge n={1} />
+              <span className="text-sm font-bold text-gray-900">Basic Information</span>
             </div>
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
-                Item Name
-              </label>
-              <Input name="item_name" placeholder="e.g. Face Mask" required />
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Item ID</label>
+                  <Input name="item_id" placeholder="e.g. 23223232" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Item Name</label>
+                  <Input name="item_name" placeholder="e.g. Face Mask" required />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Brand (optional)</label>
+                  <Input name="brand" placeholder="e.g. HealthSafe" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Generic Name (optional)</label>
+                  <Input name="generic_name" placeholder="e.g. Paracetamol" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Category</label>
+                  <select
+                    name="category_id"
+                    className={selectClass}
+                    value={createCategoryId}
+                    onChange={(e) => setCreateCategoryId(e.target.value)}
+                  >
+                    <option value="">— None —</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.category_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-600">Availability</label>
+                  <select name="availability" defaultValue="yes" className={selectClass}>
+                    <option value="yes">Available</option>
+                    <option value="short">Short supply</option>
+                    <option value="no">Unavailable</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Subcategories</label>
+                <SubcategorySelect categoryId={createCategoryId || null} />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
-                Brand (optional)
-              </label>
-              <Input name="brand" placeholder="e.g. HealthSafe" />
+          {/* SECTION 2: Pricing Options */}
+          <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <SectionBadge n={2} />
+              <span className="text-sm font-bold text-gray-900">Pricing Options</span>
             </div>
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
-                Category
-              </label>
-              <select
-                name="category_id"
-                className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm font-bold text-[#374151] focus:outline-none focus:ring-2 focus:ring-[#01AC28] focus:ring-offset-2"
-                defaultValue=""
-              >
-                <option value="">— None —</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.category_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
-                Stock Qty
-              </label>
-              <Input name="stock_qty" type="number" min={0} step={1} defaultValue={0} />
-            </div>
-            <div className="space-y-2">
-              <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
-                Re-order level
-              </label>
-              <Input name="low_stock_threshold" type="number" min={0} step={1} defaultValue={0} />
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Supplier Price (Unit, Internal)</label>
+                <Input
+                  name="retail_price_unit"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  placeholder="0.00"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Used for margin calculations only. This is <span className="font-semibold">never</span> shown to
+                  customers.
+                </p>
+              </div>
+
+              <div className="rounded-lg bg-amber-50/80 border border-amber-200/60 px-4 py-3 space-y-2.5">
+                <p className="text-sm font-semibold text-gray-800">How will you sell this?</p>
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canSellItem}
+                      onChange={(e) => setCanSellItem(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell per item (e.g. per tablet)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canSellSecondary}
+                      onChange={(e) => setCanSellSecondary(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell per secondary unit (strip, pack)
+                  </label>
+                  <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={canSellBox}
+                      onChange={(e) => setCanSellBox(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                    />
+                    Sell per box
+                  </label>
+                </div>
+              </div>
+
+              {(canSellItem || canSellSecondary || canSellBox) ? (
+                <div className="space-y-4">
+                  {canSellItem && (
+                    <div className="space-y-3">
+                      <PriceField label="Price per item (e.g. per tablet)" name="retail_price_item" defaultValue="" />
+                    </div>
+                  )}
+                  {canSellSecondary && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">Secondary tier label</label>
+                        <Input
+                          value={secondaryLabel}
+                          onChange={(e) => setSecondaryLabel(e.target.value)}
+                          placeholder="e.g. Strip, Pack, Piece, Sachet"
+                        />
+                      </div>
+                      <PriceField label="Price per secondary unit" name="retail_price_secondary" defaultValue="" />
+                    </div>
+                  )}
+                  {canSellBox && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">Box tier label</label>
+                        <Input
+                          value={boxUnitLabel}
+                          onChange={(e) => setBoxUnitLabel(e.target.value)}
+                          placeholder="e.g. Box, Pack, Carton"
+                        />
+                      </div>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <PriceField label="Price per box" name="retail_price_box" defaultValue="" />
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-gray-600">Units per box (pack_qty)</label>
+                          <Input name="pack_qty" type="number" min={0} step={1} placeholder="e.g. 24" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-600">Base unit label (optional)</label>
+                    <Input
+                      value={baseUnitLabel}
+                      onChange={(e) => setBaseUnitLabel(e.target.value)}
+                      placeholder="e.g. Tablet, Capsule, Bottle"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-3">
+                  Select at least one selling option to configure pricing.
+                </p>
+              )}
             </div>
           </div>
 
           <div className="flex items-center justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+            <Button type="button" variant="secondary" onClick={resetCreateState}>
               Cancel
             </Button>
             <PendingSubmitButton pendingText="Creating…">Create</PendingSubmitButton>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={importHelpOpen}
+        onClose={() => setImportHelpOpen(false)}
+        title="Excel import: column names"
+        description="Use these exact header names in the first row of your Excel file. Matching is case-insensitive."
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-sm text-gray-800">
+            <p className="font-semibold mb-1">Pack / strip quantities not showing after import?</p>
+            <p className="text-gray-700">
+              For the storefront to show &quot;1 Box = 5 Bottles&quot; (and similar), your Excel <strong>must</strong> have
+              columns named <strong>Pack Qty.</strong> and <strong>Strip Qty.</strong> (with the period). If these
+              columns are missing or named differently (e.g. &quot;Pack Qty&quot; without the period, or &quot;Pack Quantity&quot;),
+              the backend will not set pack_qty / strip_qty and only &quot;1 Box&quot;, &quot;1 Bottle&quot; will appear.
+            </p>
+          </div>
+          <div className="text-xs text-gray-600 space-y-1">
+            <p className="font-semibold text-gray-700">Recognized headers (examples):</p>
+            <ul className="list-disc list-inside space-y-0.5 ml-1">
+              <li>Item Id, Item Name (required)</li>
+              <li>Retail Price (Unit), Retail Price (Item), Retail Price (Strip), Retail Price (Box)</li>
+              <li><strong>Pack Qty.</strong> → units per box</li>
+              <li><strong>Strip Qty.</strong> → units per strip/secondary</li>
+              <li>Box Unit Label, Base Unit Label</li>
+              <li>Category, Sub Category, Manufacturer, Availability, etc.</li>
+            </ul>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" variant="secondary" onClick={() => setImportHelpOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal
@@ -210,7 +466,7 @@ export function InventoryToolbar({
       >
         <div className="space-y-4">
           <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-            Export includes: item id, name, brand, category, stock qty, and reorder level.
+            Export includes: item id, name, generic name, brand, category, prices (unit/secondary/box), sellable flags, secondary label, availability, cold chain, and discount.
           </div>
 
           <div className="flex items-center justify-end gap-2">
@@ -234,4 +490,3 @@ export function InventoryToolbar({
     </div>
   );
 }
-

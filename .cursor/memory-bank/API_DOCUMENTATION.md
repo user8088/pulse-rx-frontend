@@ -18,7 +18,7 @@ All routes documented below are shown **relative to `/api`**.
   - `Content-Type: application/json` (for JSON bodies)
   - `Authorization: Bearer <token>` (for authenticated routes)
 - **IDs in routes**:
-  - Resource routes use **Laravel route-model binding**: `{category}`, `{product}`, `{customer}`, `{image}` are **numeric DB IDs**, not `item_id`.
+  - Resource routes use **Laravel route-model binding**: `{category}`, `{product}`, `{customer}`, `{image}`, `{subcategory}` are **numeric DB IDs**, not `item_id`.
 - **Pagination**:
   - List endpoints use Laravel `paginate()` with default page size (typically **15**).
   - Supported query parameter: `?page=<number>`
@@ -41,7 +41,7 @@ The API has three key layers:
   - Tokens are issued by the login endpoints and must be sent as `Authorization: Bearer <token>`.
 
 - **Tenant middleware** (tenant-scoped endpoints only)
-  - **`tenant.resolve`**: resolves the tenant from the authenticated user’s `tenant_id` and binds it into the container as `tenant`.
+  - **`tenant.resolve`**: resolves the tenant from the authenticated user's `tenant_id` and binds it into the container as `tenant`.
   - **`tenant.schema`**: sets PostgreSQL `search_path` to `"{tenant_schema}, public"` so tenant tables are isolated per schema.
   - If the user is missing a tenant or the tenant is inactive, the middleware layer can return errors (commonly **401/403/404**).
 
@@ -52,7 +52,7 @@ The API has three key layers:
 
 ### Standard error responses
 
-Laravel’s default validation errors:
+Laravel's default validation errors:
 
 - **422 Unprocessable Entity** (validation failed)
 
@@ -109,6 +109,7 @@ Common not-found errors:
 - **GET** `/product-import-logs`
 - **GET** `/product-import-logs/{import_uuid}`
 - **Categories** (REST): `/categories`
+- **Subcategories** (nested): `/categories/{category}/subcategories`
 - **Products** (REST): `/products`
 - **Customers** (REST): `/customers`
 - **Product images (nested)**: `/products/{product}/images/*`
@@ -245,7 +246,7 @@ Same as normal login:
 Returns:
 
 - **user**: the authenticated user (serialized)
-- **tenant**: the user’s tenant (serialized), or `null` if none
+- **tenant**: the user's tenant (serialized), or `null` if none
 
 ```json
 {
@@ -343,6 +344,11 @@ All category endpoints exist in two variants:
   - Format: `<ALIAS><6 digits>` (example: `MED482913`)
 - **created_at**, **updated_at**: timestamps
 
+Relationships:
+
+- **products**: `hasMany(Product)`
+- **subcategories**: `hasMany(Subcategory)`
+
 ---
 
 ### 2.1 List categories
@@ -352,14 +358,14 @@ All category endpoints exist in two variants:
   - `/categories`
   - `/dashboard/categories`
 - **Middleware**:
-  - Store: `auth:sanctum`, `tenant.resolve`, `tenant.schema`
+  - Store: `tenant.resolve`, `tenant.schema`
   - Dashboard: `auth:sanctum`, `tenant.resolve`, `tenant.schema`, `role:admin,staff`
 
 #### Query parameters
 
 - `page` (optional): page number
 
-#### Success response (200) — paginated
+#### Success response (200) -- paginated
 
 ```json
 {
@@ -479,7 +485,148 @@ Returns the updated category record.
 
 Returns empty body.
 
-**Important**: Products referencing this category will have `category_id` set to `null` (category is `nullOnDelete`).
+**Important**: Products referencing this category will have `category_id` set to `null` (category is `nullOnDelete`). Subcategories under this category are cascade-deleted.
+
+---
+
+## 2b. Subcategories (nested under category, tenant-scoped)
+
+All subcategory endpoints exist in two variants:
+
+- **Store API**: `/categories/{category}/subcategories/*`
+- **Dashboard API**: `/dashboard/categories/{category}/subcategories/*` (admin/staff only)
+
+### Subcategory model fields
+
+- **id**: integer
+- **category_id**: integer (FK to categories)
+- **subcategory_name**: string
+- **created_at**, **updated_at**: timestamps
+
+Relationships:
+
+- **category**: `belongsTo(Category)`
+- **products**: `belongsToMany(Product)` via `product_subcategory` pivot
+
+---
+
+### 2b.1 List subcategories for a category
+
+- **Method**: `GET`
+- **Routes**:
+  - `/categories/{category}/subcategories`
+  - `/dashboard/categories/{category}/subcategories`
+
+#### Path parameters
+
+- **category**: integer (category `id`)
+
+#### Success response (200) -- paginated
+
+Returns a standard Laravel paginator of subcategory records for the given category.
+
+```json
+{
+  "current_page": 1,
+  "data": [
+    {
+      "id": 1,
+      "category_id": 5,
+      "subcategory_name": "Tablets",
+      "created_at": "2026-02-17T10:00:00.000000Z",
+      "updated_at": "2026-02-17T10:00:00.000000Z"
+    },
+    {
+      "id": 2,
+      "category_id": 5,
+      "subcategory_name": "Syrups",
+      "created_at": "2026-02-17T10:00:00.000000Z",
+      "updated_at": "2026-02-17T10:00:00.000000Z"
+    }
+  ],
+  "per_page": 15,
+  "total": 2
+}
+```
+
+---
+
+### 2b.2 Create subcategory
+
+- **Method**: `POST`
+- **Routes**:
+  - `/categories/{category}/subcategories`
+  - `/dashboard/categories/{category}/subcategories`
+
+#### Request body (JSON)
+
+Validation rules:
+
+- **subcategory_name**: required, string, max 255
+
+```json
+{
+  "subcategory_name": "Tablets"
+}
+```
+
+#### Success response (201)
+
+```json
+{
+  "id": 3,
+  "category_id": 5,
+  "subcategory_name": "Tablets",
+  "created_at": "2026-02-17T10:00:00.000000Z",
+  "updated_at": "2026-02-17T10:00:00.000000Z"
+}
+```
+
+---
+
+### 2b.3 Get subcategory by ID
+
+- **Method**: `GET`
+- **Routes**:
+  - `/categories/{category}/subcategories/{subcategory}`
+  - `/dashboard/categories/{category}/subcategories/{subcategory}`
+
+#### Path parameters
+
+- **category**: integer (category `id`)
+- **subcategory**: integer (subcategory `id`)
+
+If the subcategory does not belong to the given category, returns **404**.
+
+---
+
+### 2b.4 Update subcategory
+
+- **Method**: `PATCH`
+- **Routes**:
+  - `/categories/{category}/subcategories/{subcategory}`
+  - `/dashboard/categories/{category}/subcategories/{subcategory}`
+
+#### Request body (JSON)
+
+- **subcategory_name**: optional, string, max 255
+
+#### Success response (200)
+
+Returns the updated subcategory record.
+
+---
+
+### 2b.5 Delete subcategory
+
+- **Method**: `DELETE`
+- **Routes**:
+  - `/categories/{category}/subcategories/{subcategory}`
+  - `/dashboard/categories/{category}/subcategories/{subcategory}`
+
+#### Success response (204)
+
+Returns empty body. Pivot rows in `product_subcategory` are cascade-deleted.
 
 ---
 
@@ -492,21 +639,83 @@ All product endpoints exist in two variants:
 
 ### Product model fields
 
-- **id**: integer
-- **item_id**: string, unique per tenant schema (typically comes from Excel import)
-- **item_name**: string
-- **category_id**: integer or null
-- **brand**: string or null
-- **stock_qty**: integer (defaults to 0)
-- **low_stock_threshold**: integer (defaults to 0)
-- **in_stock**: boolean
-  - Automatically recomputed on save: `in_stock = (stock_qty > 0)`
-- **created_at**, **updated_at**: timestamps
+| Field | Type | Description |
+|-------|------|-------------|
+| **id** | integer | Primary key |
+| **item_id** | string | Unique SKU (e.g. from Excel) |
+| **product_group_id** | string \| null | Variation group (e.g. `SEVLA`). Same across all variants. |
+| **variation_type** | string \| null | What varies: `Strength`, `Size`, `Volume`, etc. |
+| **variation_value** | string \| null | Specific value: `400mg`, `1L`, `50ml`, etc. |
+| **item_name** | string | Display name |
+| **generic_name** | string \| null | Generic / pharmaceutical name |
+| **is_narcotic** | boolean | Whether the product is a narcotic (default false) |
+| **category_id** | integer \| null | FK to categories |
+| **brand** | string \| null | Manufacturer / brand |
+| **retail_price_unit** | string | Supplier/cost reference price as decimal string (e.g. `"49.00"`). Internal only, not customer-facing. |
+| **retail_price_item** | string | Price per single item (e.g. `"100.00"`). Customer-facing when `can_sell_item` is true. |
+| **retail_price_secondary** | string | Price per secondary unit as decimal string (e.g. `"325.00"`). Customer-facing when `can_sell_secondary` is true. |
+| **retail_price_box** | string | Price per box as decimal string (e.g. `"1990.04"`). Customer-facing when `can_sell_box` is true. |
+| **pack_qty** | integer \| null | How many secondary units in a box (informational) |
+| **strip_qty** | integer \| null | How many items in one secondary unit (informational) |
+| **availability** | string | `yes`, `no`, or `short` (default `yes`) |
+| **cold_chain_needed** | boolean | Whether cold storage is required (default false) |
+| **item_discount** | string | Discount amount as decimal string (e.g. `"5.00"`, default `"0.00"`) |
+| **can_sell_secondary** | boolean | Whether the product can be sold per secondary unit (default false) |
+| **can_sell_box** | boolean | Whether the product can be sold per box (default false) |
+| **can_sell_item** | boolean | Whether the product can be sold per individual item (default false) |
+| **secondary_unit_label** | string | Admin-defined label for the secondary tier (e.g. `"Pack"`, `"Strip"`, `"Sachet"`; default `"Pack"`) |
+| **box_unit_label** | string | Admin-defined label for the top/box tier (e.g. `"Box"`, `"Pack"`, `"Carton"`; default `"Box"`) |
+| **base_unit_label** | string \| null | Label for the base unit (e.g. `"Tablet"`, `"Capsule"`, `"Bottle"`). Defaults to `"Unit"` in display when null. |
+| **in_city** | boolean | When true (Excel "In City" = YES), product is visible to all cities. When false (NO), product is Islamabad-only and hidden when `customer_city=other`. Default true. |
+| **created_at** | string | ISO 8601 |
+| **updated_at** | string | ISO 8601 |
+| **category** | object \| null | Eager-loaded when included |
+| **subcategories** | array | Eager-loaded when included (list, show, create, update) |
+| **images** | array | Eager-loaded when included (list, show) |
+| **packaging_display** | object | Computed. Contains `base_unit` (string) and `options` (array of sellable tiers for the "Select Pack Size" UI). See below. |
 
-Relationships:
+**Removed fields** (no longer present): `stock_qty`, `low_stock_threshold`, `in_stock`, `retail_price`, `retail_price_strip`, `can_sell_unit`, `can_sell_strip`.
 
-- **category**: `belongsTo(Category)` (nullable)
-- **images**: `hasMany(ProductImage)`
+**Variations:** Use `product_group_id` to group variants (e.g. Sevla 400mg / 800mg). Filter with `?product_group_id=SEVLA` to fetch all variants. Each variant has its own `item_id`, prices, and images.
+
+#### packaging_display (computed, appended)
+
+Every product response includes a computed `packaging_display` object. It contains only the **sellable** tiers so the frontend can render a "Select Pack Size" UI directly.
+
+```json
+{
+  "packaging_display": {
+    "base_unit": "Tablet",
+    "options": [
+      {
+        "tier": "box",
+        "label": "Pack",
+        "description": "1 Pack = 10 Strips",
+        "price": "135.00"
+      },
+      {
+        "tier": "secondary",
+        "label": "Strip",
+        "description": "1 Strip = 10 Tablets",
+        "price": "13.50"
+      },
+      {
+        "tier": "item",
+        "label": "Tablet",
+        "description": "1 Tablet",
+        "price": "1.35"
+      }
+    ]
+  }
+}
+```
+
+- `base_unit`: human label for the smallest unit (from `base_unit_label`, defaults to `"Unit"`).
+- `options[]`: only tiers where the corresponding `can_sell_*` flag is `true`.
+  - `tier`: `"box"`, `"secondary"`, or `"item"` (used as identifier for cart/order).
+  - `label`: display name of the tier (from `box_unit_label` or `secondary_unit_label`).
+  - `description`: formatted string like `"1 Pack = 10 Strips"`. Uses `pack_qty`/`strip_qty`. If qty is null, shows just `"1 Pack"`.
+  - `price`: retail price as decimal string.
 
 ---
 
@@ -521,30 +730,103 @@ Relationships:
 
 - `page` (optional): page number
 - `per_page` (optional): integer 1..100 (default 15)
+- `product_group_id` (optional): filter by variation group (exact match). Use to fetch all variations of a product (e.g. `?product_group_id=SEVLA`).
+- `customer_city` (optional): when set to `other`, only products with `in_city` true (deliverable outside Islamabad) are returned. When `islamabad` or omitted, all products are returned.
 - `q` (optional): full-dataset search string
   - If `q` is missing/empty: returns the normal paginated list
-  - If `q` is present: filters server-side using a case-insensitive “contains” match across:
+  - If `q` is present: filters server-side using a case-insensitive "contains" match across:
     - `products.item_id`
     - `products.item_name`
+    - `products.generic_name`
     - `products.brand`
     - `categories.category_name` (via `whereHas`)
 
-#### Success response (200) — paginated
+#### Success response (200) -- paginated
 
-Includes eager-loaded `category` and `images` for each product.
-
-#### Frontend usage (required change)
-
-- Use `q` to search server-side instead of fetching all pages and filtering client-side.
-- Reset to `page=1` whenever `q` changes.
-- Debounce typing (recommended ~250–400ms) and cancel in-flight requests when the user keeps typing.
+Paginator with `data` = array of products. Each product includes eager-loaded `category`, `subcategories`, and `images`.
 
 Example:
 
 - `GET /products?page=1&per_page=15&q=mask`
+- `GET /products?product_group_id=SEVLA` -- all variants in that group
 - `GET /dashboard/products?page=2&q=ibuprofen`
 
-Response shape is unchanged (standard Laravel paginator JSON).
+Response shape (paginator):
+
+```json
+{
+  "current_page": 1,
+  "data": [
+    {
+      "id": 101,
+      "item_id": "2112486",
+      "product_group_id": null,
+      "variation_type": null,
+      "variation_value": null,
+      "item_name": "Uv-Lite Spf-60 Sunblock Medium Tinted Cream",
+      "generic_name": "cosmetics 0",
+      "is_narcotic": false,
+      "category_id": 5,
+      "brand": "CRYSTOLITE PHARMACEUTICALS",
+      "retail_price_unit": "220.00",
+      "retail_price_secondary": "0.00",
+      "retail_price_box": "0.00",
+      "pack_qty": null,
+      "strip_qty": null,
+      "availability": "yes",
+      "cold_chain_needed": false,
+      "item_discount": "0.00",
+      "can_sell_secondary": false,
+      "can_sell_box": false,
+      "secondary_unit_label": "Pack",
+      "box_unit_label": "Box",
+      "base_unit_label": null,
+      "created_at": "2026-01-19T12:00:00.000000Z",
+      "updated_at": "2026-01-19T12:00:00.000000Z",
+      "packaging_display": {
+        "base_unit": "Unit",
+        "options": []
+      },
+      "category": {
+        "id": 5,
+        "category_name": "Consumer",
+        "alias": "CON",
+        "serial_id": "CON001",
+        "created_at": "2026-01-19T11:00:00.000000Z",
+        "updated_at": "2026-01-19T11:00:00.000000Z"
+      },
+      "subcategories": [
+        {
+          "id": 1,
+          "category_id": 5,
+          "subcategory_name": "Skincare",
+          "created_at": "2026-02-17T10:00:00.000000Z",
+          "updated_at": "2026-02-17T10:00:00.000000Z"
+        }
+      ],
+      "images": []
+    }
+  ],
+  "first_page_url": "http://localhost:8000/api/products?page=1",
+  "from": 1,
+  "last_page": 1,
+  "last_page_url": "http://localhost:8000/api/products?page=1",
+  "links": [],
+  "next_page_url": null,
+  "path": "http://localhost:8000/api/products",
+  "per_page": 15,
+  "prev_page_url": null,
+  "to": 1,
+  "total": 1
+}
+```
+
+#### Frontend usage (required change)
+
+- Use `q` to search server-side instead of fetching all pages and filtering client-side.
+- Use `product_group_id` to load all variants of a product (e.g. for a product detail page with size/strength options).
+- Reset to `page=1` whenever `q` or `product_group_id` changes.
+- Debounce typing (recommended ~250-400ms) and cancel in-flight requests when the user keeps typing.
 
 ---
 
@@ -561,32 +843,56 @@ Validation rules:
 
 - **item_id**: required, string, unique in `products.item_id`
 - **item_name**: required, string, max 255
+- **generic_name**: nullable, string, max 255
+- **is_narcotic**: optional, boolean
+- **product_group_id**: optional, string, max 64 (variation group)
+- **variation_type**: optional, string, max 64
+- **variation_value**: optional, string, max 128
 - **category_id**: nullable, must exist in `categories.id` if provided
 - **brand**: nullable, string, max 255
-- **stock_qty**: optional, integer, min 0
-- **low_stock_threshold**: optional, integer, min 0
+- **retail_price_unit**: optional, numeric, min 0 (internal/supplier price, defaults to 0 if omitted)
+- **retail_price_item**: optional, numeric, min 0 (must be > 0 when `can_sell_item` is true; defaults to 0)
+- **retail_price_secondary**: optional, numeric, min 0 (must be > 0 when `can_sell_secondary` is true; defaults to 0)
+- **retail_price_box**: optional, numeric, min 0 (must be > 0 when `can_sell_box` is true; defaults to 0)
+- **pack_qty**: nullable, integer, min 0
+- **strip_qty**: nullable, integer, min 0
+- **availability**: optional, string, one of `yes`, `no`, `short` (defaults to `yes`)
+- **cold_chain_needed**: optional, boolean (defaults to false)
+- **item_discount**: optional, numeric, min 0 (defaults to 0)
+- **can_sell_secondary**: optional, boolean (defaults to false)
+- **can_sell_box**: optional, boolean (defaults to false)
+- **can_sell_item**: optional, boolean (defaults to false)
+- **secondary_unit_label**: optional, string, max 50 (defaults to `"Pack"`)
+- **box_unit_label**: optional, string, max 50 (defaults to `"Box"`)
+- **base_unit_label**: nullable, string, max 50 (e.g. `"Tablet"`, `"Capsule"`)
+- **subcategory_ids**: optional, array of subcategory IDs (each must exist in `subcategories.id`)
 
 Example:
 
 ```json
 {
-  "item_id": "23223232",
-  "item_name": "Face Mask",
+  "item_id": "2117061",
+  "item_name": "Cetaqua-V Cleanser 236ml",
+  "generic_name": "consumer",
+  "is_narcotic": false,
   "category_id": 1,
-  "brand": "HealthSafe",
-  "stock_qty": 100,
-  "low_stock_threshold": 10
+  "brand": "A- Crystolite",
+  "retail_price_unit": 650.00,
+  "retail_price_secondary": 50.00,
+  "retail_price_box": 550.00,
+  "can_sell_secondary": true,
+  "can_sell_box": true,
+  "secondary_unit_label": "Strip",
+  "availability": "yes",
+  "cold_chain_needed": false,
+  "item_discount": 5,
+  "subcategory_ids": [1, 3]
 }
 ```
 
-Notes:
-
-- Do **not** send `null` for `stock_qty` / `low_stock_threshold` (they are not `nullable`); omit them or send an integer.
-- `in_stock` is computed automatically from `stock_qty`.
-
 #### Success response (201)
 
-Returns the created product with `category` loaded.
+Returns the created product with `category` and `subcategories` loaded (no `images`).
 
 ---
 
@@ -603,7 +909,7 @@ Returns the created product with `category` loaded.
 
 #### Success response (200)
 
-Returns the product with `category` and `images` loaded.
+Returns the product with `category`, `subcategories`, and `images` loaded.
 
 ---
 
@@ -620,26 +926,43 @@ Validation rules:
 
 - **item_id**: optional, but if provided must be unique in `products.item_id` excluding current product
 - **item_name**: optional, string, max 255
+- **generic_name**: nullable, string, max 255
+- **is_narcotic**: optional, boolean
+- **product_group_id**: optional, nullable, string, max 64
+- **variation_type**: optional, nullable, string, max 64
+- **variation_value**: optional, nullable, string, max 128
 - **category_id**: optional; if provided may be null; if non-null must exist in `categories.id`
 - **brand**: optional; may be null; if non-null must be string, max 255
-- **stock_qty**: optional integer, min 0
-- **low_stock_threshold**: optional integer, min 0
+- **retail_price_unit**: optional, numeric, min 0 (internal/supplier price)
+- **retail_price_item**: optional, numeric, min 0 (must be > 0 when `can_sell_item` is true)
+- **retail_price_secondary**: optional, numeric, min 0 (must be > 0 when `can_sell_secondary` is true)
+- **retail_price_box**: optional, numeric, min 0 (must be > 0 when `can_sell_box` is true)
+- **pack_qty**: nullable, integer, min 0
+- **strip_qty**: nullable, integer, min 0
+- **availability**: optional, string, one of `yes`, `no`, `short`
+- **cold_chain_needed**: optional, boolean
+- **item_discount**: optional, numeric, min 0
+- **can_sell_secondary**: optional, boolean
+- **can_sell_box**: optional, boolean
+- **can_sell_item**: optional, boolean
+- **secondary_unit_label**: optional, string, max 50
+- **box_unit_label**: optional, string, max 50
+- **base_unit_label**: nullable, string, max 50
+- **subcategory_ids**: optional, array of subcategory IDs (replaces current subcategories via sync)
 
 Example:
 
 ```json
 {
-  "stock_qty": 0
+  "availability": "short",
+  "retail_price_unit": 24.50,
+  "subcategory_ids": [2]
 }
 ```
 
-Notes:
-
-- `in_stock` will be recomputed on save.
-
 #### Success response (200)
 
-Returns the updated product with `category` loaded.
+Returns the updated product with `category` and `subcategories` loaded (no `images`).
 
 ---
 
@@ -684,7 +1007,7 @@ All customer endpoints exist in two variants:
 
 - `page` (optional)
 
-#### Success response (200) — paginated
+#### Success response (200) -- paginated
 
 Returns a standard Laravel paginator of customer records.
 
@@ -786,7 +1109,7 @@ Example curl:
 curl -X POST "http://localhost:8000/api/products/import" \
   -H "Authorization: Bearer <token>" \
   -H "Accept: application/json" \
-  -F "file=@Item List - 08Jan26.xlsx"
+  -F "file=@Data Template.xlsx"
 ```
 
 ### Excel parsing behavior (exact)
@@ -794,23 +1117,60 @@ curl -X POST "http://localhost:8000/api/products/import" \
 - Reads the **active worksheet** (first/active sheet).
 - Uses the **first row as headers** and maps them case-insensitively after `trim()` + `lowercase`.
 - Only these headers are recognized:
-  - **Item Id** → `item_id` (required)
-  - **Item Name** → `item_name` (required)
-  - **Category** → category name lookup (optional)
-  - **Manufacturer** → `brand` (optional)
-  - **Available Qty.** → `stock_qty` (optional, cast to int, default 0)
-  - **Re-Ordering level** → `low_stock_threshold` (optional, cast to int, default 0)
+
+| Excel Header | Maps to | Required |
+|---|---|---|
+| **Item Id** | `item_id` | Yes |
+| **Item Name** | `item_name` | Yes |
+| **Generic Name** | `generic_name` | No |
+| **Narcotics(s)** | `is_narcotic` (TRUE/FALSE -> boolean) | No |
+| **Category** | category name lookup (creates if missing) | No |
+| **Sub Category** | subcategory 1 lookup (creates under category) | No |
+| **Sub Category II** | subcategory 2 lookup (creates under category) | No |
+| **Manufacturer** | `brand` | No |
+| **Retail Price (Unit)** | `retail_price_unit` | No |
+| **Retail Price (Item)** | `retail_price_item` | No |
+| **Retail Price (Strip)** | `retail_price_secondary` | No |
+| **Retail Price (Box)** | `retail_price_box` | No |
+| **Pack Qty.** | `pack_qty` (cast to int) | No |
+| **Strip Qty.** | `strip_qty` (cast to int) | No |
+| **Availability** | `availability` (YES/NO/SHORT -> lowercase, default `yes`) | No |
+| **Cold Chain Needed** | `cold_chain_needed` (YES/NO -> boolean) | No |
+| **Item Discount** | `item_discount` (cast to decimal) | No |
+| **Product Group Id** | `product_group_id` (legacy/future) | No |
+| **Variation Type** | `variation_type` (legacy/future) | No |
+| **Variation Value** | `variation_value` (legacy/future) | No |
+| **Box Unit Label** | `box_unit_label` (e.g. "Pack", "Box") | No |
+| **Base Unit Label** | `base_unit_label` (e.g. "Tablet", "Capsule") | No |
+| **In City** | `in_city` (YES = visible to all cities, NO = Islamabad-only; default YES when empty) | No |
 
 ### Category handling
 
-- If **Category** is present and non-empty, it must exactly match an existing `categories.category_name` (after `trim()`).
-- If no match is found, the row is **skipped** with reason `unknown_category`.
+- If **Category** is present and non-empty, the backend looks up `categories.category_name` (case-insensitive, after `trim()`).
+- If no match is found, a new category is created with that name.
+
+### Subcategory handling
+
+- If **Sub Category** or **Sub Category II** is present and non-empty, and a category was resolved, the backend looks up or creates a `Subcategory` under that category.
+- After upserting the product, the resolved subcategory IDs are synced to the `product_subcategory` pivot table.
+- If no category is resolved, subcategories are skipped.
+
+### Smart auto-marking (sellable tiers)
+
+The import **automatically sets** `can_sell_item`, `can_sell_secondary`, and `can_sell_box` based on which price columns have values > 0:
+
+- If **Retail Price (Item)** has a value > 0 → `can_sell_item` = true
+- If **Retail Price (Strip)** has a value > 0 → `can_sell_secondary` = true
+- If **Retail Price (Box)** has a value > 0 → `can_sell_box` = true
+
+Products with only `Retail Price (Item)` populated are sold per individual item. Products with Strip and/or Box prices get the corresponding flags enabled.
 
 ### Upsert behavior (important)
 
 - Upserts by `item_id`:
   - `Product::updateOrCreate(['item_id' => (string) $itemId], $data)`
 - Import **overwrites existing values**, including setting `category_id` to `null` if the Category cell is blank.
+- Subcategories are **synced** (replaces previous associations for that product).
 
 ### Response (200)
 
@@ -826,42 +1186,28 @@ curl -X POST "http://localhost:8000/api/products/import" \
     {
       "row": 45,
       "item_id": null,
-      "reason": "missing_item_id",
-      "message": "Item Id is required.",
+      "reason": "missing_required_fields",
+      "message": "Item Id and Item Name are required.",
       "data": {
         "item_id": null,
         "item_name": "Face Mask",
+        "generic_name": null,
+        "is_narcotic": "FALSE",
+        "product_group_id": null,
+        "variation_type": null,
+        "variation_value": null,
         "category": "Medical Supplies",
+        "sub_category_1": null,
+        "sub_category_2": null,
         "brand": "HealthSafe",
-        "stock_qty": "100",
-        "low_stock_threshold": "10"
-      }
-    },
-    {
-      "row": 102,
-      "item_id": "2115296",
-      "reason": "unknown_category",
-      "message": "Category 'Unknown Cat' not found in system.",
-      "data": {
-        "item_id": "2115296",
-        "item_name": "Some Item",
-        "category": "Unknown Cat",
-        "brand": "ACME",
-        "stock_qty": "0",
-        "low_stock_threshold": "0"
-      }
-    },
-    {
-      "row": 250,
-      "reason": "exception",
-      "message": "...",
-      "data": {
-        "item_id": "2119999",
-        "item_name": "Some Item",
-        "category": "Medical Supplies",
-        "brand": null,
-        "stock_qty": "10",
-        "low_stock_threshold": "0"
+        "retail_price_unit": "100",
+        "retail_price_secondary": null,
+        "retail_price_box": null,
+        "pack_qty": null,
+        "strip_qty": null,
+        "availability": "YES",
+        "cold_chain_needed": "NO",
+        "item_discount": "0"
       }
     }
   ]
@@ -874,7 +1220,7 @@ When the import finishes, the backend **persists the summary + rejected rows** i
 
 - `product_import_logs`
 
-This is keyed by `import_uuid` (returned in the response) so you can correlate a UI “Import run” with its saved rejection log.
+This is keyed by `import_uuid` (returned in the response) so you can correlate a UI "Import run" with its saved rejection log.
 
 ---
 
@@ -901,7 +1247,7 @@ All endpoints exist in two variants:
 
 - `per_page` (optional): integer 1..100
 
-#### Success response (200) — paginated
+#### Success response (200) -- paginated
 
 Returns a standard Laravel paginator of import log records **without** the heavy `errors` payload.
 
@@ -951,12 +1297,12 @@ When using the upload endpoint, the backend generates keys like:
 Where:
 
 - `tenant_id` is resolved from tenant middleware
-- `item_id` is the product’s `item_id`
+- `item_id` is the product's `item_id`
 - the filename number is `max(sort_order) + 1` for that product
 
 ---
 
-### 6.1 List images for a product
+### 7.1 List images for a product
 
 - **Method**: `GET`
 - **Routes**:
@@ -973,7 +1319,7 @@ Returns a JSON array of image records for that product.
 
 ---
 
-### 6.2 Create image record (no file upload)
+### 7.2 Create image record (no file upload)
 
 Use this endpoint if your frontend uploads the file separately and you only want to register the `object_key` and metadata.
 
@@ -1010,7 +1356,7 @@ Returns the created image record.
 
 ---
 
-### 6.3 Upload image file (backend uploads to object storage)
+### 7.3 Upload image file (backend uploads to object storage)
 
 - **Method**: `POST`
 - **Routes**:
@@ -1050,7 +1396,7 @@ Notes:
 
 ---
 
-### 6.4 Update image metadata
+### 7.4 Update image metadata
 
 - **Method**: `PATCH`
 - **Routes**:
@@ -1094,7 +1440,7 @@ Returns the updated image record.
 
 ---
 
-### 6.5 Delete image (DB + best-effort object delete)
+### 7.5 Delete image (DB + best-effort object delete)
 
 - **Method**: `DELETE`
 - **Routes**:
@@ -1113,7 +1459,7 @@ Returns empty body.
 
 ---
 
-### 6.6 Automatic Image Pickup (Sync)
+### 7.6 Automatic Image Pickup (Sync)
 
 The system automatically scans object storage for images that match existing products and registers them in the database.
 
@@ -1141,4 +1487,3 @@ For the system to pick up images, they must be uploaded to the following path in
 - **No Duplicates**: If a `product_images` record already exists for that specific `object_key`, it is skipped.
 - **Automatic Primary**: If a product has no primary image, the first image discovered during sync will be marked as `is_primary=true`.
 - **Sorting**: If the filename is a number, it becomes the `sort_order`. Otherwise, it defaults to `max(sort_order) + 1`.
-

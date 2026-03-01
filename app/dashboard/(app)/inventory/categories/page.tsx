@@ -1,17 +1,27 @@
 import React from "react";
 import { dashboardFetch } from "@/lib/dashboardApi";
-import { PaginatedCategories } from "@/types";
+import { PaginatedCategories, PaginatedSubcategories, Subcategory } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { ConfirmingSubmitButton } from "@/components/ui/ConfirmingSubmitButton";
+import { Pagination } from "@/components/ui/Pagination";
 import { createCategory, updateCategory, deleteCategory } from "./actions";
 import { Trash2 } from "lucide-react";
 import { CategoryEditCell } from "./CategoryEditCell";
+import { SubcategorySection } from "./SubcategorySection";
 
-async function getCategories(): Promise<PaginatedCategories | null> {
+async function getCategories({
+  page,
+}: {
+  page?: number;
+}): Promise<PaginatedCategories | null> {
   try {
-    const res = await dashboardFetch("/categories");
+    const sp = new URLSearchParams();
+    if (page && Number.isFinite(page)) sp.set("page", String(page));
+    const qs = sp.toString();
+
+    const res = await dashboardFetch(qs ? `/categories?${qs}` : "/categories");
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -19,23 +29,43 @@ async function getCategories(): Promise<PaginatedCategories | null> {
   }
 }
 
+async function getSubcategoriesForCategory(categoryId: number): Promise<Subcategory[]> {
+  try {
+    const res = await dashboardFetch(`/categories/${categoryId}/subcategories?per_page=100`);
+    if (!res.ok) return [];
+    const data: PaginatedSubcategories = await res.json();
+    return data.data;
+  } catch {
+    return [];
+  }
+}
+
 export default async function CategoriesPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ message?: string; error?: string }>;
+  searchParams?: Promise<{ message?: string; error?: string; page?: string }>;
 }) {
   const sp = (await searchParams) ?? {};
   const message = sp.message;
   const error = sp.error;
+  const page = sp.page ? Number.parseInt(sp.page, 10) : undefined;
 
-  const categoriesData = await getCategories();
+  const categoriesData = await getCategories({ page });
   const categories = categoriesData?.data ?? [];
+
+  const subcategoriesMap = new Map<number, Subcategory[]>();
+  await Promise.all(
+    categories.map(async (cat) => {
+      const subs = await getSubcategoriesForCategory(cat.id);
+      subcategoriesMap.set(cat.id, subs);
+    })
+  );
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
             Inventory
           </div>
           <h2 className="mt-1 text-2xl font-black text-[#374151]">Categories</h2>
@@ -67,7 +97,7 @@ export default async function CategoriesPage({
             <CardContent>
               <form action={createCategory} className="space-y-4">
                 <div className="space-y-2">
-                  <label className="ml-1 text-[10px] font-extrabold text-[#374151] uppercase tracking-[0.2em]">
+                  <label className="ml-1 text-[10px] font-semibold text-[#374151] uppercase tracking-widest">
                     Category Name
                   </label>
                   <Input
@@ -94,7 +124,7 @@ export default async function CategoriesPage({
               <div className="overflow-x-auto">
                 <table className="min-w-full text-left">
                   <thead className="bg-gray-50">
-                    <tr className="text-[10px] font-extrabold text-gray-400 uppercase tracking-[0.2em]">
+                    <tr className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
                       <th className="px-5 py-3">Name</th>
                       <th className="px-5 py-3">Alias / ID</th>
                       <th className="px-5 py-3 text-right">Actions</th>
@@ -112,6 +142,10 @@ export default async function CategoriesPage({
                         <tr key={category.id} className="group hover:bg-gray-50/60 transition-colors">
                           <td className="px-5 py-4">
                             <CategoryEditCell category={category} />
+                            <SubcategorySection
+                              categoryId={category.id}
+                              subcategories={subcategoriesMap.get(category.id) ?? []}
+                            />
                           </td>
                           <td className="px-5 py-4">
                             <div className="text-sm font-bold text-gray-700">
@@ -148,6 +182,17 @@ export default async function CategoriesPage({
           </Card>
         </div>
       </div>
+
+      {categoriesData ? (
+        <Pagination
+          basePath="/dashboard/inventory/categories"
+          currentPage={categoriesData.current_page}
+          lastPage={categoriesData.last_page}
+          total={categoriesData.total}
+          from={categoriesData.from}
+          to={categoriesData.to}
+        />
+      ) : null}
     </div>
   );
 }

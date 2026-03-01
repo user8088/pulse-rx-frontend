@@ -24,9 +24,9 @@ export default function InventoryLayout({ children }: { children: React.ReactNod
               key={item.href}
               href={item.href}
               className={cn(
-                "px-6 py-3 text-sm font-bold uppercase tracking-[0.2em] transition-colors border-b-2",
+                "px-6 py-3 text-sm font-semibold uppercase tracking-widest transition-colors border-b-2",
                 active
-                  ? "border-[#01AC28] text-[#111827]"
+                  ? "border-gray-900 text-gray-900"
                   : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200"
               )}
             >

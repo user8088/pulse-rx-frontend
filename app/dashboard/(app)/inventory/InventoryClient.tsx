@@ -113,7 +113,7 @@ export default function InventoryClient() {
             <CardTitle>Stock value</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-black text-[#111827]">${totals.value.toFixed(0)}</div>
+            <div className="text-3xl font-black text-[#111827]">Rs. {totals.value.toFixed(0)}</div>
             <div className="mt-2 text-xs text-gray-500">Approx. inventory valuation</div>
           </CardContent>
         </Card>
@@ -187,7 +187,7 @@ export default function InventoryClient() {
                         <Badge variant={status.variant}>{status.label}</Badge>
                       </td>
                       <td className="px-5 py-4 text-right">
-                        <span className="text-sm font-bold text-gray-700">${item.price.toFixed(2)}</span>
+                        <span className="text-sm font-bold text-gray-700">Rs. {item.price.toFixed(2)}</span>
                       </td>
                     </tr>
                   );

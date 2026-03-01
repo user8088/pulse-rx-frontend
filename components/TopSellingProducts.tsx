@@ -95,7 +95,7 @@ export default function TopSellingProducts() {
                 {/* Price and Add to Cart */}
                 <div className="flex items-center justify-between mt-4">
                   <span className="text-lg md:text-xl font-bold text-[#01AC28]">
-                    ${product.price.toFixed(2)}
+                    Rs. {product.price.toFixed(2)}
                   </span>
                   <button
                     onClick={(e) => {

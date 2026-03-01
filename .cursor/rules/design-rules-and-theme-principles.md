@@ -3,7 +3,7 @@
 This document captures design rules and theme principles derived from the app architecture (`app.xml`), components (`components.xml`), and utilities (`utils.xml`). Use it when creating new UI pages or components so the experience stays consistent.
 
 ---
-
+asim
 ## 1. Architecture Overview
 
 - **One Next.js app, two surfaces**: **Storefront** (public: `/`, `/products`, `/cart`, `/checkout`, `/profile`) and **Dashboard** (staff: `/dashboard/**`). They are separate feature domains; dashboard must not import storefront-only components or providers.

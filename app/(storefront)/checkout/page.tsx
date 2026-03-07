@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronRight, ArrowLeft, ShieldCheck, CreditCard, Truck, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -10,52 +11,96 @@ import Footer from '@/components/Footer';
 import ProductGrid from '@/components/ProductGrid';
 import PrescriptionUpload from '@/components/PrescriptionUpload';
 import { useCart } from '@/lib/context/CartContext';
+import { useAuth } from '@/lib/context/AuthContext';
+import { createOrder } from '@/lib/api/orders';
+import type { CreateOrderPayload } from '@/lib/api/orders';
+
+const CITIES = ['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Other'];
 
 const recommendedProducts = [
-  {
-    id: 101,
-    name: "Vitamin C 1000mg Immune Support",
-    price: 24.99,
-    originalPrice: 29.99,
-    image: "/assets/home/product-3.png",
-  },
-  {
-    id: 102,
-    name: "Zinc Picolinate 50mg Tablets",
-    price: 18.50,
-    image: "/assets/home/product-4.png",
-  },
-  {
-    id: 103,
-    name: "Omega-3 Fish Oil 1200mg",
-    price: 32.00,
-    image: "/assets/home/product-5.png",
-  },
-  {
-    id: 104,
-    name: "Magnesium Citrate 200mg",
-    price: 15.00,
-    image: "/assets/home/product-6.png",
-  }
+  { id: 101, name: "Vitamin C 1000mg Immune Support", price: 24.99, originalPrice: 29.99, image: "/assets/home/product-3.png" },
+  { id: 102, name: "Zinc Picolinate 50mg Tablets", price: 18.50, image: "/assets/home/product-4.png" },
+  { id: 103, name: "Omega-3 Fish Oil 1200mg", price: 32.00, image: "/assets/home/product-5.png" },
+  { id: 104, name: "Magnesium Citrate 200mg", price: 15.00, image: "/assets/home/product-6.png" },
 ];
 
 export default function CheckoutPage() {
-  const [step, setStep] = useState(1);
-  const { cartItems, cartTotal, uploadPrescription, canPlaceOrder } = useCart();
-  
+  const router = useRouter();
+  const { user, isAuthenticated } = useAuth();
+  const { cartItems, cartTotal, uploadPrescription, canPlaceOrder, clearCart } = useCart();
+
+  const [customerName, setCustomerName] = useState(isAuthenticated && user?.name ? user.name : '');
+  const [customerEmail, setCustomerEmail] = useState(isAuthenticated && user?.email ? user.email : '');
+  const [phone, setPhone] = useState('');
+  const [houseApt, setHouseApt] = useState('');
+  const [street, setStreet] = useState('');
+  const [blockLocality, setBlockLocality] = useState('');
+  const [city, setCity] = useState('');
+  const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card'>('cod');
+  const [placing, setPlacing] = useState(false);
+
   const subtotal = cartTotal;
   const tax = subtotal * 0.15;
-  const shipping = 0; // Free for demo
+  const shipping = deliveryMethod === 'express' ? 15 : 0;
   const total = subtotal + tax + shipping;
 
   const prescriptionRequiredItems = cartItems.filter(item => item.requiresPrescription);
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     if (!canPlaceOrder) {
       alert('Please ensure all prescription-required products have verified prescriptions before placing your order.');
       return;
     }
-    alert('Order placed successfully! (Demo mode)');
+    if (!phone.trim() || !houseApt.trim() || !street.trim() || !blockLocality.trim() || !city.trim()) {
+      alert('Please fill in all required address fields.');
+      return;
+    }
+    if (!customerName.trim()) {
+      alert('Please enter your name.');
+      return;
+    }
+
+    setPlacing(true);
+    try {
+      const payload: CreateOrderPayload = {
+        customer_name: customerName.trim(),
+        customer_email: customerEmail.trim() || null,
+        customer_phone: phone.trim(),
+        address: {
+          phone: phone.trim(),
+          house_apt: houseApt.trim(),
+          street: street.trim(),
+          block_locality: blockLocality.trim(),
+          city: city.trim(),
+        },
+        payment_method: paymentMethod,
+        items: cartItems.map((item) => ({
+          product_id: item.id,
+          item_name: item.name,
+          item_id: '',
+          tier: 'item',
+          tier_label: item.quantity,
+          unit_price: item.price.toFixed(2),
+          quantity: item.qty,
+          line_total: (item.price * item.qty).toFixed(2),
+          image_url: item.image,
+        })),
+        subtotal: subtotal.toFixed(2),
+        tax: tax.toFixed(2),
+        shipping: shipping.toFixed(2),
+        total: total.toFixed(2),
+      };
+
+      const order = await createOrder(payload);
+      clearCart();
+      router.push(`/order-confirmation/${order.id}`);
+    } catch (e) {
+      console.error('Place order failed:', e);
+      alert('Unable to place order. Please try again.');
+    } finally {
+      setPlacing(false);
+    }
   };
 
   return (
@@ -63,7 +108,6 @@ export default function CheckoutPage() {
       <Header />
       <Navbar />
 
-      {/* Breadcrumb */}
       <div className="bg-[#EFEFEF] py-4 md:py-6">
         <div className="container mx-auto px-4 md:px-6 lg:px-12">
           <nav className="flex items-center gap-2 text-sm">
@@ -79,30 +123,153 @@ export default function CheckoutPage() {
       <section className="py-8 md:py-16 px-4 md:px-6 lg:px-12">
         <div className="container mx-auto max-w-7xl">
           <div className="flex flex-col lg:flex-row gap-8 md:gap-16">
-            
-            {/* Left Column - Checkout Steps */}
             <div className="lg:col-span-8 flex-1">
               <h1 className="text-3xl md:text-4xl font-bold text-[#374151] mb-8">Complete Your Order</h1>
-              
-              {/* Checkout Progress */}
-              <div className="flex items-center gap-4 mb-12 overflow-x-auto pb-4 scrollbar-hide">
-                <div className={`flex items-center gap-2 flex-shrink-0 ${step >= 1 ? 'text-[#01AC28]' : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 1 ? 'bg-[#01AC28] text-white' : 'bg-gray-100 text-gray-400'}`}>1</div>
-                  <span className="text-xs font-bold uppercase tracking-widest">Shipping</span>
+
+              {!isAuthenticated && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
+                  <div className="flex items-center gap-3 mb-6">
+                    <MapPin className="w-5 h-5 text-[#01AC28]" />
+                    <h2 className="text-xl font-bold text-[#374151]">Contact Information</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Full Name *</label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                        placeholder="John Doe"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email (optional)</label>
+                      <input
+                        type="email"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                        placeholder="john@example.com"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Phone *</label>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                        placeholder="+92 300 1234567"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="w-12 h-[1px] bg-gray-200" />
-                <div className={`flex items-center gap-2 flex-shrink-0 ${step >= 2 ? 'text-[#01AC28]' : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 2 ? 'bg-[#01AC28] text-white' : 'bg-gray-100 text-gray-400'}`}>2</div>
-                  <span className="text-xs font-bold uppercase tracking-widest">Payment</span>
+              )}
+
+              {isAuthenticated && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
+                  <div className="flex items-center gap-3 mb-4">
+                    <CheckCircle2 className="w-5 h-5 text-[#01AC28]" />
+                    <h2 className="text-xl font-bold text-[#374151]">Signed in as {user?.name ?? user?.email}</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Name</label>
+                      <input
+                        type="text"
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                        placeholder="Full name"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Email</label>
+                      <input
+                        type="email"
+                        value={customerEmail}
+                        onChange={(e) => setCustomerEmail(e.target.value)}
+                        className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                        placeholder="Email"
+                      />
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Phone *</label>
+                      <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                        placeholder="+92 300 1234567"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="w-12 h-[1px] bg-gray-200" />
-                <div className={`flex items-center gap-2 flex-shrink-0 ${step >= 3 ? 'text-[#01AC28]' : 'text-gray-400'}`}>
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${step >= 3 ? 'bg-[#01AC28] text-white' : 'bg-gray-100 text-gray-400'}`}>3</div>
-                  <span className="text-xs font-bold uppercase tracking-widest">Review</span>
+              )}
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <MapPin className="w-5 h-5 text-[#01AC28]" />
+                  <h2 className="text-xl font-bold text-[#374151]">Delivery Address</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Phone *</label>
+                    <input
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                      placeholder="+92 300 1234567"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">House / Apt *</label>
+                    <input
+                      type="text"
+                      value={houseApt}
+                      onChange={(e) => setHouseApt(e.target.value)}
+                      className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                      placeholder="House 12, Apt 4B"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Street *</label>
+                    <input
+                      type="text"
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                      placeholder="Street 7"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Block or Locality *</label>
+                    <input
+                      type="text"
+                      value={blockLocality}
+                      onChange={(e) => setBlockLocality(e.target.value)}
+                      className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                      placeholder="F-7 Markaz"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">City *</label>
+                    <select
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all"
+                    >
+                      <option value="">Select city</option>
+                      {CITIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Prescription Upload Section */}
               {prescriptionRequiredItems.length > 0 && (
                 <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
                   <div className="flex items-center gap-3 mb-6">
@@ -117,18 +284,11 @@ export default function CheckoutPage() {
                       <div key={item.id} className="border border-gray-200 rounded-xl p-6">
                         <div className="flex items-start gap-4 mb-4">
                           <div className="relative w-20 h-20 rounded-lg bg-gray-50 border border-gray-200 flex-shrink-0 overflow-hidden">
-                            <Image
-                              src={item.image}
-                              alt={item.name}
-                              fill
-                              className="object-contain p-2"
-                            />
+                            <Image src={item.image} alt={item.name} fill className="object-contain p-2" />
                           </div>
                           <div className="flex-1">
                             <h3 className="text-sm font-bold text-[#374151] mb-1">{item.name}</h3>
-                            <p className="text-xs text-gray-500 uppercase tracking-wider">
-                              {item.variation} • {item.quantity}
-                            </p>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider">{item.variation} • {item.quantity}</p>
                           </div>
                         </div>
                         <PrescriptionUpload
@@ -145,100 +305,62 @@ export default function CheckoutPage() {
                 </div>
               )}
 
-              {/* Shipping Form */}
-              <div className="space-y-8">
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <MapPin className="w-5 h-5 text-[#01AC28]" />
-                    <h2 className="text-xl font-bold text-[#374151]">Shipping Information</h2>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">First Name</label>
-                      <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="John" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Last Name</label>
-                      <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="Doe" />
-                    </div>
-                    <div className="space-y-1.5 md:col-span-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Street Address</label>
-                      <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="123 Health Ave, Apt 4B" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">City</label>
-                      <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="Wellness City" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Postcode</label>
-                      <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="12345" />
-                    </div>
-                  </div>
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <Truck className="w-5 h-5 text-[#01AC28]" />
+                  <h2 className="text-xl font-bold text-[#374151]">Delivery Method</h2>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className={`relative flex items-center p-4 rounded-xl cursor-pointer border-2 transition-all ${deliveryMethod === 'standard' ? 'border-[#01AC28] bg-[#F0FDF4]' : 'border-gray-100 bg-gray-50/50 hover:border-[#01AC28]'}`}>
+                    <input type="radio" name="delivery" className="sr-only" checked={deliveryMethod === 'standard'} onChange={() => setDeliveryMethod('standard')} />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-[#374151]">Standard Delivery</p>
+                      <p className="text-xs text-[#6B7280]">3-5 Business Days</p>
+                    </div>
+                    <span className="text-sm font-bold text-[#01AC28]">FREE</span>
+                    {deliveryMethod === 'standard' && <CheckCircle2 className="w-5 h-5 text-[#01AC28] ml-3" />}
+                  </label>
+                  <label className={`relative flex items-center p-4 rounded-xl cursor-pointer border-2 transition-all ${deliveryMethod === 'express' ? 'border-[#01AC28] bg-[#F0FDF4]' : 'border-gray-100 bg-gray-50/50 hover:border-[#01AC28]'}`}>
+                    <input type="radio" name="delivery" className="sr-only" checked={deliveryMethod === 'express'} onChange={() => setDeliveryMethod('express')} />
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-[#374151]">Express Delivery</p>
+                      <p className="text-xs text-[#6B7280]">Next Business Day</p>
+                    </div>
+                    <span className="text-sm font-bold text-[#374151]">Rs. 15.00</span>
+                    {deliveryMethod === 'express' && <CheckCircle2 className="w-5 h-5 text-[#01AC28] ml-3" />}
+                  </label>
+                </div>
+              </div>
 
-                {/* Delivery Method */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Truck className="w-5 h-5 text-[#01AC28]" />
-                    <h2 className="text-xl font-bold text-[#374151]">Delivery Method</h2>
-                  </div>
-                  
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <CreditCard className="w-5 h-5 text-[#01AC28]" />
+                  <h2 className="text-xl font-bold text-[#374151]">Payment Method</h2>
+                </div>
+                <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <label className="relative flex items-center p-4 border-2 border-[#01AC28] bg-[#F0FDF4] rounded-xl cursor-pointer">
-                      <input type="radio" name="delivery" className="sr-only" defaultChecked />
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-[#374151]">Standard Delivery</p>
-                        <p className="text-xs text-[#6B7280]">3-5 Business Days</p>
+                    <label className={`flex items-center p-4 rounded-xl cursor-pointer border-2 transition-all ${paymentMethod === 'cod' ? 'border-[#01AC28] bg-[#F0FDF4]' : 'border-gray-100 bg-gray-50/50 hover:border-[#01AC28]'}`}>
+                      <input type="radio" name="payment" className="sr-only" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                        <Truck className="w-6 h-6 text-[#01AC28]" />
                       </div>
-                      <span className="text-sm font-bold text-[#01AC28]">FREE</span>
-                      <CheckCircle2 className="w-5 h-5 text-[#01AC28] ml-3" />
+                      <span className="text-sm font-bold text-[#374151]">Cash on Delivery</span>
+                      {paymentMethod === 'cod' && <CheckCircle2 className="w-5 h-5 text-[#01AC28] ml-auto" />}
                     </label>
-                    <label className="relative flex items-center p-4 border border-gray-100 bg-gray-50/50 rounded-xl cursor-pointer hover:border-[#01AC28] transition-all group">
-                      <input type="radio" name="delivery" className="sr-only" />
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-[#374151]">Express Delivery</p>
-                        <p className="text-xs text-[#6B7280]">Next Business Day</p>
+                    <label className={`flex items-center p-4 rounded-xl cursor-pointer border-2 transition-all ${paymentMethod === 'card' ? 'border-[#01AC28] bg-[#F0FDF4]' : 'border-gray-100 bg-gray-50/50 hover:border-[#01AC28]'}`}>
+                      <input type="radio" name="payment" className="sr-only" checked={paymentMethod === 'card'} onChange={() => setPaymentMethod('card')} />
+                      <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm">
+                        <CreditCard className="w-6 h-6 text-[#01AC28]" />
                       </div>
-                      <span className="text-sm font-bold text-[#374151] group-hover:text-[#01AC28] transition-colors">Rs. 15.00</span>
+                      <span className="text-sm font-bold text-[#374151]">Credit / Debit Card</span>
+                      {paymentMethod === 'card' && <CheckCircle2 className="w-5 h-5 text-[#01AC28] ml-auto" />}
                     </label>
                   </div>
-                </div>
-
-                {/* Payment Method */}
-                <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <CreditCard className="w-5 h-5 text-[#01AC28]" />
-                    <h2 className="text-xl font-bold text-[#374151]">Payment Method</h2>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <label className="flex items-center p-4 border-2 border-[#01AC28] bg-[#F0FDF4] rounded-xl cursor-pointer">
-                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm">
-                          <CreditCard className="w-6 h-6 text-[#01AC28]" />
-                        </div>
-                        <span className="text-sm font-bold text-[#374151]">Credit / Debit Card</span>
-                        <CheckCircle2 className="w-5 h-5 text-[#01AC28] ml-auto" />
-                      </label>
-                      <label className="flex items-center p-4 border border-gray-100 bg-gray-50/50 rounded-xl cursor-pointer hover:border-[#01AC28] transition-all group">
-                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center mr-3 shadow-sm grayscale group-hover:grayscale-0 transition-all">
-                          <div className="w-6 h-6 bg-[#003087] rounded-sm" />
-                        </div>
-                        <span className="text-sm font-bold text-[#374151] group-hover:text-[#01AC28]">PayPal</span>
-                      </label>
-                    </div>
-
-                    <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {paymentMethod === 'card' && (
+                    <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-100">
                       <div className="space-y-1.5 md:col-span-2">
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Card Number</label>
-                        <div className="relative">
-                          <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="XXXX XXXX XXXX XXXX" />
-                          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
-                            <div className="w-6 h-4 bg-gray-300 rounded-sm" />
-                            <div className="w-6 h-4 bg-gray-300 rounded-sm" />
-                          </div>
-                        </div>
+                        <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="XXXX XXXX XXXX XXXX" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Expiry Date</label>
@@ -249,16 +371,14 @@ export default function CheckoutPage() {
                         <input type="text" className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all" placeholder="XXX" />
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Right Column - Order Summary */}
             <div className="lg:w-[400px]">
               <div className="bg-[#374151] rounded-3xl p-6 md:p-8 text-white sticky top-[150px] shadow-2xl">
                 <h2 className="text-xl md:text-2xl font-bold mb-8">Order Summary</h2>
-                
                 <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
                   {cartItems.map((item) => (
                     <div key={item.id} className="flex gap-4 items-center">
@@ -275,25 +395,16 @@ export default function CheckoutPage() {
                         </div>
                         {item.requiresPrescription && (
                           <div className="mt-1">
-                            {item.prescription?.status === 'verified' && (
-                              <span className="text-[10px] text-green-400 font-bold">✓ Prescription Verified</span>
-                            )}
-                            {item.prescription?.status === 'pending' && (
-                              <span className="text-[10px] text-yellow-400 font-bold">⏳ Verification Pending</span>
-                            )}
-                            {item.prescription?.status === 'rejected' && (
-                              <span className="text-[10px] text-red-400 font-bold">✗ Prescription Rejected</span>
-                            )}
-                            {!item.prescription && (
-                              <span className="text-[10px] text-orange-400 font-bold">⚠ Prescription Required</span>
-                            )}
+                            {item.prescription?.status === 'verified' && <span className="text-[10px] text-green-400 font-bold">✓ Prescription Verified</span>}
+                            {item.prescription?.status === 'pending' && <span className="text-[10px] text-yellow-400 font-bold">⏳ Verification Pending</span>}
+                            {item.prescription?.status === 'rejected' && <span className="text-[10px] text-red-400 font-bold">✗ Prescription Rejected</span>}
+                            {!item.prescription && <span className="text-[10px] text-orange-400 font-bold">⚠ Prescription Required</span>}
                           </div>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
-
                 <div className="space-y-4 pt-6 border-t border-white/10 mb-8">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Subtotal</span>
@@ -305,41 +416,24 @@ export default function CheckoutPage() {
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Shipping Fee</span>
-                    <span className="text-[#01AC28] font-bold">FREE</span>
+                    <span className={shipping === 0 ? 'text-[#01AC28] font-bold' : 'font-bold'}>{shipping === 0 ? 'FREE' : `Rs. ${shipping.toFixed(2)}`}</span>
                   </div>
                   <div className="pt-4 border-t border-white/20 flex justify-between items-center">
                     <span className="text-lg font-bold">Total</span>
                     <span className="text-2xl font-black text-[#01AC28]">Rs. {total.toFixed(2)}</span>
                   </div>
                 </div>
-
-                <button 
+                <button
                   data-cursor="Place Order"
                   onClick={handlePlaceOrder}
-                  disabled={!canPlaceOrder}
-                  className={`w-full py-4 rounded-xl font-bold text-xs tracking-[0.2em] transition-all uppercase flex items-center justify-center gap-2 shadow-lg ${
-                    canPlaceOrder
-                      ? 'bg-[#01AC28] hover:bg-[#044644] text-white hover:shadow-xl cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
+                  disabled={!canPlaceOrder || placing}
+                  className={`w-full py-4 rounded-xl font-bold text-xs tracking-[0.2em] transition-all uppercase flex items-center justify-center gap-2 shadow-lg ${canPlaceOrder && !placing ? 'bg-[#01AC28] hover:bg-[#044644] text-white hover:shadow-xl cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
                 >
-                  {canPlaceOrder ? (
-                    <>
-                      Confirm & Place Order <CheckCircle2 className="w-4 h-4" />
-                    </>
-                  ) : (
-                    <>
-                      Verify Prescriptions First <AlertCircle className="w-4 h-4" />
-                    </>
-                  )}
+                  {placing ? 'Placing Order…' : canPlaceOrder ? <>Confirm & Place Order <CheckCircle2 className="w-4 h-4" /></> : <>Verify Prescriptions First <AlertCircle className="w-4 h-4" /></>}
                 </button>
-                
                 {!canPlaceOrder && (
-                  <p className="text-xs text-red-600 text-center mt-2">
-                    Please ensure all prescription-required products have verified prescriptions.
-                  </p>
+                  <p className="text-xs text-red-600 text-center mt-2">Please ensure all prescription-required products have verified prescriptions.</p>
                 )}
-
                 <div className="mt-8 pt-6 border-t border-white/10">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
@@ -364,14 +458,10 @@ export default function CheckoutPage() {
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Up-sell</span>
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#374151]">Recommended for you</h2>
             </div>
-            <Link 
-              href="/special-offers"
-              className="text-[#01AC28] font-bold text-sm hover:underline flex items-center gap-1"
-            >
+            <Link href="/special-offers" className="text-[#01AC28] font-bold text-sm hover:underline flex items-center gap-1">
               View All <ChevronRight className="w-4 h-4" />
             </Link>
           </div>
-          
           <ProductGrid products={recommendedProducts} />
         </div>
       </section>

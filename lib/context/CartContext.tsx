@@ -32,6 +32,7 @@ interface CartContextType {
   addItem: (item: CartItem) => void;
   removeItem: (id: number) => void;
   updateQty: (id: number, qty: number) => void;
+  clearCart: () => void;
   uploadPrescription: (itemId: number, file: File) => void;
   getPrescriptionStatus: (itemId: number) => PrescriptionStatus;
   cartCount: number;
@@ -134,6 +135,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
   const updateQty = (id: number, qty: number) => {
     if (qty < 1) return;
     setCartItems(prev => prev.map(item => item.id === id ? { ...item, qty } : item));
@@ -196,6 +201,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       addItem,
       removeItem,
       updateQty,
+      clearCart,
       uploadPrescription,
       getPrescriptionStatus,
       cartCount,

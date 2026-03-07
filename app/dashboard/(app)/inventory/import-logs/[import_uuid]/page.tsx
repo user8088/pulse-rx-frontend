@@ -3,6 +3,37 @@ import { getProductImportLogByUuid } from "@/lib/productImportLogs";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 
+const PACKAGING_KEYS = [
+  { key: "is_pack_item", label: "Is Pack Item" },
+  { key: "sell_per_item_only", label: "Sell Per Item Only" },
+  { key: "pack_unit", label: "Pack Unit" },
+  { key: "pack_item_unit", label: "Pack Item Unit" },
+] as const;
+
+function PackagingFields({ data }: { data: Record<string, unknown> }) {
+  const fields = PACKAGING_KEYS.filter((f) => f.key in data);
+  if (fields.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {fields.map(({ key, label }) => {
+        const raw = data[key];
+        const value =
+          raw === true ? "Yes" : raw === false ? "No" : raw == null ? "—" : String(raw);
+        return (
+          <span
+            key={key}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-xs"
+          >
+            <span className="font-semibold text-indigo-600">{label}:</span>
+            <span className="font-medium text-indigo-900">{value}</span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 function formatDate(value?: string) {
   if (!value) return "—";
   const d = new Date(value);
@@ -116,9 +147,17 @@ export default async function ImportLogDetailPage({
                       </div>
 
                       {e.data && typeof e.data === "object" ? (
-                        <pre className="mt-3 overflow-auto rounded-xl bg-gray-50 border border-gray-200 p-3 text-xs text-gray-700">
+                        <div className="mt-3 space-y-2">
+                          <PackagingFields data={e.data as Record<string, unknown>} />
+                          <details className="group">
+                            <summary className="cursor-pointer text-[10px] font-semibold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
+                              Raw data
+                            </summary>
+                            <pre className="mt-2 overflow-auto rounded-xl bg-gray-50 border border-gray-200 p-3 text-xs text-gray-700">
 {JSON.stringify(e.data, null, 2)}
-                        </pre>
+                            </pre>
+                          </details>
+                        </div>
                       ) : null}
                     </div>
                   );

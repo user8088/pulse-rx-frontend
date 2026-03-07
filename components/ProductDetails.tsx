@@ -112,14 +112,16 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       safePrice = Number.isFinite(priceSource) ? priceSource : 0;
       const baseLabel =
         (selectedVariation.base_unit_label as unknown as string) || "Unit";
-      const secondaryLabel =
+      const secLabel =
         (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+      const bxLabel =
+        (selectedVariation.box_unit_label as unknown as string) || "Box";
       quantityLabel =
         effectiveType === "item"
           ? `1 ${baseLabel}`
           : effectiveType === "box"
-            ? "Per Box"
-            : `Per ${secondaryLabel}`;
+            ? `Per ${bxLabel}`
+            : `Per ${secLabel}`;
     }
 
     addItem({
@@ -178,6 +180,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
     (selectedVariation.base_unit_label as unknown as string) || "Unit";
   const secondaryLabel =
     (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+  const boxUnitLabel =
+    (selectedVariation.box_unit_label as unknown as string) || "Box";
   const itemPrice = Number.parseFloat(
     (selectedVariation.retail_price_item as unknown as string) ?? "0"
   );
@@ -392,7 +396,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                                 : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
                             }`}
                           >
-                            Box · Rs. {boxPrice.toFixed(2)}
+                            {boxUnitLabel} · Rs. {boxPrice.toFixed(2)}
                           </button>
                         )}
                       </>

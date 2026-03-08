@@ -113,7 +113,7 @@ function shouldRetryBasedOnStatus(error: AxiosError): boolean {
 
 function shouldRetryBasedOnCode(error: AxiosError): boolean {
   const code = error.code;
-  return code !== null && RETRYABLE_ERROR_CODES.includes(code);
+  return code !== null && code !== undefined && RETRYABLE_ERROR_CODES.includes(code);
 }
 
 export default apiClient;

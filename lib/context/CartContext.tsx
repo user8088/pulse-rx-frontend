@@ -31,14 +31,19 @@ interface CartContextType {
   openCart: () => void;
   closeCart: () => void;
   addItem: (item: CartItem) => void;
-  removeItem: (id: number) => void;
-  updateQty: (id: number, qty: number) => void;
+  removeItem: (key: string) => void;
+  updateQty: (key: string, qty: number) => void;
   clearCart: () => void;
-  uploadPrescription: (itemId: number, file: File) => void;
-  getPrescriptionStatus: (itemId: number) => PrescriptionStatus;
+  uploadPrescription: (key: string, file: File) => void;
+  getPrescriptionStatus: (key: string) => PrescriptionStatus;
   cartCount: number;
   cartTotal: number;
   canPlaceOrder: boolean;
+}
+
+/** Stable unique key for a cart line item (product + variation + tier). */
+export function cartItemKey(item: { id: number; variation: string; unit_type: string }): string {
+  return `${item.id}::${item.variation}::${item.unit_type}`;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -139,22 +144,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     openCart();
   };
 
-  const removeItem = (id: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
+  const matchKey = (item: CartItem, key: string) => cartItemKey(item) === key;
+
+  const removeItem = (key: string) => {
+    setCartItems(prev => prev.filter(item => !matchKey(item, key)));
   };
 
   const clearCart = () => {
     setCartItems([]);
   };
 
-  const updateQty = (id: number, qty: number) => {
+  const updateQty = (key: string, qty: number) => {
     if (qty < 1) return;
-    setCartItems(prev => prev.map(item => item.id === id ? { ...item, qty } : item));
+    setCartItems(prev => prev.map(item => matchKey(item, key) ? { ...item, qty } : item));
   };
 
-  const uploadPrescription = (itemId: number, file: File) => {
+  const uploadPrescription = (key: string, file: File) => {
     setCartItems(prev => prev.map(item => {
-      if (item.id === itemId) {
+      if (matchKey(item, key)) {
         const prescriptionData: PrescriptionData = {
           file,
           fileName: file.name,
@@ -166,12 +173,10 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return item;
     }));
 
-    // Simulate admin verification after 3 seconds (for demo)
     setTimeout(() => {
-      // 80% chance of verification, 20% chance of rejection
       const isVerified = Math.random() > 0.2;
       setCartItems(prev => prev.map(item => {
-        if (item.id === itemId && item.prescription?.status === 'pending') {
+        if (matchKey(item, key) && item.prescription?.status === 'pending') {
           return {
             ...item,
             prescription: {
@@ -186,8 +191,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     }, 3000);
   };
 
-  const getPrescriptionStatus = (itemId: number): PrescriptionStatus => {
-    const item = cartItems.find(i => i.id === itemId);
+  const getPrescriptionStatus = (key: string): PrescriptionStatus => {
+    const item = cartItems.find(i => matchKey(i, key));
     return item?.prescription?.status || null;
   };
 

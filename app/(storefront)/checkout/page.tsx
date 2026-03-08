@@ -10,7 +10,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductGrid from '@/components/ProductGrid';
 import PrescriptionUpload from '@/components/PrescriptionUpload';
-import { useCart } from '@/lib/context/CartContext';
+import { useCart, cartItemKey } from '@/lib/context/CartContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { placeOrder } from '@/lib/api/orders';
 import type { MockCartHint } from '@/lib/api/orders';
@@ -90,9 +90,15 @@ export default function CheckoutPage() {
       try { sessionStorage.setItem('last_order', JSON.stringify(order)); } catch { /* ignore */ }
       clearCart();
       router.push(`/order-confirmation/${encodeURIComponent(order.order_number)}`);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Place order failed:', e);
-      alert('Unable to place order. Please try again.');
+      const axiosErr = e as { response?: { data?: { message?: string }; status?: number } };
+      const apiMsg = axiosErr?.response?.data?.message;
+      const status = axiosErr?.response?.status;
+      const detail = apiMsg
+        ? `Server said: ${apiMsg} (${status})`
+        : 'Could not reach the server. Please check your connection and try again.';
+      alert(`Unable to place order.\n${detail}`);
     } finally {
       setPlacing(false);
     }
@@ -292,7 +298,7 @@ export default function CheckoutPage() {
                           currentStatus={item.prescription?.status || null}
                           fileName={item.prescription?.fileName}
                           rejectionReason={item.prescription?.rejectionReason}
-                          onUpload={(file) => uploadPrescription(item.id, file)}
+                          onUpload={(file) => uploadPrescription(cartItemKey(item), file)}
                         />
                       </div>
                     ))}

@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
-import { useCart } from '@/lib/context/CartContext';
+import { useCart, cartItemKey } from '@/lib/context/CartContext';
 
 export default function CartSidebar() {
   const { cartItems, isCartOpen, closeCart, updateQty, removeItem, cartTotal, cartCount } = useCart();
@@ -71,8 +71,10 @@ export default function CartSidebar() {
         {/* Cart Items */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6 scrollbar-hide">
           {cartItems.length > 0 ? (
-            cartItems.map((item) => (
-              <div key={item.id} className="flex gap-4 group">
+            cartItems.map((item) => {
+              const key = cartItemKey(item);
+              return (
+              <div key={key} className="flex gap-4 group">
                 {/* Image */}
                 <div className="relative w-24 h-24 bg-gray-50 rounded-2xl border border-gray-100 flex-shrink-0 overflow-hidden">
                   <Image 
@@ -89,7 +91,7 @@ export default function CartSidebar() {
                     <div className="flex justify-between items-start gap-2">
                       <h3 className="text-sm font-bold text-[#374151] line-clamp-2">{item.name}</h3>
                       <button 
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(key)}
                         className="text-gray-300 hover:text-red-500 transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -132,14 +134,14 @@ export default function CartSidebar() {
                     {/* Qty Controls */}
                     <div className="flex items-center bg-[#EFEFEF] rounded-lg p-1">
                       <button 
-                        onClick={() => updateQty(item.id, item.qty - 1)}
+                        onClick={() => updateQty(key, item.qty - 1)}
                         className="w-7 h-7 flex items-center justify-center hover:bg-white rounded-md transition-all text-gray-500"
                       >
                         <Minus className="w-3 h-3" />
                       </button>
                       <span className="w-8 text-center text-xs font-bold text-[#374151]">{item.qty}</span>
                       <button 
-                        onClick={() => updateQty(item.id, item.qty + 1)}
+                        onClick={() => updateQty(key, item.qty + 1)}
                         className="w-7 h-7 flex items-center justify-center hover:bg-white rounded-md transition-all text-gray-500"
                       >
                         <Plus className="w-3 h-3" />
@@ -149,7 +151,8 @@ export default function CartSidebar() {
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
               <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">

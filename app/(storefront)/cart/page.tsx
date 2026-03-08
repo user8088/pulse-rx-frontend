@@ -6,7 +6,7 @@ import { Minus, Plus, Trash2, ChevronRight, ArrowLeft, ShoppingBag, CheckCircle2
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { useCart } from '@/lib/context/CartContext';
+import { useCart, cartItemKey } from '@/lib/context/CartContext';
 
 export default function CartPage() {
   const { cartItems, updateQty, removeItem, cartTotal } = useCart();
@@ -49,8 +49,10 @@ export default function CartPage() {
                   <div className="col-span-2 text-right">Total</div>
                 </div>
 
-                {cartItems.map((item) => (
-                  <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-6 border-b border-gray-100 items-center group">
+                {cartItems.map((item) => {
+                  const key = cartItemKey(item);
+                  return (
+                  <div key={key} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-6 border-b border-gray-100 items-center group">
                     {/* Product Details */}
                     <div className="col-span-1 md:col-span-6 flex items-center gap-4">
                       <div className="relative w-20 h-20 md:w-24 md:h-24 rounded-xl bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
@@ -90,7 +92,7 @@ export default function CartPage() {
                           </div>
                         )}
                         <button 
-                          onClick={() => removeItem(item.id)}
+                          onClick={() => removeItem(key)}
                           className="mt-2 flex items-center gap-1.5 text-xs font-bold text-red-500 hover:text-red-600 transition-colors uppercase tracking-wider"
                         >
                           <Trash2 className="w-3.5 h-3.5" /> Remove
@@ -102,14 +104,14 @@ export default function CartPage() {
                     <div className="col-span-1 md:col-span-2 flex justify-center">
                       <div className="flex items-center bg-gray-50 border border-gray-100 rounded-lg overflow-hidden">
                         <button 
-                          onClick={() => updateQty(item.id, item.qty - 1)}
+                          onClick={() => updateQty(key, item.qty - 1)}
                           className="p-2 hover:bg-gray-100 transition-colors text-gray-500"
                         >
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="px-4 font-bold text-[#374151]">{item.qty}</span>
                         <button 
-                          onClick={() => updateQty(item.id, item.qty + 1)}
+                          onClick={() => updateQty(key, item.qty + 1)}
                           className="p-2 hover:bg-gray-100 transition-colors text-gray-500"
                         >
                           <Plus className="w-4 h-4" />
@@ -129,7 +131,8 @@ export default function CartPage() {
                       </span>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 <Link 
                   href="/special-offers" 

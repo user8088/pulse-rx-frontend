@@ -4,10 +4,6 @@ import type {
   PaginatedOrders,
   CreateOrderRequest,
 } from "@/types/order";
-import {
-  createMockOrder,
-  trackMockOrder,
-} from "./mockOrders";
 
 export interface MockCartHint {
   name: string;
@@ -46,24 +42,18 @@ function enrichOrder(
 }
 
 /**
- * Place an order (POST /orders).
- * Sends delivery_* fields + items with product_id, unit_type, quantity.
- * Works for both guest (no token) and logged-in customer (with token).
+ * Place an order (POST /orders). Throws on failure so the caller
+ * can display the real error to the user instead of silently succeeding.
  *
- * `cartHints` supplies product names / images that the backend may not return
- * in the order response (it only snapshots prices). Used both for enriching
- * the real API response and for the mock fallback.
+ * `cartHints` enriches the API response with product names / images
+ * that the backend may not return (it only snapshots prices).
  */
 export async function placeOrder(
   payload: CreateOrderRequest,
   cartHints?: Record<number, MockCartHint>
 ): Promise<Order> {
-  try {
-    const { data } = await apiClient.post<Order>("/orders", payload);
-    return enrichOrder(data, cartHints);
-  } catch {
-    return createMockOrder(payload, cartHints);
-  }
+  const { data } = await apiClient.post<Order>("/orders", payload);
+  return enrichOrder(data, cartHints);
 }
 
 /**
@@ -81,7 +71,7 @@ export async function trackOrder(
     );
     return data;
   } catch {
-    return trackMockOrder(orderNumber, phone);
+    return null;
   }
 }
 

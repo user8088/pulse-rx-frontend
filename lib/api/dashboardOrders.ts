@@ -37,7 +37,7 @@ export async function getDashboardOrders(
 
     const query = searchParams.toString();
     const path = query ? `/dashboard/orders?${query}` : "/dashboard/orders";
-    const res = await dashboardFetch(path);
+    const res = await dashboardFetch(path, { cache: "no-store" });
     if (!res.ok) throw new Error("Orders fetch failed");
     const data = (await res.json()) as PaginatedOrders;
     return data;
@@ -58,7 +58,7 @@ export async function getDashboardOrder(
   id: number | string
 ): Promise<Order | null> {
   try {
-    const res = await dashboardFetch(`/dashboard/orders/${id}`);
+    const res = await dashboardFetch(`/dashboard/orders/${id}`, { cache: "no-store" });
     if (!res.ok) return null;
     const data = (await res.json()) as Order;
     return data;

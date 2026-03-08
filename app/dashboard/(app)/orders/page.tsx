@@ -3,6 +3,7 @@ import { getDashboardOrders } from "@/lib/api/dashboardOrders";
 import type { Order } from "@/types/order";
 import { Badge } from "@/components/ui/Badge";
 import { Pagination } from "@/components/ui/Pagination";
+import { OrdersToolbar } from "./OrdersToolbar";
 
 const STATUS_VARIANTS: Record<Order["status"], "success" | "warning" | "danger" | "neutral"> = {
   pending: "warning",
@@ -48,7 +49,7 @@ export default async function DashboardOrdersPage({
 
   const data = await getDashboardOrders({
     page,
-    per_page: 15,
+    per_page: 50,
     status: status === "all" ? undefined : status,
     q: q || undefined,
   });
@@ -85,37 +86,7 @@ export default async function DashboardOrdersPage({
       )}
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <form method="GET" action="/dashboard/orders" className="flex flex-wrap items-center gap-3 flex-1">
-            <input type="hidden" name="page" value="1" />
-            <input
-              type="text"
-              name="q"
-              defaultValue={q}
-              placeholder="Search by order # or customer..."
-              className="h-10 rounded-lg border border-gray-200 px-3 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
-            />
-            <select
-              name="status"
-              defaultValue={status}
-              className="h-10 rounded-lg border border-gray-200 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="processing">Processing</option>
-              <option value="out_for_delivery">Out for Delivery</option>
-              <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <button
-              type="submit"
-              className="h-10 px-4 rounded-lg bg-[#374151] text-white text-sm font-semibold hover:bg-[#111827] transition-colors"
-            >
-              Search
-            </button>
-          </form>
-        </div>
+        <OrdersToolbar query={q} status={status} total={total} showing={orders.length} />
 
         <div className="overflow-x-auto">
           <table className="w-full text-left">

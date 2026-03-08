@@ -1,5 +1,15 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { getApiBaseURL } from './baseUrl';
+
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 1000; // 1 second
+const RETRYABLE_STATUS_CODES = [408, 429, 500, 502, 503, 504];
+const RETRYABLE_ERROR_CODES = ['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'ERR_NETWORK', 'ERR_HTTP2_PROTOCOL_ERROR'];
+
+interface RetryConfig extends InternalAxiosRequestConfig {
+  _retryCount?: number;
+}
 
 const apiClient = axios.create({
   baseURL: getApiBaseURL(),
@@ -8,7 +18,7 @@ const apiClient = axios.create({
     'Accept': 'application/json',
   },
   // Add timeout to prevent hanging requests
-  timeout: 10000, // 10 seconds
+  timeout: 15000, // 15 seconds
 });
 
 // Add token and tenant ID to all requests
@@ -39,10 +49,34 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Handle errors
+// Handle errors with retry logic
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error: AxiosError) => {
+    const config = error.config as RetryConfig;
+
+    // Check if we should retry
+    const shouldRetry =
+      config &&
+      (config._retryCount ?? 0) < MAX_RETRIES &&
+      (shouldRetryBasedOnStatus(error) || shouldRetryBasedOnCode(error));
+
+    if (shouldRetry) {
+      config._retryCount = (config._retryCount ?? 0) + 1;
+
+      console.warn(
+        `API request failed (${error.message}). Retrying (${config._retryCount}/${MAX_RETRIES})...`,
+        `URL: ${config.url}`
+      );
+
+      // Exponential backoff delay
+      const delay = RETRY_DELAY * Math.pow(2, (config._retryCount ?? 1) - 1);
+
+      await new Promise((resolve) => setTimeout(resolve, delay));
+
+      return apiClient.request(config);
+    }
+
     // Handle network errors (API unreachable)
     if (!error.response) {
       if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
@@ -50,7 +84,7 @@ apiClient.interceptors.response.use(
       }
       return Promise.reject(error);
     }
-    
+
     // Handle 401 errors (token expired)
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
@@ -61,14 +95,25 @@ apiClient.interceptors.response.use(
         }
       }
     }
-    
+
     // Handle 404 errors
     if (error.response?.status === 404) {
       console.warn(`API endpoint not found: ${error.config?.url}`);
     }
-    
+
     return Promise.reject(error);
   }
 );
+
+// Helper functions to determine if retry is appropriate
+function shouldRetryBasedOnStatus(error: AxiosError): boolean {
+  const status = error.response?.status;
+  return status !== undefined && RETRYABLE_STATUS_CODES.includes(status);
+}
+
+function shouldRetryBasedOnCode(error: AxiosError): boolean {
+  const code = error.code;
+  return code !== null && RETRYABLE_ERROR_CODES.includes(code);
+}
 
 export default apiClient;

@@ -6,6 +6,25 @@ import { ChevronDown } from "lucide-react";
 import { updateOrderStatusAction } from "../actions";
 import type { OrderStatus } from "@/types/order";
 
+const TRANSITIONS: Record<string, { status: OrderStatus; label: string }[]> = {
+  pending: [
+    { status: "confirmed", label: "Confirm order" },
+    { status: "cancelled", label: "Cancel order" },
+  ],
+  confirmed: [
+    { status: "processing", label: "Start processing" },
+    { status: "cancelled", label: "Cancel order" },
+  ],
+  processing: [
+    { status: "out_for_delivery", label: "Out for delivery" },
+    { status: "cancelled", label: "Cancel order" },
+  ],
+  out_for_delivery: [
+    { status: "delivered", label: "Mark delivered" },
+    { status: "cancelled", label: "Cancel order" },
+  ],
+};
+
 export function OrderStatusActions({
   orderId,
   currentStatus,
@@ -15,16 +34,7 @@ export function OrderStatusActions({
 }) {
   const [open, setOpen] = useState(false);
 
-  const actions: { status: OrderStatus; label: string }[] = [];
-  if (currentStatus === "pending") {
-    actions.push({ status: "confirmed", label: "Confirm order" });
-    actions.push({ status: "cancelled", label: "Cancel order" });
-  }
-  if (currentStatus === "confirmed") {
-    actions.push({ status: "delivered", label: "Mark delivered" });
-    actions.push({ status: "cancelled", label: "Cancel order" });
-  }
-
+  const actions = TRANSITIONS[currentStatus] ?? [];
   if (actions.length === 0) return null;
 
   return (

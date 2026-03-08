@@ -4,14 +4,25 @@ import { useEffect, useState } from 'react';
 import { ShoppingBag, Search, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getOrders } from '@/lib/api/orders';
+import { getCustomerOrders } from '@/lib/api/orders';
 import type { Order } from '@/types/order';
 
 const STATUS_STYLES: Record<Order['status'], string> = {
   pending: 'bg-amber-100 text-amber-700',
   confirmed: 'bg-blue-100 text-blue-700',
+  processing: 'bg-indigo-100 text-indigo-700',
+  out_for_delivery: 'bg-cyan-100 text-cyan-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
+};
+
+const STATUS_LABELS: Record<Order['status'], string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  processing: 'Processing',
+  out_for_delivery: 'Out for Delivery',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
 };
 
 function formatDate(iso: string) {
@@ -28,7 +39,7 @@ export default function OrdersPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await getOrders({ per_page: 50 });
+        const res = await getCustomerOrders({ per_page: 50 });
         setOrders(res.data ?? []);
       } finally {
         setLoading(false);
@@ -66,7 +77,7 @@ export default function OrdersPage() {
       {loading ? (
         <div className="py-12 text-center">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#01AC28] mx-auto" />
-          <p className="text-gray-500 mt-3 text-sm">Loading orders…</p>
+          <p className="text-gray-500 mt-3 text-sm">Loading orders...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-3xl border border-gray-100 p-12 text-center shadow-sm">
@@ -93,7 +104,7 @@ export default function OrdersPage() {
                     <div className="flex items-center gap-3 mb-1">
                       <h3 className="font-bold text-lg text-[#374151]">{order.order_number}</h3>
                       <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${STATUS_STYLES[order.status]}`}>
-                        {order.status}
+                        {STATUS_LABELS[order.status]}
                       </span>
                     </div>
                     <p className="text-sm text-[#6B7280] font-medium">{formatDate(order.created_at)}</p>
@@ -105,7 +116,7 @@ export default function OrdersPage() {
                     <p className="text-xl font-black text-[#374151]">Rs. {order.total}</p>
                   </div>
                   <Link
-                    href={`/order-confirmation/${order.id}`}
+                    href={`/order-confirmation/${encodeURIComponent(order.order_number)}`}
                     className="flex items-center gap-2 bg-[#EFEFEF] hover:bg-[#374151] hover:text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all"
                   >
                     Details <ExternalLink className="w-3.5 h-3.5" />
@@ -122,7 +133,7 @@ export default function OrdersPage() {
                     ) : (
                       <div className="w-10 h-10 rounded-lg bg-gray-100" />
                     )}
-                    <span className="text-xs font-bold text-[#374151] whitespace-nowrap">{item.quantity}× {item.item_name}</span>
+                    <span className="text-xs font-bold text-[#374151] whitespace-nowrap">{item.quantity}x {item.item_name}</span>
                   </div>
                 ))}
               </div>

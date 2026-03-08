@@ -1,4 +1,11 @@
-export type OrderStatus = "pending" | "confirmed" | "delivered" | "cancelled";
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled";
+
 export type PaymentMethod = "cod" | "card";
 
 export interface OrderAddress {
@@ -27,13 +34,23 @@ export interface Order {
   order_number: string;
   status: OrderStatus;
   payment_method: PaymentMethod;
+  customer_id?: number | null;
   customer_name: string;
   customer_email?: string | null;
   customer_phone: string;
-  address: OrderAddress;
+  delivery_name: string;
+  delivery_phone: string;
+  delivery_address: string;
+  delivery_city?: string | null;
+  delivery_gender?: string | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
+  /** @deprecated kept for mock/legacy compat; prefer delivery_* fields */
+  address?: OrderAddress;
   subtotal: string;
   tax: string;
   shipping: string;
+  discount?: string | null;
   total: string;
   notes?: string | null;
   items: OrderItem[];
@@ -49,4 +66,23 @@ export interface PaginatedOrders {
   last_page: number;
   from: number | null;
   to: number | null;
+}
+
+/** Payload sent to POST /orders to place an order. */
+export interface CreateOrderRequest {
+  delivery_name: string;
+  delivery_phone: string;
+  delivery_address: string;
+  delivery_city?: string;
+  delivery_gender?: string;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
+  notes?: string;
+  items: CreateOrderItemRequest[];
+}
+
+export interface CreateOrderItemRequest {
+  product_id: number;
+  unit_type: "item" | "secondary" | "box";
+  quantity: number;
 }

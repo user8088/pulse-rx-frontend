@@ -1,73 +1,141 @@
 import apiClient from "./client";
-import type { Order, PaginatedOrders } from "@/types/order";
+import type {
+  Order,
+  PaginatedOrders,
+  CreateOrderRequest,
+} from "@/types/order";
 import {
-  getMockOrder,
-  getMockOrders,
   createMockOrder,
+  trackMockOrder,
 } from "./mockOrders";
-import type { CreateOrderItemPayload } from "./mockOrders";
 
-export type CreateOrderPayload = {
-  customer_name: string;
-  customer_email?: string | null;
-  customer_phone: string;
-  address: {
-    phone: string;
-    house_apt: string;
-    street: string;
-    block_locality: string;
-    city: string;
-  };
-  payment_method: "cod" | "card";
-  items: CreateOrderItemPayload[];
-  subtotal: string;
-  tax: string;
-  shipping: string;
-  total: string;
-  notes?: string | null;
-};
+export interface MockCartHint {
+  name: string;
+  price: number;
+  image: string;
+  variation?: string;
+}
+
+function tierLabel(tier: string): string {
+  if (tier === "box") return "Box";
+  if (tier === "secondary") return "Pack";
+  return "Unit";
+}
 
 /**
- * Create an order (POST /orders). Falls back to mock on failure.
+ * Enrich order items with display data (names, images, tier labels) from cart
+ * hints when the backend response leaves those fields empty.
  */
-export async function createOrder(payload: CreateOrderPayload): Promise<Order> {
+function enrichOrder(
+  order: Order,
+  hints?: Record<number, MockCartHint>
+): Order {
+  if (!hints || !order.items?.length) return order;
+  return {
+    ...order,
+    items: order.items.map((item) => {
+      const h = hints[item.product_id];
+      return {
+        ...item,
+        item_name: item.item_name || h?.name || `Product #${item.product_id}`,
+        image_url: item.image_url || h?.image || null,
+        tier_label: item.tier_label || tierLabel(item.tier),
+      };
+    }),
+  };
+}
+
+/**
+ * Place an order (POST /orders).
+ * Sends delivery_* fields + items with product_id, unit_type, quantity.
+ * Works for both guest (no token) and logged-in customer (with token).
+ *
+ * `cartHints` supplies product names / images that the backend may not return
+ * in the order response (it only snapshots prices). Used both for enriching
+ * the real API response and for the mock fallback.
+ */
+export async function placeOrder(
+  payload: CreateOrderRequest,
+  cartHints?: Record<number, MockCartHint>
+): Promise<Order> {
   try {
     const { data } = await apiClient.post<Order>("/orders", payload);
-    return data;
+    return enrichOrder(data, cartHints);
   } catch {
-    return createMockOrder(payload);
+    return createMockOrder(payload, cartHints);
   }
 }
 
 /**
- * Get orders for current user (GET /orders). For profile order history.
- * Falls back to mock on failure.
+ * Track an order by order_number + phone (guest flow).
+ * GET /orders/{orderNumber}/track?phone=...
  */
-export async function getOrders(params?: {
+export async function trackOrder(
+  orderNumber: string,
+  phone: string
+): Promise<Order | null> {
+  try {
+    const { data } = await apiClient.get<Order>(
+      `/orders/${encodeURIComponent(orderNumber)}/track`,
+      { params: { phone } }
+    );
+    return data;
+  } catch {
+    return trackMockOrder(orderNumber, phone);
+  }
+}
+
+/**
+ * Get customer's orders (GET /customer/orders). Requires Bearer token.
+ * Returns empty result set when API is unreachable (no mock fallback).
+ */
+export async function getCustomerOrders(params?: {
   page?: number;
   per_page?: number;
 }): Promise<PaginatedOrders> {
   try {
-    const { data } = await apiClient.get<PaginatedOrders>("/orders", {
+    const { data } = await apiClient.get<PaginatedOrders>("/customer/orders", {
       params,
     });
     return data;
   } catch {
-    return getMockOrders({
-      page: params?.page ?? 1,
+    return {
+      data: [],
+      total: 0,
       per_page: params?.per_page ?? 15,
-    });
+      current_page: params?.page ?? 1,
+      last_page: 1,
+      from: null,
+      to: null,
+    };
   }
 }
 
 /**
- * Get a single order by id (GET /orders/:id). Falls back to mock on failure.
+ * Get a single customer order (GET /customer/orders/:id). Requires Bearer token.
+ * Returns null when API is unreachable (no mock fallback).
+ */
+export async function getCustomerOrder(
+  id: number | string
+): Promise<Order | null> {
+  try {
+    const { data } = await apiClient.get<Order>(`/customer/orders/${id}`);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get a single order by id or order_number (GET /orders/:id).
+ * Returns null when API is unreachable (no mock fallback -- use sessionStorage
+ * from checkout for order confirmation page).
  */
 export async function getOrder(id: number | string): Promise<Order | null> {
   try {
     const { data } = await apiClient.get<Order>(`/orders/${id}`);
     return data;
   } catch {
-    return getMockOrder(id);
+    return null;
   }
 }

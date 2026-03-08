@@ -44,6 +44,7 @@ export default function ProductCard({
       price,
       image,
       qty: 1,
+      unit_type: "item",
     });
   };
 

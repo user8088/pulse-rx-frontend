@@ -12,8 +12,9 @@ import ProductGrid from '@/components/ProductGrid';
 import PrescriptionUpload from '@/components/PrescriptionUpload';
 import { useCart } from '@/lib/context/CartContext';
 import { useAuth } from '@/lib/context/AuthContext';
-import { createOrder } from '@/lib/api/orders';
-import type { CreateOrderPayload } from '@/lib/api/orders';
+import { placeOrder } from '@/lib/api/orders';
+import type { MockCartHint } from '@/lib/api/orders';
+import type { CreateOrderRequest } from '@/types/order';
 
 const CITIES = ['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Other'];
 
@@ -36,14 +37,14 @@ export default function CheckoutPage() {
   const [street, setStreet] = useState('');
   const [blockLocality, setBlockLocality] = useState('');
   const [city, setCity] = useState('');
+  const [notes, setNotes] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
 
   const subtotal = cartTotal;
-  const tax = subtotal * 0.15;
   const shipping = deliveryMethod === 'express' ? 15 : 0;
-  const total = subtotal + tax + shipping;
+  const total = subtotal + shipping;
 
   const prescriptionRequiredItems = cartItems.filter(item => item.requiresPrescription);
 
@@ -63,38 +64,32 @@ export default function CheckoutPage() {
 
     setPlacing(true);
     try {
-      const payload: CreateOrderPayload = {
-        customer_name: customerName.trim(),
-        customer_email: customerEmail.trim() || null,
-        customer_phone: phone.trim(),
-        address: {
-          phone: phone.trim(),
-          house_apt: houseApt.trim(),
-          street: street.trim(),
-          block_locality: blockLocality.trim(),
-          city: city.trim(),
-        },
-        payment_method: paymentMethod,
+      const deliveryAddress = [houseApt.trim(), street.trim(), blockLocality.trim()]
+        .filter(Boolean)
+        .join(', ');
+
+      const payload: CreateOrderRequest = {
+        delivery_name: customerName.trim(),
+        delivery_phone: phone.trim(),
+        delivery_address: deliveryAddress,
+        delivery_city: city.trim() || undefined,
+        notes: notes.trim() || undefined,
         items: cartItems.map((item) => ({
           product_id: item.id,
-          item_name: item.name,
-          item_id: '',
-          tier: 'item',
-          tier_label: item.quantity,
-          unit_price: item.price.toFixed(2),
+          unit_type: item.unit_type || 'item',
           quantity: item.qty,
-          line_total: (item.price * item.qty).toFixed(2),
-          image_url: item.image,
         })),
-        subtotal: subtotal.toFixed(2),
-        tax: tax.toFixed(2),
-        shipping: shipping.toFixed(2),
-        total: total.toFixed(2),
       };
 
-      const order = await createOrder(payload);
+      const hints: Record<number, MockCartHint> = {};
+      for (const ci of cartItems) {
+        hints[ci.id] = { name: ci.name, price: ci.price, image: ci.image, variation: ci.variation };
+      }
+
+      const order = await placeOrder(payload, hints);
+      try { sessionStorage.setItem('last_order', JSON.stringify(order)); } catch { /* ignore */ }
       clearCart();
-      router.push(`/order-confirmation/${order.id}`);
+      router.push(`/order-confirmation/${encodeURIComponent(order.order_number)}`);
     } catch (e) {
       console.error('Place order failed:', e);
       alert('Unable to place order. Please try again.');
@@ -306,6 +301,19 @@ export default function CheckoutPage() {
               )}
 
               <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Order Notes (optional)</label>
+                  <textarea
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                    className="w-full bg-[#EFEFEF] border-none rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all resize-none"
+                    placeholder="Any special instructions for your order..."
+                  />
+                </div>
+              </div>
+
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
                 <div className="flex items-center gap-3 mb-6">
                   <Truck className="w-5 h-5 text-[#01AC28]" />
                   <h2 className="text-xl font-bold text-[#374151]">Delivery Method</h2>
@@ -409,10 +417,6 @@ export default function CheckoutPage() {
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Subtotal</span>
                     <span className="font-bold">Rs. {subtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-white/60 font-medium">Tax (15%)</span>
-                    <span className="font-bold">Rs. {tax.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Shipping Fee</span>

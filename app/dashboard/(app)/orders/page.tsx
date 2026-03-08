@@ -7,8 +7,19 @@ import { Pagination } from "@/components/ui/Pagination";
 const STATUS_VARIANTS: Record<Order["status"], "success" | "warning" | "danger" | "neutral"> = {
   pending: "warning",
   confirmed: "neutral",
+  processing: "neutral",
+  out_for_delivery: "neutral",
   delivered: "success",
   cancelled: "danger",
+};
+
+const STATUS_LABELS: Record<Order["status"], string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
 };
 
 function formatDate(iso: string) {
@@ -92,6 +103,8 @@ export default async function DashboardOrdersPage({
               <option value="all">All statuses</option>
               <option value="pending">Pending</option>
               <option value="confirmed">Confirmed</option>
+              <option value="processing">Processing</option>
+              <option value="out_for_delivery">Out for Delivery</option>
               <option value="delivered">Delivered</option>
               <option value="cancelled">Cancelled</option>
             </select>
@@ -111,7 +124,7 @@ export default async function DashboardOrdersPage({
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Order #</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Customer</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden md:table-cell">Phone</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Items</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Products</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">Date</th>
@@ -131,12 +144,33 @@ export default async function DashboardOrdersPage({
                     <td className="px-4 py-3">
                       <span className="font-mono font-semibold text-[#374151]">{order.order_number}</span>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{order.customer_name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{order.customer_phone}</td>
-                    <td className="px-4 py-3 text-sm text-gray-600">{order.items?.length ?? 0}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">
+                      {order.delivery_name || order.customer_name}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                      {order.delivery_phone || order.customer_phone}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[220px]">
+                      {order.items?.length ? (
+                        <div className="space-y-0.5">
+                          {order.items.slice(0, 2).map((item) => (
+                            <p key={item.id} className="truncate text-gray-900 text-xs font-medium">
+                              {item.item_name || `Product #${item.product_id}`} <span className="text-gray-400 font-normal">x{item.quantity}</span>
+                            </p>
+                          ))}
+                          {order.items.length > 2 && (
+                            <p className="text-[10px] text-gray-400">+{order.items.length - 2} more</p>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">--</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 font-semibold text-[#374151]">Rs. {order.total}</td>
                     <td className="px-4 py-3">
-                      <Badge variant={STATUS_VARIANTS[order.status]}>{order.status}</Badge>
+                      <Badge variant={STATUS_VARIANTS[order.status]}>
+                        {STATUS_LABELS[order.status]}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">{formatDate(order.created_at)}</td>
                     <td className="px-4 py-3 text-right">

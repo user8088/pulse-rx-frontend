@@ -83,12 +83,14 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
 
     let safePrice: number;
     let quantityLabel: string;
+    let resolvedUnitType: "item" | "secondary" | "box" = "item";
 
     if (opts.length > 0) {
       const opt = opts[selectedPackOptionIndex];
       if (!opt) return;
       safePrice = Number.parseFloat(opt.price) || 0;
       quantityLabel = `1 ${opt.label}`;
+      resolvedUnitType = opt.tier;
     } else {
       const canSellItem = !!selectedVariation.can_sell_item;
       if (!canSellItem && !canSellSecondary && !canSellBox) return;
@@ -122,6 +124,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
           : effectiveType === "box"
             ? `Per ${bxLabel}`
             : `Per ${secLabel}`;
+      resolvedUnitType = effectiveType;
     }
 
     addItem({
@@ -132,6 +135,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       price: safePrice,
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
+      unit_type: resolvedUnitType,
       requiresPrescription: false
     });
   };

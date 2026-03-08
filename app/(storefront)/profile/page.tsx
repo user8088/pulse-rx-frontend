@@ -4,14 +4,25 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { ShoppingBag, Tag, Clock, ChevronRight, Package, Calendar } from 'lucide-react';
 import Link from 'next/link';
-import { getOrders } from '@/lib/api/orders';
+import { getCustomerOrders } from '@/lib/api/orders';
 import type { Order } from '@/types/order';
 
 const STATUS_STYLES: Record<Order['status'], string> = {
   pending: 'bg-amber-100 text-amber-700',
   confirmed: 'bg-blue-100 text-blue-700',
+  processing: 'bg-indigo-100 text-indigo-700',
+  out_for_delivery: 'bg-cyan-100 text-cyan-700',
   delivered: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-700',
+};
+
+const STATUS_LABELS: Record<Order['status'], string> = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  processing: 'Processing',
+  out_for_delivery: 'Out for Delivery',
+  delivered: 'Delivered',
+  cancelled: 'Cancelled',
 };
 
 function formatShortDate(iso: string) {
@@ -23,25 +34,35 @@ function formatShortDate(iso: string) {
 export default function ProfileOverview() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [totalOrders, setTotalOrders] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await getOrders({ per_page: 3 });
-        setOrders(res.data ?? []);
-        setTotalOrders(res.total ?? 0);
+        const [recent, all] = await Promise.all([
+          getCustomerOrders({ per_page: 3 }),
+          getCustomerOrders({ per_page: 100 }),
+        ]);
+        setOrders(recent.data ?? []);
+        setAllOrders(all.data ?? []);
+        setTotalOrders(all.total ?? 0);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
 
+  const pendingCount = allOrders.filter(
+    o => o.status === 'pending' || o.status === 'confirmed' || o.status === 'processing' || o.status === 'out_for_delivery'
+  ).length;
+  const deliveredCount = allOrders.filter(o => o.status === 'delivered').length;
+
   const stats = [
     { label: 'Total Orders', value: String(totalOrders), icon: Package, color: 'bg-blue-500' },
-    { label: 'Pending Prescriptions', value: '2', icon: Clock, color: 'bg-amber-500' },
-    { label: 'Available Offers', value: '5', icon: Tag, color: 'bg-[#01AC28]' },
+    { label: 'In Progress', value: String(pendingCount), icon: Clock, color: 'bg-amber-500' },
+    { label: 'Delivered', value: String(deliveredCount), icon: Tag, color: 'bg-[#01AC28]' },
   ];
 
   return (
@@ -95,7 +116,7 @@ export default function ProfileOverview() {
           ) : (
             <div className="divide-y divide-gray-50">
               {orders.map((order) => (
-                <Link key={order.id} href={`/order-confirmation/${order.id}`} className="block p-6 hover:bg-gray-50/50 transition-colors group">
+                <Link key={order.id} href={`/order-confirmation/${encodeURIComponent(order.order_number)}`} className="block p-6 hover:bg-gray-50/50 transition-colors group">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-[#374151]">
@@ -109,7 +130,7 @@ export default function ProfileOverview() {
                     <div className="text-right">
                       <p className="text-sm font-bold text-[#374151]">Rs. {order.total}</p>
                       <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${STATUS_STYLES[order.status]}`}>
-                        {order.status}
+                        {STATUS_LABELS[order.status]}
                       </span>
                     </div>
                   </div>

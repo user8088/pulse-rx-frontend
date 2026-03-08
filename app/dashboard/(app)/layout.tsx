@@ -54,7 +54,7 @@ export default async function DashboardAppLayout({ children }: { children: React
         <div className="flex min-w-0 flex-1 flex-col">
           <DashboardHeader />
 
-          <main className="flex-1 min-h-0 px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+          <main className="flex-1 min-h-0 min-w-0 overflow-x-auto px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>
       </div>
     </div>

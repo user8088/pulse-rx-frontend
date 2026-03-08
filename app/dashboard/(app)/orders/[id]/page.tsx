@@ -8,14 +8,37 @@ import { OrderStatusActions } from "./OrderStatusActions";
 const STATUS_VARIANTS: Record<Order["status"], "success" | "warning" | "danger" | "neutral"> = {
   pending: "warning",
   confirmed: "neutral",
+  processing: "neutral",
+  out_for_delivery: "neutral",
   delivered: "success",
   cancelled: "danger",
+};
+
+const STATUS_LABELS: Record<Order["status"], string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
 };
 
 function formatDate(iso: string) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString();
+}
+
+function deliveryDisplay(order: Order) {
+  if (order.delivery_address) {
+    return [order.delivery_address, order.delivery_city].filter(Boolean).join(", ");
+  }
+  if (order.address) {
+    return [order.address.house_apt, order.address.street, order.address.block_locality, order.address.city]
+      .filter(Boolean)
+      .join(", ");
+  }
+  return "N/A";
 }
 
 export default async function DashboardOrderDetailPage({
@@ -38,7 +61,7 @@ export default async function DashboardOrderDetailPage({
           Order not found.
         </div>
         <Link href="/dashboard/orders" className="text-sm font-semibold text-[#01AC28] hover:underline">
-          ← Back to Orders
+          &larr; Back to Orders
         </Link>
       </div>
     );
@@ -54,7 +77,7 @@ export default async function DashboardOrderDetailPage({
             href="/dashboard/orders"
             className="text-sm font-semibold text-gray-500 hover:text-[#01AC28] transition-colors"
           >
-            ← Back to Orders
+            &larr; Back to Orders
           </Link>
           <div>
             <h1 className="text-2xl font-black text-[#374151] font-mono">{order.order_number}</h1>
@@ -62,7 +85,9 @@ export default async function DashboardOrderDetailPage({
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <Badge variant={STATUS_VARIANTS[order.status]}>{order.status}</Badge>
+          <Badge variant={STATUS_VARIANTS[order.status]}>
+            {STATUS_LABELS[order.status]}
+          </Badge>
           {canChangeStatus && <OrderStatusActions orderId={order.id} currentStatus={order.status} />}
         </div>
       </div>
@@ -75,24 +100,31 @@ export default async function DashboardOrderDetailPage({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Customer &amp; Address</h2>
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Customer</h2>
           <div className="space-y-2 text-sm">
             <p className="font-semibold text-[#374151]">{order.customer_name}</p>
             {order.customer_email && <p className="text-gray-600">{order.customer_email}</p>}
             <p className="text-gray-600">{order.customer_phone}</p>
-            <div className="pt-3 mt-3 border-t border-gray-100">
-              <p className="text-gray-700">
-                {order.address.house_apt}, {order.address.street}
-              </p>
-              <p className="text-gray-700">
-                {order.address.block_locality}, {order.address.city}
-              </p>
-              <p className="text-gray-600">Phone: {order.address.phone}</p>
-            </div>
+            {order.customer_id && (
+              <p className="text-xs text-gray-400 mt-1">Customer ID: {order.customer_id}</p>
+            )}
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment</p>
-            <p className="text-sm font-semibold text-[#374151]">{order.payment_method === "cod" ? "Cash on Delivery" : "Card"}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Delivery</h2>
+          <div className="space-y-2 text-sm">
+            <p className="font-semibold text-[#374151]">{order.delivery_name || order.customer_name}</p>
+            <p className="text-gray-600">{order.delivery_phone || order.customer_phone}</p>
+            <p className="text-gray-700 mt-1">{deliveryDisplay(order)}</p>
+            {order.delivery_gender && (
+              <p className="text-gray-600">Gender: {order.delivery_gender}</p>
+            )}
+            {order.delivery_latitude != null && order.delivery_longitude != null && (
+              <p className="text-xs text-gray-400">
+                Coords: {order.delivery_latitude}, {order.delivery_longitude}
+              </p>
+            )}
           </div>
         </div>
 
@@ -104,18 +136,27 @@ export default async function DashboardOrderDetailPage({
               <span className="font-medium">Rs. {order.subtotal}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Tax</span>
-              <span className="font-medium">Rs. {order.tax}</span>
-            </div>
-            <div className="flex justify-between">
               <span className="text-gray-500">Shipping</span>
               <span className="font-medium">Rs. {order.shipping}</span>
             </div>
+            {order.discount && Number(order.discount) > 0 && (
+              <div className="flex justify-between">
+                <span className="text-gray-500">Discount</span>
+                <span className="font-medium text-green-600">-Rs. {order.discount}</span>
+              </div>
+            )}
             <div className="flex justify-between pt-2 border-t border-gray-100 text-base font-bold">
               <span>Total</span>
               <span className="text-[#01AC28]">Rs. {order.total}</span>
             </div>
           </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Payment</h2>
+          <p className="text-sm font-semibold text-[#374151]">
+            {order.payment_method === "cod" ? "Cash on Delivery" : "Card"}
+          </p>
         </div>
       </div>
 
@@ -135,29 +176,35 @@ export default async function DashboardOrderDetailPage({
               </tr>
             </thead>
             <tbody>
-              {order.items.map((item) => (
-                <tr key={item.id} className="border-b border-gray-50">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      {item.image_url ? (
-                        <div className="relative w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex-shrink-0">
-                          <Image src={item.image_url} alt={item.item_name} fill className="object-contain p-1" />
+              {order.items.map((item) => {
+                const name = item.item_name || `Product #${item.product_id}`;
+                const label = item.tier_label || (item.tier === 'box' ? 'Box' : item.tier === 'secondary' ? 'Pack' : 'Unit');
+                return (
+                  <tr key={item.id} className="border-b border-gray-50">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {item.image_url ? (
+                          <div className="relative w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 overflow-hidden flex-shrink-0">
+                            <Image src={item.image_url} alt={name} fill className="object-contain p-1" />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <span className="text-[10px] font-bold text-gray-400">IMG</span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-semibold text-[#374151]">{name}</p>
+                          <p className="text-xs text-gray-400 font-mono">{item.item_id}</p>
                         </div>
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0" />
-                      )}
-                      <div>
-                        <p className="font-semibold text-[#374151]">{item.item_name}</p>
-                        <p className="text-xs text-gray-400 font-mono">{item.item_id}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{item.tier_label}</td>
-                  <td className="px-6 py-4 text-sm font-medium">Rs. {item.unit_price}</td>
-                  <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
-                  <td className="px-6 py-4 text-sm font-bold text-right text-[#01AC28]">Rs. {item.line_total}</td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{label}</td>
+                    <td className="px-6 py-4 text-sm font-medium">Rs. {item.unit_price}</td>
+                    <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-right text-[#01AC28]">Rs. {item.line_total}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

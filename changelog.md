@@ -69,4 +69,50 @@ This document summarizes backend changes that affect the frontend. Use it to adj
 
 ---
 
-*Last updated: after Excel import new columns implementation.*
+## Ordering & Customer profile (new)
+
+### Backend overview
+
+- **Guest checkout:** Any user can place an order without an account. Send **X-Tenant-Id** header and `POST /api/orders` with delivery info + items.
+- **Registered customers:** Customers sign up via `POST /api/customer/register` (with **X-Tenant-Id**). Login with `POST /api/customer/login`. Profile is stored in tenant `customers` table; auth is Laravel Sanctum (email + password).
+- **Customer profile:** Name, email, phone, gender, address, city, latitude, longitude, discount_percentage (admin-set). Frontend gets coordinates via Google Maps/geolocation and sends `latitude`/`longitude` to the backend.
+- **Orders:** Delivery info is always snapshotted on the order. Prices are snapshotted on each order item. Order number is auto-generated (e.g. `ORD-00001`). Cash on Delivery only for now.
+
+### API endpoints
+
+**Public (tenant-aware; send X-Tenant-Id for guests)**
+
+- `POST /api/customer/register` — body: name, email, password, password_confirmation, phone?, gender?, address?, city?, latitude?, longitude?
+- `POST /api/customer/login` — body: email, password. Returns token, user, customer.
+- `POST /api/orders` — place order (guest or with Bearer token). If Bearer token is a customer, order is linked and customer discount applied.
+  - Body: delivery_name, delivery_phone, delivery_address, delivery_city?, delivery_gender?, delivery_latitude?, delivery_longitude?, notes?, items: [{ product_id, unit_type, quantity }]. `unit_type`: `item` | `secondary` | `box`.
+- `GET /api/orders/{orderNumber}/track?phone=...` — guest order tracking.
+
+**Customer-only (auth:sanctum + role customer)**
+
+- `GET /api/customer/profile` — current customer profile.
+- `PUT /api/customer/profile` — update name, phone, gender, address, city, latitude, longitude (no email change).
+- `GET /api/customer/orders` — paginated order history.
+- `GET /api/customer/orders/{order}` — single order (must own it).
+
+**Dashboard (admin/staff)**
+
+- `GET /api/dashboard/orders` — list orders (query: status, from_date, to_date, customer_id, per_page).
+- `GET /api/dashboard/orders/{order}` — order detail.
+- `PATCH /api/dashboard/orders/{order}/status` — body: `{ "status": "pending"|"confirmed"|"processing"|"out_for_delivery"|"delivered"|"cancelled" }`.
+
+### Customer-facing app
+
+- **Checkout:** Collect delivery_name, delivery_phone, delivery_address, delivery_city, delivery_gender; get coordinates (Google Maps / geolocation) and send delivery_latitude, delivery_longitude. Send items with product_id, unit_type (from packaging_display.options[].tier), quantity.
+- **Guest:** Omit Bearer token; send X-Tenant-Id. After order, show order_number and tell user to track with order number + phone.
+- **Logged-in customer:** Send Bearer token; backend links order to customer and applies discount_percentage. Optionally prefill delivery from customer profile.
+- **Tracking:** Call `GET /api/orders/{orderNumber}/track?phone=...` with X-Tenant-Id.
+
+### Dashboard (admin)
+
+- **Customers:** Customer list/detail now includes gender, address, city, latitude, longitude, discount_percentage. Editable; discount_percentage is a percentage (e.g. 10 = 10% off).
+- **Orders:** New orders section: list orders, filter by status/date/customer, view order detail, update status (pending → confirmed → processing → out_for_delivery → delivered or cancelled).
+
+---
+
+*Last updated: after ordering feature and customer profile implementation.*

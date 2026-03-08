@@ -12,9 +12,8 @@ export default function CartPage() {
   const { cartItems, updateQty, removeItem, cartTotal } = useCart();
 
   const subtotal = cartTotal;
-  const tax = subtotal * 0.15;
   const shipping = subtotal > 199 ? 0 : 15.00;
-  const total = subtotal + tax + shipping;
+  const total = subtotal + shipping;
 
   return (
     <main className="min-h-screen bg-white">
@@ -149,10 +148,6 @@ export default function CartPage() {
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Subtotal</span>
                       <span className="text-[#374151] font-bold">Rs. {subtotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-[#6B7280] font-medium">Tax (15%)</span>
-                      <span className="text-[#374151] font-bold">Rs. {tax.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Shipping Fee</span>

@@ -79,7 +79,7 @@ export default function OfferBanners() {
                       Rs. {offers[0].originalPrice.toFixed(2)}
                     </span>
                     <span className="text-lg md:text-xl lg:text-2xl font-bold">
-                      Rs. {offers[0].currentPrice.toFixed(2)} Including Tax
+                      Rs. {offers[0].currentPrice.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -126,7 +126,7 @@ export default function OfferBanners() {
                           Rs. {offer.originalPrice.toFixed(2)}
                         </span>
                         <span className="text-sm md:text-base lg:text-lg font-bold">
-                          Rs. {offer.currentPrice.toFixed(2)} Including Tax
+                          Rs. {offer.currentPrice.toFixed(2)}
                         </span>
                       </div>
                     </div>

@@ -12,7 +12,7 @@ export interface PrescriptionData {
   rejectionReason?: string;
 }
 
-interface CartItem {
+export interface CartItem {
   id: number;
   name: string;
   variation: string;
@@ -20,6 +20,7 @@ interface CartItem {
   price: number;
   image: string;
   qty: number;
+  unit_type: "item" | "secondary" | "box";
   requiresPrescription?: boolean;
   prescription?: PrescriptionData;
 }
@@ -52,6 +53,7 @@ const initialItems: CartItem[] = [
     price: 99.00,
     image: "/assets/home/product-250mg.png",
     qty: 1,
+    unit_type: "item",
     requiresPrescription: false
   },
   {
@@ -62,6 +64,7 @@ const initialItems: CartItem[] = [
     price: 43.00,
     image: "/assets/home/product-1.png",
     qty: 1,
+    unit_type: "item",
     requiresPrescription: false
   }
 ];
@@ -119,14 +122,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const closeCart = () => setIsCartOpen(false);
 
   const addItem = (item: CartItem) => {
+    const safeItem = { ...item, unit_type: item.unit_type || "item" } as CartItem;
     setCartItems(prev => {
-      const existing = prev.find(i => i.id === item.id && i.variation === item.variation && i.quantity === item.quantity);
+      const existing = prev.find(
+        i => i.id === safeItem.id && i.variation === safeItem.variation && i.unit_type === safeItem.unit_type
+      );
       if (existing) {
-        return prev.map(i => i.id === item.id && i.variation === item.variation && i.quantity === item.quantity 
-          ? { ...i, qty: i.qty + 1 } 
-          : i);
+        return prev.map(i =>
+          i.id === safeItem.id && i.variation === safeItem.variation && i.unit_type === safeItem.unit_type
+            ? { ...i, qty: i.qty + (safeItem.qty || 1) }
+            : i
+        );
       }
-      return [...prev, { ...item, qty: 1 }];
+      return [...prev, { ...safeItem, qty: safeItem.qty || 1 }];
     });
     openCart();
   };

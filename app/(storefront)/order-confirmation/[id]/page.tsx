@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ChevronRight, CheckCircle2, MapPin, ShoppingBag } from 'lucide-react';
+import { ChevronRight, CheckCircle2, MapPin, ShoppingBag, Search } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
@@ -14,6 +14,8 @@ import type { Order } from '@/types/order';
 const STATUS_LABELS: Record<Order['status'], string> = {
   pending: 'Pending',
   confirmed: 'Confirmed',
+  processing: 'Processing',
+  out_for_delivery: 'Out for Delivery',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
 };
@@ -21,9 +23,24 @@ const STATUS_LABELS: Record<Order['status'], string> = {
 const STATUS_VARIANTS: Record<Order['status'], string> = {
   pending: 'bg-amber-100 text-amber-800',
   confirmed: 'bg-blue-100 text-blue-800',
+  processing: 'bg-indigo-100 text-indigo-800',
+  out_for_delivery: 'bg-cyan-100 text-cyan-800',
   delivered: 'bg-green-100 text-green-800',
   cancelled: 'bg-red-100 text-red-800',
 };
+
+function deliveryDisplay(order: Order) {
+  if (order.delivery_address) {
+    const parts = [order.delivery_address, order.delivery_city].filter(Boolean);
+    return parts.join(', ');
+  }
+  if (order.address) {
+    return [order.address.house_apt, order.address.street, order.address.block_locality, order.address.city]
+      .filter(Boolean)
+      .join(', ');
+  }
+  return '';
+}
 
 export default function OrderConfirmationPage({
   params,
@@ -39,20 +56,48 @@ export default function OrderConfirmationPage({
     let mounted = true;
     (async () => {
       const { id } = await params;
-      setResolvedId(id);
-      if (!id) {
+      const decoded = decodeURIComponent(id);
+      if (!mounted) return;
+      setResolvedId(decoded);
+      if (!decoded) {
         setLoading(false);
         return;
       }
+
+      // Try sessionStorage first (set by checkout after placing the order).
+      // We keep the entry around (don't remove immediately) so React Strict Mode
+      // double-invoke doesn't lose it on the second run.
+      let found: Order | null = null;
       try {
-        const data = await getOrder(id);
-        if (mounted) setOrder(data ?? null);
-      } finally {
-        if (mounted) setLoading(false);
+        const cached = sessionStorage.getItem('last_order');
+        if (cached) {
+          const parsed: Order = JSON.parse(cached);
+          if (parsed.order_number === decoded) {
+            found = parsed;
+          }
+        }
+      } catch { /* ignore */ }
+
+      if (!found) {
+        try {
+          found = await getOrder(decoded);
+        } catch { /* ignore */ }
+      }
+
+      if (mounted) {
+        setOrder(found ?? null);
+        setLoading(false);
       }
     })();
     return () => { mounted = false; };
   }, [params]);
+
+  // Clean up sessionStorage once order is displayed and component is stable
+  useEffect(() => {
+    if (order) {
+      try { sessionStorage.removeItem('last_order'); } catch { /* ignore */ }
+    }
+  }, [order]);
 
   if (loading || !resolvedId) {
     return (
@@ -61,7 +106,7 @@ export default function OrderConfirmationPage({
         <Navbar />
         <div className="container mx-auto px-4 py-20 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#01AC28] mx-auto" />
-          <p className="mt-4 text-gray-500">Loading order…</p>
+          <p className="mt-4 text-gray-500">Loading order...</p>
         </div>
         <Footer />
       </main>
@@ -84,7 +129,7 @@ export default function OrderConfirmationPage({
         </div>
         <div className="container mx-auto px-4 py-20 text-center">
           <h1 className="text-2xl font-bold text-[#374151]">Order not found</h1>
-          <p className="text-gray-500 mt-2">We couldn’t find an order with that ID.</p>
+          <p className="text-gray-500 mt-2">We couldn&apos;t find an order with that ID.</p>
           <Link href="/" className="mt-6 inline-block text-[#01AC28] font-semibold hover:underline">Continue Shopping</Link>
         </div>
         <Footer />
@@ -121,17 +166,35 @@ export default function OrderConfirmationPage({
             <span className={`mt-3 inline-block px-3 py-1 rounded-full text-sm font-semibold ${statusClass}`}>{statusLabel}</span>
           </div>
 
+          {!isAuthenticated && (
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 mb-6">
+              <div className="flex items-center gap-3 mb-2">
+                <Search className="w-5 h-5 text-blue-600" />
+                <h3 className="font-bold text-blue-900">Track your order</h3>
+              </div>
+              <p className="text-sm text-blue-800 mb-3">
+                Save your order number <span className="font-mono font-bold">{order.order_number}</span> and your phone number to track your order anytime.
+              </p>
+              <Link
+                href={`/track?order=${encodeURIComponent(order.order_number)}`}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold text-sm transition-colors"
+              >
+                Track Order <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+
           <div className="space-y-6">
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
               <div className="flex items-center gap-2 mb-4">
                 <MapPin className="w-5 h-5 text-[#01AC28]" />
                 <h2 className="text-lg font-bold text-[#374151]">Delivery address</h2>
               </div>
-              <p className="font-medium text-[#374151]">{order.customer_name}</p>
-              {order.customer_phone && <p className="text-gray-600">{order.customer_phone}</p>}
-              <p className="text-gray-600 mt-2">
-                {order.address.house_apt}, {order.address.street}, {order.address.block_locality}, {order.address.city}
-              </p>
+              <p className="font-medium text-[#374151]">{order.delivery_name || order.customer_name}</p>
+              {(order.delivery_phone || order.customer_phone) && (
+                <p className="text-gray-600">{order.delivery_phone || order.customer_phone}</p>
+              )}
+              <p className="text-gray-600 mt-2">{deliveryDisplay(order)}</p>
             </div>
 
             <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
@@ -140,20 +203,28 @@ export default function OrderConfirmationPage({
                 <h2 className="text-lg font-bold text-[#374151]">Order items</h2>
               </div>
               <ul className="divide-y divide-gray-100">
-                {order.items.map((item) => (
-                  <li key={item.id} className="py-4 flex gap-4 items-center">
-                    {item.image_url && (
-                      <div className="relative w-16 h-16 rounded-lg bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
-                        <Image src={item.image_url} alt={item.item_name} fill className="object-contain p-2" />
+                {order.items.map((item) => {
+                  const name = item.item_name || `Product #${item.product_id}`;
+                  const label = item.tier_label || (item.tier === 'box' ? 'Box' : item.tier === 'secondary' ? 'Pack' : 'Unit');
+                  return (
+                    <li key={item.id} className="py-4 flex gap-4 items-center">
+                      {item.image_url ? (
+                        <div className="relative w-16 h-16 rounded-lg bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
+                          <Image src={item.image_url} alt={name} fill className="object-contain p-2" />
+                        </div>
+                      ) : (
+                        <div className="w-16 h-16 rounded-lg bg-gray-50 border border-gray-100 flex-shrink-0 flex items-center justify-center">
+                          <ShoppingBag className="w-6 h-6 text-gray-300" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-[#374151]">{name}</p>
+                        <p className="text-xs text-gray-500">{label} x {item.quantity}</p>
                       </div>
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-[#374151]">{item.item_name}</p>
-                      <p className="text-xs text-gray-500">{item.tier_label} × {item.quantity}</p>
-                    </div>
-                    <span className="font-bold text-[#01AC28]">Rs. {item.line_total}</span>
-                  </li>
-                ))}
+                      <span className="font-bold text-[#01AC28]">Rs. {item.line_total}</span>
+                    </li>
+                  );
+                })}
               </ul>
               <div className="pt-4 border-t border-gray-100 space-y-2">
                 <div className="flex justify-between text-sm">
@@ -161,19 +232,28 @@ export default function OrderConfirmationPage({
                   <span className="font-medium">Rs. {order.subtotal}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Tax</span>
-                  <span className="font-medium">Rs. {order.tax}</span>
-                </div>
-                <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Shipping</span>
                   <span className="font-medium">Rs. {order.shipping}</span>
                 </div>
+                {order.discount && Number(order.discount) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Discount</span>
+                    <span className="font-medium text-green-600">-Rs. {order.discount}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold pt-2">
                   <span>Total</span>
                   <span className="text-[#01AC28]">Rs. {order.total}</span>
                 </div>
               </div>
             </div>
+
+            {order.notes && (
+              <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-1">Order notes</p>
+                <p className="text-sm text-amber-900">{order.notes}</p>
+              </div>
+            )}
           </div>
 
           <div className="mt-10 flex flex-wrap justify-center gap-4">
@@ -189,6 +269,14 @@ export default function OrderConfirmationPage({
                 className="inline-flex items-center gap-2 border-2 border-[#374151] text-[#374151] hover:bg-[#374151] hover:text-white px-6 py-3 rounded-xl font-bold text-sm transition-colors"
               >
                 View Order History
+              </Link>
+            )}
+            {!isAuthenticated && (
+              <Link
+                href={`/track?order=${encodeURIComponent(order.order_number)}`}
+                className="inline-flex items-center gap-2 border-2 border-[#374151] text-[#374151] hover:bg-[#374151] hover:text-white px-6 py-3 rounded-xl font-bold text-sm transition-colors"
+              >
+                Track Order
               </Link>
             )}
           </div>

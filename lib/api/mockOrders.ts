@@ -1,18 +1,43 @@
-import type { Order, OrderItem, PaginatedOrders } from "@/types/order";
+import type {
+  Order,
+  OrderItem,
+  OrderStatus,
+  PaginatedOrders,
+  CreateOrderRequest,
+} from "@/types/order";
 
 /** Item payload for create order (id assigned by server/mock). */
 export type CreateOrderItemPayload = Omit<OrderItem, "id"> & { id?: number };
 
-/** Mock orders for when backend is unavailable. Remove when API is ready. */
+function buildAddress(o: {
+  delivery_phone: string;
+  delivery_address: string;
+  delivery_city?: string | null;
+}) {
+  const parts = o.delivery_address.split(",").map((p) => p.trim());
+  return {
+    phone: o.delivery_phone,
+    house_apt: parts[0] ?? "",
+    street: parts[1] ?? "",
+    block_locality: parts[2] ?? "",
+    city: o.delivery_city ?? parts[3] ?? "",
+  };
+}
+
 export const MOCK_ORDERS: Order[] = [
   {
     id: 1,
-    order_number: "ORD-7721",
+    order_number: "ORD-00001",
     status: "delivered",
     payment_method: "cod",
+    customer_id: 1,
     customer_name: "Ahmed Khan",
     customer_email: "ahmed@example.com",
     customer_phone: "+92 300 1234567",
+    delivery_name: "Ahmed Khan",
+    delivery_phone: "+92 300 1234567",
+    delivery_address: "House 12 Apt 4B, Street 7, F-7 Markaz",
+    delivery_city: "Islamabad",
     address: {
       phone: "+92 300 1234567",
       house_apt: "House 12, Apt 4B",
@@ -20,10 +45,10 @@ export const MOCK_ORDERS: Order[] = [
       block_locality: "F-7 Markaz",
       city: "Islamabad",
     },
-    subtotal: "1250.00",
-    tax: "187.50",
+    subtotal: "648.00",
+    tax: "0.00",
     shipping: "0.00",
-    total: "1437.50",
+    total: "648.00",
     notes: null,
     items: [
       {
@@ -56,12 +81,17 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 2,
-    order_number: "ORD-7690",
-    status: "confirmed",
-    payment_method: "card",
+    order_number: "ORD-00002",
+    status: "processing",
+    payment_method: "cod",
+    customer_id: 2,
     customer_name: "Sara Ali",
     customer_email: "sara@example.com",
     customer_phone: "+92 321 9876543",
+    delivery_name: "Sara Ali",
+    delivery_phone: "+92 321 9876543",
+    delivery_address: "Plot 45, Main Boulevard, DHA Phase 2",
+    delivery_city: "Rawalpindi",
     address: {
       phone: "+92 321 9876543",
       house_apt: "Plot 45",
@@ -69,10 +99,10 @@ export const MOCK_ORDERS: Order[] = [
       block_locality: "DHA Phase 2",
       city: "Rawalpindi",
     },
-    subtotal: "890.00",
-    tax: "133.50",
+    subtotal: "555.00",
+    tax: "0.00",
     shipping: "15.00",
-    total: "1038.50",
+    total: "570.00",
     notes: "Please call before delivery.",
     items: [
       {
@@ -93,12 +123,16 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 3,
-    order_number: "ORD-7512",
-    status: "pending",
+    order_number: "ORD-00003",
+    status: "out_for_delivery",
     payment_method: "cod",
-    customer_name: "Guest User",
+    customer_name: "Fatima Noor",
     customer_email: null,
     customer_phone: "+92 333 1112233",
+    delivery_name: "Fatima Noor",
+    delivery_phone: "+92 333 1112233",
+    delivery_address: "Shop 3, Mall Road, Saddar",
+    delivery_city: "Rawalpindi",
     address: {
       phone: "+92 333 1112233",
       house_apt: "Shop 3",
@@ -107,9 +141,9 @@ export const MOCK_ORDERS: Order[] = [
       city: "Rawalpindi",
     },
     subtotal: "2100.00",
-    tax: "315.00",
+    tax: "0.00",
     shipping: "0.00",
-    total: "2415.00",
+    total: "2100.00",
     notes: null,
     items: [
       {
@@ -130,12 +164,17 @@ export const MOCK_ORDERS: Order[] = [
   },
   {
     id: 4,
-    order_number: "ORD-7405",
-    status: "cancelled",
+    order_number: "ORD-00004",
+    status: "pending",
     payment_method: "cod",
+    customer_id: 3,
     customer_name: "Imran Shah",
     customer_email: "imran@example.com",
     customer_phone: "+92 345 5556677",
+    delivery_name: "Imran Shah",
+    delivery_phone: "+92 345 5556677",
+    delivery_address: "Block A Unit 8, Street 2, I-8/4",
+    delivery_city: "Islamabad",
     address: {
       phone: "+92 345 5556677",
       house_apt: "Block A, Unit 8",
@@ -143,23 +182,76 @@ export const MOCK_ORDERS: Order[] = [
       block_locality: "I-8/4",
       city: "Islamabad",
     },
-    subtotal: "320.00",
-    tax: "48.00",
+    subtotal: "297.00",
+    tax: "0.00",
     shipping: "15.00",
-    total: "383.00",
+    total: "312.00",
     notes: null,
-    items: [],
+    items: [
+      {
+        id: 5,
+        product_id: 1,
+        item_name: "MedRelief Pain Killer",
+        item_id: "MED-001",
+        tier: "item",
+        tier_label: "Tablet",
+        unit_price: "99.00",
+        quantity: 3,
+        line_total: "297.00",
+        image_url: "/assets/home/product-250mg.png",
+      },
+    ],
+    created_at: "2025-03-07T11:00:00Z",
+    updated_at: "2025-03-07T11:00:00Z",
+  },
+  {
+    id: 5,
+    order_number: "ORD-00005",
+    status: "cancelled",
+    payment_method: "cod",
+    customer_name: "Bilal Hussain",
+    customer_email: null,
+    customer_phone: "+92 311 4455667",
+    delivery_name: "Bilal Hussain",
+    delivery_phone: "+92 311 4455667",
+    delivery_address: "House 7, Street 1, G-9",
+    delivery_city: "Islamabad",
+    address: {
+      phone: "+92 311 4455667",
+      house_apt: "House 7",
+      street: "Street 1",
+      block_locality: "G-9",
+      city: "Islamabad",
+    },
+    subtotal: "99.00",
+    tax: "0.00",
+    shipping: "0.00",
+    total: "99.00",
+    notes: null,
+    items: [
+      {
+        id: 6,
+        product_id: 1,
+        item_name: "MedRelief Pain Killer",
+        item_id: "MED-001",
+        tier: "item",
+        tier_label: "Tablet",
+        unit_price: "99.00",
+        quantity: 1,
+        line_total: "99.00",
+        image_url: "/assets/home/product-250mg.png",
+      },
+    ],
     created_at: "2025-02-10T11:00:00Z",
     updated_at: "2025-02-10T12:30:00Z",
   },
 ];
 
-let nextMockId = 10;
+let nextMockId = 100;
 
-/** Generate a new order number for mock create. */
 export function generateMockOrderNumber(): string {
-  const n = 7700 + Math.floor(Math.random() * 300);
-  return `ORD-${n}`;
+  const n = nextMockId;
+  return `ORD-${String(n).padStart(5, "0")}`;
 }
 
 /** Get paginated mock orders with optional status filter and search. */
@@ -203,15 +295,109 @@ export function getMockOrders(params?: {
   };
 }
 
-/** Get a single mock order by id. */
+/** Get a single mock order by id or order_number. */
 export function getMockOrder(id: number | string): Order | null {
+  if (typeof id === "string" && id.startsWith("ORD-")) {
+    return MOCK_ORDERS.find((o) => o.order_number === id) ?? null;
+  }
   const numId = typeof id === "string" ? parseInt(id, 10) : id;
   if (!Number.isFinite(numId)) return null;
   return MOCK_ORDERS.find((o) => o.id === numId) ?? null;
 }
 
-/** Create a mock order (adds to in-memory list for session). Not persisted. */
-export function createMockOrder(payload: {
+/** Track a mock order by order number + phone (guest flow). */
+export function trackMockOrder(
+  orderNumber: string,
+  phone: string
+): Order | null {
+  return (
+    MOCK_ORDERS.find(
+      (o) =>
+        o.order_number === orderNumber &&
+        o.delivery_phone.replace(/\s/g, "") === phone.replace(/\s/g, "")
+    ) ?? null
+  );
+}
+
+/** Hint object passed from checkout so mock can produce realistic prices. */
+export interface CartHint {
+  name: string;
+  price: number;
+  image: string;
+  variation?: string;
+}
+
+/** Create a mock order from the new API payload shape. */
+export function createMockOrder(
+  payload: CreateOrderRequest,
+  cartHints?: Record<number, CartHint>
+): Order {
+  const id = nextMockId++;
+  const orderNumber = generateMockOrderNumber();
+  const now = new Date().toISOString();
+
+  const items: OrderItem[] = payload.items.map((item, idx) => {
+    const hint = cartHints?.[item.product_id];
+    const unitPrice = hint?.price ?? 0;
+    const lineTotal = unitPrice * item.quantity;
+    return {
+      id: id * 100 + idx,
+      product_id: item.product_id,
+      item_name: hint?.name || `Product #${item.product_id}`,
+      item_id: `PROD-${item.product_id}`,
+      tier: item.unit_type,
+      tier_label:
+        item.unit_type === "box"
+          ? "Box"
+          : item.unit_type === "secondary"
+            ? "Pack"
+            : "Unit",
+      unit_price: unitPrice.toFixed(2),
+      quantity: item.quantity,
+      line_total: lineTotal.toFixed(2),
+      image_url: hint?.image || null,
+    };
+  });
+
+  const subtotal = items.reduce(
+    (sum, i) => sum + parseFloat(i.line_total),
+    0
+  );
+  const shipping = subtotal >= 199 ? 0 : 15;
+  const total = subtotal + shipping;
+
+  const addr = buildAddress(payload);
+
+  const order: Order = {
+    id,
+    order_number: orderNumber,
+    status: "pending",
+    payment_method: "cod",
+    customer_name: payload.delivery_name,
+    customer_phone: payload.delivery_phone,
+    delivery_name: payload.delivery_name,
+    delivery_phone: payload.delivery_phone,
+    delivery_address: payload.delivery_address,
+    delivery_city: payload.delivery_city ?? null,
+    delivery_gender: payload.delivery_gender ?? null,
+    delivery_latitude: payload.delivery_latitude ?? null,
+    delivery_longitude: payload.delivery_longitude ?? null,
+    address: addr,
+    subtotal: subtotal.toFixed(2),
+    tax: "0.00",
+    shipping: shipping.toFixed(2),
+    total: total.toFixed(2),
+    notes: payload.notes ?? null,
+    items,
+    created_at: now,
+    updated_at: now,
+  };
+  MOCK_ORDERS.push(order);
+  return order;
+}
+
+/** Create a mock order from the legacy payload shape (old checkout compat). */
+export function createMockOrderLegacy(payload: {
   customer_name: string;
   customer_email?: string | null;
   customer_phone: string;
@@ -235,6 +421,10 @@ export function createMockOrder(payload: {
     customer_name: payload.customer_name,
     customer_email: payload.customer_email ?? null,
     customer_phone: payload.customer_phone,
+    delivery_name: payload.customer_name,
+    delivery_phone: payload.customer_phone,
+    delivery_address: `${payload.address.house_apt}, ${payload.address.street}, ${payload.address.block_locality}`,
+    delivery_city: payload.address.city,
     address: payload.address,
     subtotal: payload.subtotal,
     tax: payload.tax,
@@ -255,7 +445,7 @@ export function createMockOrder(payload: {
 /** Update mock order status (for dashboard fallback). */
 export function updateMockOrderStatus(
   id: number | string,
-  status: Order["status"]
+  status: OrderStatus
 ): Order | null {
   const numId = typeof id === "string" ? parseInt(id, 10) : id;
   if (!Number.isFinite(numId)) return null;

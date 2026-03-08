@@ -110,7 +110,7 @@ const saveCartToStorage = (items: CartItem[]) => {
     }));
     localStorage.setItem('cart_items', JSON.stringify(itemsToSave));
   } catch (error) {
-    console.error('Failed to save cart to storage:', error);
+    console.error('Failed to save the cart to storage:', error);
   }
 };
 

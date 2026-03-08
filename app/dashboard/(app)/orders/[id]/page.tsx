@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getDashboardOrder } from "@/lib/api/dashboardOrders";
-import type { Order } from "@/types/order";
+import { dashboardFetch } from "@/lib/dashboardApi";
+import type { Order, OrderItem } from "@/types/order";
+import type { Product } from "@/types/product";
 import { Badge } from "@/components/ui/Badge";
 import { OrderStatusActions } from "./OrderStatusActions";
 
@@ -41,6 +43,42 @@ function deliveryDisplay(order: Order) {
   return "N/A";
 }
 
+async function fetchProduct(id: number): Promise<Product | null> {
+  try {
+    const res = await dashboardFetch(`/products/${id}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as Product;
+  } catch {
+    return null;
+  }
+}
+
+function primaryImage(p: Product): string | null {
+  const primary = p.images?.find((i) => i.is_primary) ?? p.images?.[0];
+  if (!primary) return null;
+  const key = primary.object_key;
+  if (key.startsWith("http")) return key;
+  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") ?? "";
+  return `${base}/storage/${key}`;
+}
+
+async function enrichItems(items: OrderItem[]): Promise<OrderItem[]> {
+  const ids = [...new Set(items.map((i) => i.product_id))];
+  const products = await Promise.all(ids.map(fetchProduct));
+  const map = new Map<number, Product>();
+  products.forEach((p) => { if (p) map.set(p.id, p); });
+
+  return items.map((item) => {
+    const p = map.get(item.product_id);
+    if (!p) return item;
+    return {
+      ...item,
+      item_name: item.item_name || p.item_name,
+      image_url: item.image_url || primaryImage(p),
+    };
+  });
+}
+
 export default async function DashboardOrderDetailPage({
   params,
   searchParams,
@@ -52,9 +90,9 @@ export default async function DashboardOrderDetailPage({
   const sp = (await searchParams) ?? {};
   const message = sp.message;
 
-  const order = await getDashboardOrder(id);
+  const rawOrder = await getDashboardOrder(id);
 
-  if (!order) {
+  if (!rawOrder) {
     return (
       <div className="space-y-6">
         <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
@@ -67,6 +105,7 @@ export default async function DashboardOrderDetailPage({
     );
   }
 
+  const order: Order = { ...rawOrder, items: await enrichItems(rawOrder.items ?? []) };
   const canChangeStatus = order.status !== "cancelled" && order.status !== "delivered";
 
   return (

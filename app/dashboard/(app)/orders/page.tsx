@@ -95,7 +95,7 @@ export default async function DashboardOrdersPage({
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Order #</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Customer</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden md:table-cell">Phone</th>
-                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Products</th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden lg:table-cell">Address</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Status</th>
                 <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">Date</th>
@@ -121,21 +121,11 @@ export default async function DashboardOrdersPage({
                     <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
                       {order.delivery_phone || order.customer_phone}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 max-w-[220px]">
-                      {order.items?.length ? (
-                        <div className="space-y-0.5">
-                          {order.items.slice(0, 2).map((item) => (
-                            <p key={item.id} className="truncate text-gray-900 text-xs font-medium">
-                              {item.item_name || `Product #${item.product_id}`} <span className="text-gray-400 font-normal">x{item.quantity}</span>
-                            </p>
-                          ))}
-                          {order.items.length > 2 && (
-                            <p className="text-[10px] text-gray-400">+{order.items.length - 2} more</p>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">--</span>
-                      )}
+                    <td className="px-4 py-3 text-sm text-gray-600 hidden lg:table-cell max-w-[260px]">
+                      <p className="truncate">
+                        {order.delivery_address || "—"}
+                        {order.delivery_city ? `, ${order.delivery_city}` : ""}
+                      </p>
                     </td>
                     <td className="px-4 py-3 font-semibold text-[#374151]">Rs. {order.total}</td>
                     <td className="px-4 py-3">

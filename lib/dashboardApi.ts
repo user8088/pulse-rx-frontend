@@ -27,7 +27,8 @@ export async function dashboardFetch(path: string, init?: RequestInit) {
   const headers = new Headers(init?.headers);
   
   // Include Tenant ID for schema resolution (required for the new backend architecture)
-  const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || '1';
+  // Must match the value used by apiClient (defaults to '2' if env is missing)
+  const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || '2';
   headers.set("X-Tenant-Id", tenantId);
 
   if (token) {

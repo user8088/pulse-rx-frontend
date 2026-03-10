@@ -19,6 +19,7 @@ export interface Product {
   variation_value: string | null;
   generic_name: string | null;
   is_narcotic: boolean;
+  requires_prescription?: boolean;
   category_id: number | null;
   brand: string | null;
   retail_price_unit: string;

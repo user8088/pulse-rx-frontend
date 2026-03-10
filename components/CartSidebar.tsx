@@ -102,10 +102,10 @@ export default function CartSidebar() {
                     </p>
                     {item.requiresPrescription && (
                       <div className="mt-2 flex items-center gap-1.5">
-                        {item.prescription?.status === 'verified' && (
+                        {item.prescription?.status === 'approved' && (
                           <>
                             <CheckCircle2 className="w-3 h-3 text-green-600" />
-                            <span className="text-[10px] font-bold text-green-600">Prescription Verified</span>
+                            <span className="text-[10px] font-bold text-green-600">Prescription Uploaded</span>
                           </>
                         )}
                         {item.prescription?.status === 'pending' && (

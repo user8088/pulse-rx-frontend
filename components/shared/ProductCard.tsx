@@ -15,6 +15,8 @@ export interface ProductCardProps {
   variation?: string;
   quantity?: string;
   href?: string;
+  unitType?: "item" | "secondary" | "box";
+  requiresPrescription?: boolean;
 }
 
 export default function ProductCard({
@@ -27,6 +29,8 @@ export default function ProductCard({
   variation = "",
   quantity = "1 Unit",
   href,
+  unitType = "item",
+  requiresPrescription = false,
 }: ProductCardProps) {
   const { addItem } = useCart();
 
@@ -44,7 +48,8 @@ export default function ProductCard({
       price,
       image,
       qty: 1,
-      unit_type: "item",
+      unit_type: unitType,
+      requiresPrescription,
     });
   };
 

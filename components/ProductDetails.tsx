@@ -136,7 +136,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
       unit_type: resolvedUnitType,
-      requiresPrescription: false
+      requiresPrescription: !!selectedVariation.requires_prescription,
     });
   };
 

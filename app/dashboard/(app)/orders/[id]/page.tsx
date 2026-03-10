@@ -1,11 +1,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { getDashboardOrder } from "@/lib/api/dashboardOrders";
-import { dashboardFetch } from "@/lib/dashboardApi";
-import type { Order, OrderItem } from "@/types/order";
-import type { Product } from "@/types/product";
+import type { Order } from "@/types/order";
 import { Badge } from "@/components/ui/Badge";
 import { OrderStatusActions } from "./OrderStatusActions";
+import PrescriptionReview from "./PrescriptionReview";
 
 const STATUS_VARIANTS: Record<Order["status"], "success" | "warning" | "danger" | "neutral"> = {
   pending: "warning",
@@ -43,42 +42,6 @@ function deliveryDisplay(order: Order) {
   return "N/A";
 }
 
-async function fetchProduct(id: number): Promise<Product | null> {
-  try {
-    const res = await dashboardFetch(`/products/${id}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    return (await res.json()) as Product;
-  } catch {
-    return null;
-  }
-}
-
-function primaryImage(p: Product): string | null {
-  const primary = p.images?.find((i) => i.is_primary) ?? p.images?.[0];
-  if (!primary) return null;
-  const key = primary.object_key;
-  if (key.startsWith("http")) return key;
-  const base = process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "") ?? "";
-  return `${base}/storage/${key}`;
-}
-
-async function enrichItems(items: OrderItem[]): Promise<OrderItem[]> {
-  const ids = [...new Set(items.map((i) => i.product_id))];
-  const products = await Promise.all(ids.map(fetchProduct));
-  const map = new Map<number, Product>();
-  products.forEach((p) => { if (p) map.set(p.id, p); });
-
-  return items.map((item) => {
-    const p = map.get(item.product_id);
-    if (!p) return item;
-    return {
-      ...item,
-      item_name: item.item_name || p.item_name,
-      image_url: item.image_url || primaryImage(p),
-    };
-  });
-}
-
 export default async function DashboardOrderDetailPage({
   params,
   searchParams,
@@ -105,7 +68,7 @@ export default async function DashboardOrderDetailPage({
     );
   }
 
-  const order: Order = { ...rawOrder, items: await enrichItems(rawOrder.items ?? []) };
+  const order: Order = rawOrder;
   const canChangeStatus = order.status !== "cancelled" && order.status !== "delivered";
 
   return (
@@ -209,6 +172,7 @@ export default async function DashboardOrderDetailPage({
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Product</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Tier</th>
+                <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Unit</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Unit Price</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">Qty</th>
                 <th className="px-6 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Line Total</th>
@@ -216,8 +180,8 @@ export default async function DashboardOrderDetailPage({
             </thead>
             <tbody>
               {order.items.map((item) => {
-                const name = item.item_name || `Product #${item.product_id}`;
-                const label = item.tier_label || (item.tier === 'box' ? 'Box' : item.tier === 'secondary' ? 'Pack' : 'Unit');
+                const name = item.item_name || item.product_name || `Product #${item.product_id}`;
+                const unitLabel = item.unit_label || item.tier_label || 'Unit';
                 return (
                   <tr key={item.id} className="border-b border-gray-50">
                     <td className="px-6 py-4">
@@ -237,7 +201,10 @@ export default async function DashboardOrderDetailPage({
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{label}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{unitLabel}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500">
+                      {item.quantity} x {unitLabel}
+                    </td>
                     <td className="px-6 py-4 text-sm font-medium">Rs. {item.unit_price}</td>
                     <td className="px-6 py-4 text-sm font-medium">{item.quantity}</td>
                     <td className="px-6 py-4 text-sm font-bold text-right text-[#01AC28]">Rs. {item.line_total}</td>
@@ -248,6 +215,21 @@ export default async function DashboardOrderDetailPage({
           </table>
         </div>
       </div>
+
+      {/* Prescriptions section */}
+      {(() => {
+        const rxItemIds = order.items.map(i => i.id);
+        const itemNames: Record<number, string> = {};
+        for (const i of order.items) {
+          itemNames[i.id] = i.item_name || i.product_name || `Product #${i.product_id}`;
+        }
+        return (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Prescriptions</h2>
+            <PrescriptionReview orderId={order.id} rxItemIds={rxItemIds} itemNames={itemNames} />
+          </div>
+        );
+      })()}
 
       {order.notes && (
         <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">

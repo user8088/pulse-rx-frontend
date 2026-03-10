@@ -1,118 +1,168 @@
-# Backend changes log — for frontend (customer + dashboard)
+## Prescription-required products & prescription uploads — backend APIs for frontend
 
-This document summarizes backend changes that affect the frontend. Use it to adjust the customer-facing app and the dashboard accordingly.
+### Product-level flag
 
----
+- Products now include a boolean `requires_prescription` field derived from the Excel `Narcotic(s)` column in `Data Template.xlsx`.
+  - `Narcotic(s)` values of `TRUE`/`true` → `requires_prescription = true`.
+  - `FALSE`/`false` or empty → `requires_prescription = false`.
+- This field is available on all product JSON payloads (e.g. `/products`, `/products/{id}`) so the frontend can:
+  - Mark products as prescription-only in listings/product detail.
+  - Enforce prescription upload UX in cart/checkout when such products are present.
 
-## Excel import: new columns & packaging logic (recent)
+### Data model for prescriptions
 
-### What changed on the backend
+- New `Prescription` model with table `prescriptions` (tenant-scoped).
+- Each row is linked to:
+  - `product_id` (the product the prescription is for).
+  - `order_id` and `order_item_id` (the specific order + line item).
+  - `customer_id` (for logged-in customers) or `guest_phone`/`guest_name` (for guests).
+  - `file_key` (object storage key on the `s3` disk).
+  - `status` (`pending` | `approved` | `rejected`).
+  - `reviewed_by_user_id`, `reviewed_at`, `notes` for dashboard review.
 
-1. **Excel template support**
-   - Import now reads four new columns: **Is Pack Item**, **Sell Per Item Only**, **Pack Unit**, **Pack Item Unit**.
-   - Header name fixes: **Genaric Name**, **Narcotic(s)**, **Sub Category I** are now recognized (in addition to existing spellings).
+You generally don’t need to touch this directly from the frontend; use the APIs below.
 
-2. **Three product types from import**
-   - **Pack + strips** (e.g. pharmacy: Box → Strips → Tablets): `can_sell_box` and `can_sell_secondary` set from box/strip prices; **Pack Unit** → `box_unit_label`, **Pack Item Unit** → `secondary_unit_label`; `base_unit_label` = "Tablets".
-   - **Pack + individual items only** (e.g. box of jellies/chocolates): `can_sell_box` and `can_sell_item` set; `can_sell_secondary` = false. **Pack Unit** → `box_unit_label`, **Pack Item Unit** → `base_unit_label`. Single-item price comes from the *strip price column* in Excel; `strip_qty` is null.
-   - **Standalone**: same as before; only `can_sell_item` from item price when no pack/strip.
+### Object storage layout
 
-3. **Product API / `packaging_display`**
-   - **Box tier description** now depends on selling flags:
-     - If `can_sell_secondary` → "1 {boxLabel} = {pack_qty} {secondaryLabel}" (e.g. "1 Box = 10 Strips").
-     - If `can_sell_secondary` is false but `can_sell_item` is true → "1 {boxLabel} = {pack_qty} {baseLabel}" (e.g. "1 Box = 50 Jellies").
-   - No change to response shape: still `packaging_display.base_unit` and `packaging_display.options[]` with `tier`, `label`, `description`, `price`.
+- All prescriptions are stored on the `s3` disk using this pattern:
 
-4. **Labels are dynamic**
-   - `box_unit_label` can be "Box", "Pack", "Carton", etc. (from **Pack Unit** or legacy **Box Unit Label**).
-   - `secondary_unit_label` can be "Strip", "Sachet", etc. (from **Pack Item Unit** when it’s pack+strips).
-   - `base_unit_label` can be "Tablets", "Jelly", "Chocolate", "Unit", etc. (from **Pack Item Unit** when sell-per-item-only, or legacy **Base Unit Label**).
+```text
+tenants/{tenant_id}/users/{folder_id}/{filename}
+```
 
----
+- `folder_id` strategies:
+  - **Authenticated customer**: `customer-{customer_id}-{slug(customer_name)}`
+  - **Guest**: `guest-{normalized_phone}` (phone stripped to digits)
+- Filenames are timestamp + random suffix, e.g. `20260310T120102-ABCD1234.pdf`.
+- Files are **not** made publicly visible; dashboard access uses short-lived signed URLs (see below).
 
-### Customer-facing app
+### Customer APIs (authenticated, per order item)
 
-- **Use `packaging_display` only.**  
-  Keep using `product.packaging_display.options` for "Select Pack Size". Each option has `tier`, `label`, `description`, `price`. No structural change required.
-- **Don’t assume labels.**  
-  Avoid hardcoding "Pack", "Strip", "Tablet". Always show `option.label` and `option.description` from the API.
-- **New possibility: box + item only.**  
-  Some products will have only two options: box and item (e.g. "1 Box = 50 Jellies" and "1 Jelly"). Handle 2-option lists the same as 3-option; no special case needed.
-- **Cart/order payload.**  
-  Continue sending `tier` (`"box"` | `"secondary"` | `"item"`) and `price` (and quantity). Backend contract unchanged.
+All routes below live under the existing customer group:
 
----
+- Base prefix: `auth:sanctum`, `tenant.resolve`, `tenant.schema`, `role:customer`.
 
-### Dashboard (admin)
+Endpoints:
 
-- **Product create/edit**
-  - Expose and persist: `box_unit_label`, `secondary_unit_label`, `base_unit_label` (all optional; backend defaults: "Box", "Pack", "Unit").
-  - Expose and persist: `can_sell_box`, `can_sell_secondary`, `can_sell_item` (read-only for imported data if you sync from backend after import; otherwise editable).
-  - Validation: if a sellable flag is true, the corresponding price must be &gt; 0 (backend returns 422 otherwise).
+- `GET /customer/orders/{order}/items/{item}/prescriptions`
+  - **Purpose**: List prescriptions the logged-in customer has uploaded for a specific order item.
+  - **Auth**: Customer must own the `order`; `item` must belong to that `order`.
+  - **Response**: Paginated list of `Prescription` objects for that `order_item`.
 
-- **After Excel import**
-  - Imported products may now have:
-    - **Box + strips + item** (three sellable tiers),
-    - **Box + item only** (two tiers; no secondary),
-    - **Item only** (one tier).
-  - Labels will reflect Excel **Pack Unit** / **Pack Item Unit** (or legacy columns). Show them in the product form so admins can edit if needed.
+- `POST /customer/orders/{order}/items/{item}/prescriptions`
+  - **Purpose**: Upload a new prescription file for a specific order item.
+  - **Auth / guards**:
+    - The authenticated user must be the owner of the `order`.
+    - The `item` must belong to the `order`.
+    - The `item`’s product must have `requires_prescription = true`. Otherwise returns `422`.
+  - **Request (multipart/form-data)**:
+    - `file` (required): `jpg`, `jpeg`, `png`, or `pdf`; max size 8 MB.
+    - `notes` (optional): string, max 2000 chars.
+  - **Behavior**:
+    - File is stored via `PrescriptionStorageService` under the customer’s folder.
+    - A `Prescription` row is created with `status = "pending"`.
+  - **Response**: `201 Created` + the created `Prescription` JSON.
 
-- **Import logs / error snapshot**
-  - Rejected rows in import logs now include: `is_pack_item`, `sell_per_item_only`, `pack_unit`, `pack_item_unit` in the `data` object. Useful for debugging and re-export/fix flows.
+- `DELETE /customer/orders/{order}/items/{item}/prescriptions/{prescription}`
+  - **Purpose**: Allow customers to delete their own pending prescriptions (before review / processing).
+  - **Auth / guards**:
+    - Same ownership checks as above.
+    - `prescription` must belong to that `order`, `order_item`, and `customer`.
+    - Only `status = "pending"` can be deleted; otherwise returns `422`.
+  - **Response**: `204 No Content` on success.
 
----
+### Guest APIs (by order number + phone, per order item)
 
-### API contract (unchanged)
+Guest flows are tenant-aware but do not require auth; they use order number + phone for identity:
 
-- **GET** `/products`, **GET** `/products/{id}` (and dashboard variants): product payload still includes `packaging_display`, `box_unit_label`, `secondary_unit_label`, `base_unit_label`, `can_sell_box`, `can_sell_secondary`, `can_sell_item`, and all price fields.
-- **POST/PATCH** product: same request body as before; no new required fields. New import logic only affects how Excel is mapped into these existing fields.
+- Group middlewares: `tenant.resolve`, `tenant.schema`.
 
----
+Endpoints:
 
-## Ordering & Customer profile (new)
+- `GET /orders/{orderNumber}/items/{orderItemId}/prescriptions?phone=...`
+  - **Purpose**: List prescriptions uploaded for a specific order item by a guest.
+  - **Query**:
+    - `phone` (required): must match the order’s `delivery_phone`.
+  - **Behavior**:
+    - Finds `Order` by `order_number` + `delivery_phone`.
+    - Ensures `orderItemId` belongs to that order.
+  - **Response**: Paginated list of `Prescription` objects for that `order_item`.
 
-### Backend overview
+- `POST /orders/{orderNumber}/items/{orderItemId}/prescriptions?phone=...`
+  - **Purpose**: Guest upload of a prescription for a specific order item.
+  - **Query**:
+    - `phone` (required): must match the order’s `delivery_phone`.
+  - **Request (multipart/form-data)**:
+    - `file` (required): `jpg`, `jpeg`, `png`, or `pdf`; max size 8 MB.
+    - `notes` (optional): string, max 2000 chars.
+  - **Behavior**:
+    - Resolves `Order` by `order_number` + `delivery_phone`.
+    - Resolves `OrderItem` by `orderItemId` under that order.
+    - Ensures related product has `requires_prescription = true` (422 otherwise).
+    - Stores file via `PrescriptionStorageService` under `guest-{normalized_phone}` folder.
+    - Creates `Prescription` row with:
+      - `guest_phone` (from query),
+      - `guest_name` (`order.delivery_name` snapshot),
+      - `status = "pending"`.
+  - **Response**: `201 Created` + created `Prescription` JSON.
 
-- **Guest checkout:** Any user can place an order without an account. Send **X-Tenant-Id** header and `POST /api/orders` with delivery info + items.
-- **Registered customers:** Customers sign up via `POST /api/customer/register` (with **X-Tenant-Id**). Login with `POST /api/customer/login`. Profile is stored in tenant `customers` table; auth is Laravel Sanctum (email + password).
-- **Customer profile:** Name, email, phone, gender, address, city, latitude, longitude, discount_percentage (admin-set). Frontend gets coordinates via Google Maps/geolocation and sends `latitude`/`longitude` to the backend.
-- **Orders:** Delivery info is always snapshotted on the order. Prices are snapshotted on each order item. Order number is auto-generated (e.g. `ORD-00001`). Cash on Delivery only for now.
+### Dashboard APIs (admin/staff)
 
-### API endpoints
+All routes under:
 
-**Public (tenant-aware; send X-Tenant-Id for guests)**
+- Prefix: `/dashboard`
+- Middlewares: `auth:sanctum`, `tenant.resolve`, `tenant.schema`, `role:admin,staff`.
 
-- `POST /api/customer/register` — body: name, email, password, password_confirmation, phone?, gender?, address?, city?, latitude?, longitude?
-- `POST /api/customer/login` — body: email, password. Returns token, user, customer.
-- `POST /api/orders` — place order (guest or with Bearer token). If Bearer token is a customer, order is linked and customer discount applied.
-  - Body: delivery_name, delivery_phone, delivery_address, delivery_city?, delivery_gender?, delivery_latitude?, delivery_longitude?, notes?, items: [{ product_id, unit_type, quantity }]. `unit_type`: `item` | `secondary` | `box`.
-- `GET /api/orders/{orderNumber}/track?phone=...` — guest order tracking.
+Endpoints:
 
-**Customer-only (auth:sanctum + role customer)**
+- `GET /dashboard/prescriptions`
+  - **Purpose**: List/filter prescriptions for review.
+  - **Query filters** (all optional):
+    - `status`: `pending` | `approved` | `rejected`.
+    - `product_id`
+    - `order_id`
+    - `customer_id`
+    - `guest_phone`
+    - `per_page` (default 15).
+  - **Response**: Paginated list with related product/order/orderItem/customer/reviewer eagerly loaded.
 
-- `GET /api/customer/profile` — current customer profile.
-- `PUT /api/customer/profile` — update name, phone, gender, address, city, latitude, longitude (no email change).
-- `GET /api/customer/orders` — paginated order history.
-- `GET /api/customer/orders/{order}` — single order (must own it).
+- `GET /dashboard/prescriptions/{prescription}`
+  - **Purpose**: Fetch a single prescription with full details.
+  - **Response**: `Prescription` JSON with relations:
+    - `product`, `order`, `orderItem`, `customer`, `reviewer`.
 
-**Dashboard (admin/staff)**
+- `PATCH /dashboard/prescriptions/{prescription}`
+  - **Purpose**: Approve or reject a prescription (or mark as pending).
+  - **Request JSON**:
+    - `status` (required): `pending` | `approved` | `rejected`.
+    - `notes` (optional): string, max 2000 chars.
+  - **Behavior**:
+    - Updates `status` and `notes`.
+    - Sets `reviewed_by_user_id` to the current dashboard user.
+    - Sets `reviewed_at` to `now()`.
+  - **Response**: Updated `Prescription` JSON with relations.
 
-- `GET /api/dashboard/orders` — list orders (query: status, from_date, to_date, customer_id, per_page).
-- `GET /api/dashboard/orders/{order}` — order detail.
-- `PATCH /api/dashboard/orders/{order}/status` — body: `{ "status": "pending"|"confirmed"|"processing"|"out_for_delivery"|"delivered"|"cancelled" }`.
+- `DELETE /dashboard/prescriptions/{prescription}`
+  - **Purpose**: Hard-delete a prescription (cleanup/administrative).
+  - **Response**: `204 No Content`.
 
-### Customer-facing app
+- `GET /dashboard/prescriptions/{prescription}/file`
+  - **Purpose**: Get a short-lived URL to view/download the prescription file.
+  - **Behavior**:
+    - Uses `Storage::disk('s3')->temporaryUrl(file_key, now()->addMinutes(10))`.
+  - **Response**:
+    - `200 OK` with `{ "url": "<signed-url>" }` for direct use in dashboard UI (e.g. open in new tab).
 
-- **Checkout:** Collect delivery_name, delivery_phone, delivery_address, delivery_city, delivery_gender; get coordinates (Google Maps / geolocation) and send delivery_latitude, delivery_longitude. Send items with product_id, unit_type (from packaging_display.options[].tier), quantity.
-- **Guest:** Omit Bearer token; send X-Tenant-Id. After order, show order_number and tell user to track with order number + phone.
-- **Logged-in customer:** Send Bearer token; backend links order to customer and applies discount_percentage. Optionally prefill delivery from customer profile.
-- **Tracking:** Call `GET /api/orders/{orderNumber}/track?phone=...` with X-Tenant-Id.
+### Frontend integration notes
 
-### Dashboard (admin)
-
-- **Customers:** Customer list/detail now includes gender, address, city, latitude, longitude, discount_percentage. Editable; discount_percentage is a percentage (e.g. 10 = 10% off).
-- **Orders:** New orders section: list orders, filter by status/date/customer, view order detail, update status (pending → confirmed → processing → out_for_delivery → delivered or cancelled).
-
----
-
-*Last updated: after ordering feature and customer profile implementation.*
+- **When to prompt for upload**:
+  - During checkout or in order detail/confirmation/tracking views, inspect each order item’s `product.requires_prescription`.
+  - If `true`, render “Upload prescription” UI and call the appropriate endpoint:
+    - Logged-in customers: `POST /customer/orders/{order}/items/{item}/prescriptions`.
+    - Guests: `POST /orders/{orderNumber}/items/{orderItemId}/prescriptions?phone=...`.
+- **Handling status**:
+  - Use the list endpoints to show whether a prescription is:
+    - Pending review, approved, or rejected (and show `notes` when present).
+  - For guests, ensure the phone used in the query matches the one they used when ordering.
+- **Security**:
+  - Only dashboard routes can fetch file URLs; customer and guest flows never receive direct file links by design. If you want user-visible previews later, we can add dedicated read endpoints with appropriate ACLs.

@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ChevronRight, CheckCircle2, MapPin, ShoppingBag, Search } from 'lucide-react';
+import { ChevronRight, CheckCircle2, MapPin, ShoppingBag, Search, FileText } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PrescriptionUpload from '@/components/PrescriptionUpload';
 import { getOrder } from '@/lib/api/orders';
 import { useAuth } from '@/lib/context/AuthContext';
 import type { Order } from '@/types/order';
@@ -64,16 +65,15 @@ export default function OrderConfirmationPage({
         return;
       }
 
-      // Try sessionStorage first (set by checkout after placing the order).
-      // We keep the entry around (don't remove immediately) so React Strict Mode
-      // double-invoke doesn't lose it on the second run.
       let found: Order | null = null;
+
       try {
         const cached = sessionStorage.getItem('last_order');
         if (cached) {
           const parsed: Order = JSON.parse(cached);
           if (parsed.order_number === decoded) {
             found = parsed;
+            sessionStorage.removeItem('last_order');
           }
         }
       } catch { /* ignore */ }
@@ -91,13 +91,6 @@ export default function OrderConfirmationPage({
     })();
     return () => { mounted = false; };
   }, [params]);
-
-  // Clean up sessionStorage once order is displayed and component is stable
-  useEffect(() => {
-    if (order) {
-      try { sessionStorage.removeItem('last_order'); } catch { /* ignore */ }
-    }
-  }, [order]);
 
   if (loading || !resolvedId) {
     return (
@@ -204,8 +197,8 @@ export default function OrderConfirmationPage({
               </div>
               <ul className="divide-y divide-gray-100">
                 {order.items.map((item) => {
-                  const name = item.item_name || `Product #${item.product_id}`;
-                  const label = item.tier_label || (item.tier === 'box' ? 'Box' : item.tier === 'secondary' ? 'Pack' : 'Unit');
+                  const name = item.item_name || item.product_name || `Product #${item.product_id}`;
+                  const unitLabel = item.unit_label || item.tier_label || 'Unit';
                   return (
                     <li key={item.id} className="py-4 flex gap-4 items-center">
                       {item.image_url ? (
@@ -219,7 +212,9 @@ export default function OrderConfirmationPage({
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-[#374151]">{name}</p>
-                        <p className="text-xs text-gray-500">{label} x {item.quantity}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.quantity} x {unitLabel}
+                        </p>
                       </div>
                       <span className="font-bold text-[#01AC28]">Rs. {item.line_total}</span>
                     </li>
@@ -247,6 +242,43 @@ export default function OrderConfirmationPage({
                 </div>
               </div>
             </div>
+
+            {/* Prescription uploads for items that need them */}
+            {order.items.some(i => i.requires_prescription) && (
+              <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-5 h-5 text-[#01AC28]" />
+                  <h2 className="text-lg font-bold text-[#374151]">Prescriptions</h2>
+                </div>
+                <p className="text-sm text-gray-500 mb-4">Upload prescriptions for items that require them. Your order will be reviewed once prescriptions are submitted.</p>
+                <div className="space-y-4">
+                  {order.items.filter(i => i.requires_prescription).map(item => {
+                    const name = item.item_name || item.product_name || `Product #${item.product_id}`;
+                    return (
+                      <div key={item.id} className="border border-gray-200 rounded-xl p-4">
+                        <p className="text-sm font-bold text-[#374151] mb-3">{name}</p>
+                        {isAuthenticated ? (
+                          <PrescriptionUpload
+                            mode="post-order"
+                            itemName={name}
+                            orderId={order.id}
+                            orderItemId={item.id}
+                          />
+                        ) : (
+                          <PrescriptionUpload
+                            mode="post-order-guest"
+                            itemName={name}
+                            orderNumber={order.order_number}
+                            orderItemId={item.id}
+                            phone={order.delivery_phone || order.customer_phone || (() => { try { return sessionStorage.getItem('order_phone') ?? ''; } catch { return ''; } })()}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {order.notes && (
               <div className="bg-amber-50 rounded-2xl border border-amber-100 p-4">

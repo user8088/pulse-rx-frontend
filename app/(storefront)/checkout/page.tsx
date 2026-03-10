@@ -13,7 +13,10 @@ import PrescriptionUpload from '@/components/PrescriptionUpload';
 import { useCart, cartItemKey } from '@/lib/context/CartContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { placeOrder } from '@/lib/api/orders';
-import type { MockCartHint } from '@/lib/api/orders';
+import {
+  uploadPrescription as apiUploadRx,
+  uploadGuestPrescription as apiGuestUploadRx,
+} from '@/lib/api/prescriptions';
 import type { CreateOrderRequest } from '@/types/order';
 
 const CITIES = ['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Other'];
@@ -28,7 +31,7 @@ const recommendedProducts = [
 export default function CheckoutPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
-  const { cartItems, cartTotal, uploadPrescription, canPlaceOrder, clearCart } = useCart();
+  const { cartItems, cartTotal, uploadPrescription, prescriptionsPending, canPlaceOrder, clearCart } = useCart();
 
   const [customerName, setCustomerName] = useState(isAuthenticated && user?.name ? user.name : '');
   const [customerEmail, setCustomerEmail] = useState(isAuthenticated && user?.email ? user.email : '');
@@ -50,7 +53,7 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (!canPlaceOrder) {
-      alert('Please ensure all prescription-required products have verified prescriptions before placing your order.');
+      alert('Please upload prescriptions for all prescription-required products before placing your order.');
       return;
     }
     if (!phone.trim() || !houseApt.trim() || !street.trim() || !blockLocality.trim() || !city.trim()) {
@@ -81,13 +84,31 @@ export default function CheckoutPage() {
         })),
       };
 
-      const hints: Record<number, MockCartHint> = {};
-      for (const ci of cartItems) {
-        hints[ci.id] = { name: ci.name, price: ci.price, image: ci.image, variation: ci.variation };
+      const order = await placeOrder(payload);
+
+      // Auto-upload any prescriptions attached during checkout
+      const rxItems = cartItems.filter(ci => ci.requiresPrescription && ci.prescription?.file);
+      for (const ci of rxItems) {
+        const match = order.items.find(
+          oi => oi.product_id === ci.id && (oi.unit_type ?? oi.tier) === ci.unit_type
+        );
+        if (!match || !ci.prescription?.file) continue;
+        try {
+          if (isAuthenticated) {
+            await apiUploadRx(order.id, match.id, ci.prescription.file);
+          } else {
+            await apiGuestUploadRx(order.order_number, match.id, phone.trim(), ci.prescription.file);
+          }
+        } catch {
+          // Prescription upload failed — user can retry on confirmation page
+        }
       }
 
-      const order = await placeOrder(payload, hints);
-      try { sessionStorage.setItem('last_order', JSON.stringify(order)); } catch { /* ignore */ }
+      try { sessionStorage.setItem('last_order', JSON.stringify(order)); } catch { /* quota */ }
+      // Store phone for guest prescription uploads on subsequent pages
+      if (!isAuthenticated) {
+        try { sessionStorage.setItem('order_phone', phone.trim()); } catch { /* quota */ }
+      }
       clearCart();
       router.push(`/order-confirmation/${encodeURIComponent(order.order_number)}`);
     } catch (e: unknown) {
@@ -275,14 +296,14 @@ export default function CheckoutPage() {
                 <div className="bg-white border border-gray-100 rounded-2xl p-6 md:p-8 shadow-sm mb-8">
                   <div className="flex items-center gap-3 mb-6">
                     <AlertCircle className="w-5 h-5 text-[#01AC28]" />
-                    <h2 className="text-xl font-bold text-[#374151]">Prescription Verification</h2>
+                    <h2 className="text-xl font-bold text-[#374151]">Prescriptions</h2>
                   </div>
                   <p className="text-sm text-gray-600 mb-6">
-                    The following products require a valid prescription. Please upload clear images of your prescriptions for verification.
+                    The following products require a valid prescription. You can attach them now or upload after placing your order.
                   </p>
                   <div className="space-y-6">
                     {prescriptionRequiredItems.map((item) => (
-                      <div key={item.id} className="border border-gray-200 rounded-xl p-6">
+                      <div key={cartItemKey(item)} className="border border-gray-200 rounded-xl p-6">
                         <div className="flex items-start gap-4 mb-4">
                           <div className="relative w-20 h-20 rounded-lg bg-gray-50 border border-gray-200 flex-shrink-0 overflow-hidden">
                             <Image src={item.image} alt={item.name} fill className="object-contain p-2" />
@@ -293,12 +314,10 @@ export default function CheckoutPage() {
                           </div>
                         </div>
                         <PrescriptionUpload
-                          itemId={item.id}
+                          mode="pre-order"
                           itemName={item.name}
-                          currentStatus={item.prescription?.status || null}
-                          fileName={item.prescription?.fileName}
-                          rejectionReason={item.prescription?.rejectionReason}
-                          onUpload={(file) => uploadPrescription(cartItemKey(item), file)}
+                          currentFile={item.prescription?.file ?? null}
+                          onFileSelect={(file) => uploadPrescription(cartItemKey(item), file)}
                         />
                       </div>
                     ))}
@@ -409,10 +428,10 @@ export default function CheckoutPage() {
                         </div>
                         {item.requiresPrescription && (
                           <div className="mt-1">
-                            {item.prescription?.status === 'verified' && <span className="text-[10px] text-green-400 font-bold">✓ Prescription Verified</span>}
-                            {item.prescription?.status === 'pending' && <span className="text-[10px] text-yellow-400 font-bold">⏳ Verification Pending</span>}
-                            {item.prescription?.status === 'rejected' && <span className="text-[10px] text-red-400 font-bold">✗ Prescription Rejected</span>}
-                            {!item.prescription && <span className="text-[10px] text-orange-400 font-bold">⚠ Prescription Required</span>}
+                            {item.prescription?.file
+                              ? <span className="text-[10px] text-green-400 font-bold">✓ Prescription Attached</span>
+                              : <span className="text-[10px] text-orange-400 font-bold">⚠ Prescription Required</span>
+                            }
                           </div>
                         )}
                       </div>
@@ -436,13 +455,23 @@ export default function CheckoutPage() {
                 <button
                   data-cursor="Place Order"
                   onClick={handlePlaceOrder}
-                  disabled={!canPlaceOrder || placing}
-                  className={`w-full py-4 rounded-xl font-bold text-xs tracking-[0.2em] transition-all uppercase flex items-center justify-center gap-2 shadow-lg ${canPlaceOrder && !placing ? 'bg-[#01AC28] hover:bg-[#044644] text-white hover:shadow-xl cursor-pointer' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                  disabled={placing || !canPlaceOrder}
+                  className={`w-full py-4 rounded-xl font-bold text-xs tracking-[0.2em] transition-all uppercase flex items-center justify-center gap-2 shadow-lg ${
+                    !placing && canPlaceOrder
+                      ? 'bg-[#01AC28] hover:bg-[#044644] text-white hover:shadow-xl cursor-pointer'
+                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  }`}
                 >
-                  {placing ? 'Placing Order…' : canPlaceOrder ? <>Confirm & Place Order <CheckCircle2 className="w-4 h-4" /></> : <>Verify Prescriptions First <AlertCircle className="w-4 h-4" /></>}
+                  {placing
+                    ? 'Placing Order…'
+                    : canPlaceOrder
+                      ? <>Confirm & Place Order <CheckCircle2 className="w-4 h-4" /></>
+                      : <>Upload Prescriptions First <AlertCircle className="w-4 h-4" /></>}
                 </button>
-                {!canPlaceOrder && (
-                  <p className="text-xs text-red-600 text-center mt-2">Please ensure all prescription-required products have verified prescriptions.</p>
+                {prescriptionsPending && (
+                  <p className="text-xs text-red-500 text-center mt-2">
+                    You must upload a valid prescription for all prescription-only medicines before placing your order.
+                  </p>
                 )}
                 <div className="mt-8 pt-6 border-t border-white/10">
                   <div className="flex items-center gap-3">

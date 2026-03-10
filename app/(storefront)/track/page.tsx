@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, ChevronRight, MapPin, ShoppingBag, Package, AlertCircle } from 'lucide-react';
+import { Search, ChevronRight, MapPin, ShoppingBag, Package, AlertCircle, FileText } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import PrescriptionUpload from '@/components/PrescriptionUpload';
 import { trackOrder } from '@/lib/api/orders';
 import type { Order } from '@/types/order';
 
@@ -74,8 +75,10 @@ export default function TrackOrderPage() {
     setSearched(true);
     try {
       const result = await trackOrder(orderNumber.trim(), phone.trim());
-      setOrder(result);
-      if (!result) {
+      if (result) {
+        setOrder(result);
+      } else {
+        setOrder(null);
         setError('Order not found. Please check your order number and phone number.');
       }
     } catch {
@@ -223,24 +226,61 @@ export default function TrackOrderPage() {
                     <h2 className="text-lg font-bold text-[#374151]">Items</h2>
                   </div>
                   <ul className="divide-y divide-gray-100">
-                    {order.items.map((item) => (
-                      <li key={item.id} className="py-3 flex gap-3 items-center">
-                        {item.image_url && (
-                          <div className="relative w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
-                            <Image src={item.image_url} alt={item.item_name} fill className="object-contain p-1" />
+                    {order.items.map((item) => {
+                      const name = item.item_name || item.product_name || `Product #${item.product_id}`;
+                      const unitLabel = item.unit_label || item.tier_label || 'Unit';
+                      return (
+                        <li key={item.id} className="py-3 flex gap-3 items-center">
+                          {item.image_url ? (
+                            <div className="relative w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 flex-shrink-0 overflow-hidden">
+                              <Image src={item.image_url} alt={name} fill className="object-contain p-1" />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gray-50 border border-gray-100 flex-shrink-0 flex items-center justify-center">
+                              <ShoppingBag className="w-5 h-5 text-gray-300" />
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-[#374151] text-sm">{name}</p>
+                            <p className="text-xs text-gray-500">
+                              {item.quantity} x {unitLabel}
+                            </p>
                           </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-[#374151] text-sm">{item.item_name}</p>
-                          <p className="text-xs text-gray-500">{item.tier_label} x {item.quantity}</p>
-                        </div>
-                        <span className="font-bold text-sm text-[#01AC28]">Rs. {item.line_total}</span>
-                      </li>
-                    ))}
+                          <span className="font-bold text-sm text-[#01AC28]">Rs. {item.line_total}</span>
+                        </li>
+                      );
+                    })}
                   </ul>
                   <div className="pt-3 border-t border-gray-100 flex justify-between font-bold text-lg mt-2">
                     <span>Total</span>
                     <span className="text-[#01AC28]">Rs. {order.total}</span>
+                  </div>
+                </div>
+              )}
+
+              {order.items.some(i => i.requires_prescription) && phone.trim() && (
+                <div className="bg-white border border-gray-100 rounded-2xl p-6 shadow-sm">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FileText className="w-5 h-5 text-[#01AC28]" />
+                    <h2 className="text-lg font-bold text-[#374151]">Prescriptions</h2>
+                  </div>
+                  <p className="text-sm text-gray-500 mb-4">Upload or check the status of prescriptions for items that require them.</p>
+                  <div className="space-y-4">
+                    {order.items.filter(i => i.requires_prescription).map(item => {
+                      const name = item.item_name || item.product_name || `Product #${item.product_id}`;
+                      return (
+                        <div key={item.id} className="border border-gray-200 rounded-xl p-4">
+                          <p className="text-sm font-bold text-[#374151] mb-3">{name}</p>
+                          <PrescriptionUpload
+                            mode="post-order-guest"
+                            itemName={name}
+                            orderNumber={order.order_number}
+                            orderItemId={item.id}
+                            phone={phone.trim()}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}

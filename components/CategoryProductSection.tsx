@@ -20,11 +20,15 @@ function mapProductToCard(product: Product) {
 
   let displayPrice: number;
   let quantityLabel: string;
+  let unitType: "item" | "secondary" | "box" = "item";
 
   if (usePackagingDisplay) {
     const first = opts[0];
     displayPrice = Number.parseFloat(first?.price ?? "0") || 0;
     quantityLabel = first?.label ? `1 ${first.label}` : "1 Unit";
+    if (first?.tier === "box" || first?.tier === "secondary" || first?.tier === "item") {
+      unitType = first.tier;
+    }
   } else {
     const canSellItem = !!product.can_sell_item;
     const canSellBox = !!product.can_sell_box;
@@ -35,12 +39,15 @@ function mapProductToCard(product: Product) {
     if (canSellItem && Number.isFinite(itemPrice) && itemPrice > 0) {
       displayPrice = itemPrice;
       quantityLabel = `1 ${baseLabel}`;
+      unitType = "item";
     } else if (canSellBox && Number.isFinite(boxPrice) && boxPrice > 0) {
       displayPrice = boxPrice;
       quantityLabel = product.box_unit_label ? `1 ${product.box_unit_label}` : "1 Box";
+      unitType = "box";
     } else {
       displayPrice = secondaryPrice;
       quantityLabel = product.secondary_unit_label ? `1 ${product.secondary_unit_label}` : "1 Unit";
+      unitType = "secondary";
     }
   }
 
@@ -60,6 +67,8 @@ function mapProductToCard(product: Product) {
     image: imageUrl,
     variation: product.variation_value ?? product.secondary_unit_label ?? "",
     quantity: quantityLabel,
+    unitType,
+    requiresPrescription: !!product.requires_prescription,
     href: `/products/${product.id}`,
   };
 }

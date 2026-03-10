@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type PrescriptionStatus = 'pending' | 'verified' | 'rejected' | null;
+export type PrescriptionStatus = 'pending' | 'approved' | 'rejected' | null;
 
 export interface PrescriptionData {
   file: File | null;
@@ -39,6 +39,7 @@ interface CartContextType {
   cartCount: number;
   cartTotal: number;
   canPlaceOrder: boolean;
+  prescriptionsPending: boolean;
 }
 
 /** Stable unique key for a cart line item (product + variation + tier). */
@@ -172,23 +173,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return item;
     }));
-
-    setTimeout(() => {
-      const isVerified = Math.random() > 0.2;
-      setCartItems(prev => prev.map(item => {
-        if (matchKey(item, key) && item.prescription?.status === 'pending') {
-          return {
-            ...item,
-            prescription: {
-              ...item.prescription,
-              status: isVerified ? 'verified' : 'rejected',
-              rejectionReason: isVerified ? undefined : 'Prescription image is unclear or does not match the product requirements. Please upload a clear, valid prescription.'
-            }
-          };
-        }
-        return item;
-      }));
-    }, 3000);
   };
 
   const getPrescriptionStatus = (key: string): PrescriptionStatus => {
@@ -199,11 +183,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const cartCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
   const cartTotal = cartItems.reduce((acc, item) => acc + (item.price * item.qty), 0);
 
-  // Check if order can be placed (all prescription-required items must be verified)
-  const canPlaceOrder = cartItems.every(item => {
-    if (!item.requiresPrescription) return true;
-    return item.prescription?.status === 'verified';
-  });
+  const prescriptionsPending = cartItems.some(
+    item => item.requiresPrescription && !item.prescription?.file
+  );
+
+  // Block placing orders when any prescription-required item has no file attached.
+  const canPlaceOrder = !prescriptionsPending;
 
   return (
     <CartContext.Provider value={{
@@ -219,7 +204,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       getPrescriptionStatus,
       cartCount,
       cartTotal,
-      canPlaceOrder
+      canPlaceOrder,
+      prescriptionsPending
     }}>
       {children}
     </CartContext.Provider>

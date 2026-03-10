@@ -19,14 +19,18 @@ export interface OrderAddress {
 export interface OrderItem {
   id: number;
   product_id: number;
+  product_name?: string;
   item_name: string;
   item_id: string;
+  unit_type?: "item" | "secondary" | "box";
+  unit_label?: string;
   tier: "box" | "secondary" | "item";
   tier_label: string;
   unit_price: string;
   quantity: number;
   line_total: string;
   image_url?: string | null;
+  requires_prescription?: boolean;
 }
 
 export interface Order {

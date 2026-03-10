@@ -11,6 +11,8 @@ export interface ProductGridItem {
   image: string;
   variation?: string;
   quantity?: string;
+  unitType?: "item" | "secondary" | "box";
+  requiresPrescription?: boolean;
 }
 
 interface ProductGridProps {
@@ -31,6 +33,8 @@ export default function ProductGrid({ products }: ProductGridProps) {
           image={product.image}
           variation={product.variation}
           quantity={product.quantity}
+          unitType={product.unitType}
+          requiresPrescription={product.requiresPrescription}
           href={`/products/${product.id}`}
         />
       ))}

@@ -136,14 +136,17 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       }
     }
 
-    const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
-    const originalPrice = discount > 0 ? displayPrice + discount : undefined;
-    const discountPercent =
-      originalPrice && originalPrice > 0
-        ? (discount / originalPrice) * 100
-        : undefined;
+  const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
+  const originalPrice = discount > 0 ? displayPrice + discount : undefined;
+  const discountPercent =
+    originalPrice && originalPrice > 0
+      ? (discount / originalPrice) * 100
+      : undefined;
 
-    return {
+  const inStock =
+    p.availability === "yes" || p.availability === "short";
+
+  return {
       id: p.id,
       name: p.item_name,
       price: displayPrice,
@@ -153,6 +156,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       variation: p.variation_value ?? p.secondary_unit_label ?? "",
       quantity: quantityLabel,
       unitType,
+    inStock,
     requiresPrescription: !!p.requires_prescription,
     };
   });

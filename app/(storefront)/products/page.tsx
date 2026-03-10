@@ -94,6 +94,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
     const primaryImage = p.images?.find((img) => img.is_primary) || p.images?.[0];
 
+    const inStock =
+      p.availability === "yes" || p.availability === "short";
+
     return {
       id: p.id,
       name: p.item_name,
@@ -104,6 +107,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       variation: p.variation_value ?? p.secondary_unit_label ?? "",
       quantity: quantityLabel,
       unitType,
+      inStock,
       requiresPrescription: !!p.requires_prescription,
     };
   });

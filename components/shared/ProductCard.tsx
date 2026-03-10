@@ -17,6 +17,7 @@ export interface ProductCardProps {
   href?: string;
   unitType?: "item" | "secondary" | "box";
   requiresPrescription?: boolean;
+  inStock?: boolean;
 }
 
 export default function ProductCard({
@@ -31,6 +32,7 @@ export default function ProductCard({
   href,
   unitType = "item",
   requiresPrescription = false,
+  inStock = true,
 }: ProductCardProps) {
   const { addItem } = useCart();
 
@@ -38,6 +40,7 @@ export default function ProductCard({
     discountPercent != null && discountPercent > 0 && originalPrice != null && originalPrice > price;
 
   const handleAddToCart = (e: React.MouseEvent) => {
+    if (!inStock) return;
     e.preventDefault();
     e.stopPropagation();
     addItem({
@@ -70,6 +73,12 @@ export default function ProductCard({
             {Math.round(discountPercent)}% OFF
           </span>
         )}
+
+        {!inStock && (
+          <span className="absolute bottom-2.5 left-2.5 bg-red-600 text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-md">
+            Out of stock
+          </span>
+        )}
       </div>
 
       {/* Product Info */}
@@ -94,10 +103,15 @@ export default function ProductCard({
         <button
           type="button"
           onClick={handleAddToCart}
-          className="w-fit border border-[#1F3B5C] text-[#1F3B5C] text-xs font-semibold px-4 py-1.5 rounded-md hover:bg-[#1F3B5C] hover:text-white transition-colors flex items-center gap-1.5"
+          disabled={!inStock}
+          className={`w-fit border text-xs font-semibold px-4 py-1.5 rounded-md flex items-center gap-1.5 transition-colors ${
+            inStock
+              ? "border-[#1F3B5C] text-[#1F3B5C] hover:bg-[#1F3B5C] hover:text-white"
+              : "border-gray-300 text-gray-400 cursor-not-allowed bg-gray-100"
+          }`}
         >
           <ShoppingCart className="w-3.5 h-3.5" />
-          Add To Cart
+          {inStock ? "Add To Cart" : "Out of Stock"}
         </button>
       </div>
     </div>

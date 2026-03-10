@@ -58,6 +58,9 @@ function mapProductToCard(product: Product) {
       ? (discount / originalPrice) * 100
       : undefined;
 
+  const inStock =
+    product.availability === "yes" || product.availability === "short";
+
   return {
     id: product.id,
     name: product.item_name,
@@ -69,6 +72,7 @@ function mapProductToCard(product: Product) {
     quantity: quantityLabel,
     unitType,
     requiresPrescription: !!product.requires_prescription,
+    inStock,
     href: `/products/${product.id}`,
   };
 }

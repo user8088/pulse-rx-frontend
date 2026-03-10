@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { X, Plus, Minus, AlertCircle, ShoppingCart } from "lucide-react";
@@ -14,6 +15,7 @@ interface ProductDetailsProps {
 }
 
 export default function ProductDetails({ productId }: ProductDetailsProps) {
+  const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
   const [variations, setVariations] = useState<Product[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<Product | null>(null);
@@ -138,6 +140,78 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       unit_type: resolvedUnitType,
       requiresPrescription: !!selectedVariation.requires_prescription,
     });
+  };
+
+  const handleOrderNow = () => {
+    if (!selectedVariation || !isInStock) return;
+    // Add to cart without popping open the cart sidebar
+    const opts = selectedVariation.packaging_display?.options ?? [];
+    const canSellSecondary = !!selectedVariation.can_sell_secondary;
+    const canSellBox = !!selectedVariation.can_sell_box;
+
+    let safePrice: number;
+    let quantityLabel: string;
+    let resolvedUnitType: "item" | "secondary" | "box" = "item";
+
+    if (opts.length > 0) {
+      const opt = opts[selectedPackOptionIndex];
+      if (!opt) return;
+      safePrice = Number.parseFloat(opt.price) || 0;
+      quantityLabel = `1 ${opt.label}`;
+      resolvedUnitType = opt.tier;
+    } else {
+      const canSellItem = !!selectedVariation.can_sell_item;
+      if (!canSellItem && !canSellSecondary && !canSellBox) return;
+      const itemPrice = Number.parseFloat(
+        (selectedVariation.retail_price_item as unknown as string) ?? "0"
+      );
+      const secondaryPrice = Number.parseFloat(
+        (selectedVariation.retail_price_secondary as unknown as string) ?? "0"
+      );
+      const boxPrice = Number.parseFloat(
+        (selectedVariation.retail_price_box as unknown as string) ?? "0"
+      );
+      let effectiveType: "item" | "secondary" | "box" = "secondary";
+      if (unitType === "item" && canSellItem) effectiveType = "item";
+      else if (unitType === "box" && canSellBox) effectiveType = "box";
+      else if (canSellSecondary) effectiveType = "secondary";
+      else if (canSellBox) effectiveType = "box";
+      else if (canSellItem) effectiveType = "item";
+      const priceSource =
+        effectiveType === "item" ? itemPrice : effectiveType === "box" ? boxPrice : secondaryPrice;
+      safePrice = Number.isFinite(priceSource) ? priceSource : 0;
+      const baseLabel =
+        (selectedVariation.base_unit_label as unknown as string) || "Unit";
+      const secLabel =
+        (selectedVariation.secondary_unit_label as unknown as string) || "Pack";
+      const bxLabel =
+        (selectedVariation.box_unit_label as unknown as string) || "Box";
+      quantityLabel =
+        effectiveType === "item"
+          ? `1 ${baseLabel}`
+          : effectiveType === "box"
+            ? `Per ${bxLabel}`
+            : `Per ${secLabel}`;
+      resolvedUnitType = effectiveType;
+    }
+
+    addItem(
+      {
+        id: selectedVariation.id,
+        name: selectedVariation.item_name,
+        variation: selectedVariation.variation_value || "",
+        quantity: quantityLabel,
+        price: safePrice,
+        image: selectedVariation.images?.[0]
+          ? bucketUrl(selectedVariation.images[0].object_key)
+          : "/assets/home/product-1.png",
+        qty: quantity,
+        unit_type: resolvedUnitType,
+        requiresPrescription: !!selectedVariation.requires_prescription,
+      },
+      { openCart: false }
+    );
+    router.push("/checkout");
   };
 
   const toggleFaq = (id: number) => {
@@ -431,19 +505,30 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
 
               {/* Buttons Section */}
               <div className="flex flex-col sm:flex-row gap-3 md:gap-4 mt-8">
-                <button 
+                <button
                   data-cursor="Order Now"
-                  className="flex-1 bg-[#374151] hover:bg-[#1F2937] text-white py-4 rounded-md font-bold text-xs tracking-[0.2em] transition-all uppercase shadow-md hover:shadow-lg"
+                  onClick={handleOrderNow}
+                  disabled={!isInStock}
+                  className={`flex-1 py-4 rounded-md font-bold text-xs tracking-[0.2em] transition-all uppercase shadow-md ${
+                    isInStock
+                      ? "bg-[#374151] hover:bg-[#1F2937] text-white hover:shadow-lg cursor-pointer"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
                 >
-                  ORDER NOW
+                  {isInStock ? "ORDER NOW" : "OUT OF STOCK"}
                 </button>
-                <button 
+                <button
                   data-cursor="Add to Cart"
                   onClick={handleAddToCart}
-                  className="flex-1 bg-[#01AC28] hover:bg-[#044644] text-white py-4 rounded-md font-bold text-xs tracking-[0.2em] transition-all uppercase shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                  disabled={!isInStock}
+                  className={`flex-1 py-4 rounded-md font-bold text-xs tracking-[0.2em] transition-all uppercase shadow-md flex items-center justify-center gap-2 ${
+                    isInStock
+                      ? "bg-[#01AC28] hover:bg-[#044644] text-white hover:shadow-lg cursor-pointer"
+                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  }`}
                 >
                   <ShoppingCart className="w-4 h-4" />
-                  ADD TO CART
+                  {isInStock ? "ADD TO CART" : "OUT OF STOCK"}
                 </button>
               </div>
             </div>

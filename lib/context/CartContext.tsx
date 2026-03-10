@@ -30,7 +30,7 @@ interface CartContextType {
   isCartOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
-  addItem: (item: CartItem) => void;
+  addItem: (item: CartItem, options?: { openCart?: boolean }) => void;
   removeItem: (key: string) => void;
   updateQty: (key: string, qty: number) => void;
   clearCart: () => void;
@@ -127,7 +127,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const openCart = () => setIsCartOpen(true);
   const closeCart = () => setIsCartOpen(false);
 
-  const addItem = (item: CartItem) => {
+  const addItem = (item: CartItem, options?: { openCart?: boolean }) => {
     const safeItem = { ...item, unit_type: item.unit_type || "item" } as CartItem;
     setCartItems(prev => {
       const existing = prev.find(
@@ -142,7 +142,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
       return [...prev, { ...safeItem, qty: safeItem.qty || 1 }];
     });
-    openCart();
+    if (options?.openCart !== false) {
+      openCart();
+    }
   };
 
   const matchKey = (item: CartItem, key: string) => cartItemKey(item) === key;

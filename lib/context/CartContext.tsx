@@ -49,39 +49,14 @@ export function cartItemKey(item: { id: number; variation: string; unit_type: st
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Mock initial items
-const initialItems: CartItem[] = [
-  {
-    id: 1,
-    name: "MedRelief Fast-Acting Pain Killer",
-    variation: "250mg",
-    quantity: "60TAB",
-    price: 99.00,
-    image: "/assets/home/product-250mg.png",
-    qty: 1,
-    unit_type: "item",
-    requiresPrescription: false
-  },
-  {
-    id: 2,
-    name: "Solgar ESTER 100 PLUS Kapsul 500MG",
-    variation: "500mg",
-    quantity: "30TAB",
-    price: 43.00,
-    image: "/assets/home/product-1.png",
-    qty: 1,
-    unit_type: "item",
-    requiresPrescription: false
-  }
-];
-
-// Load cart from localStorage on mount
+// Load cart from localStorage on mount. Empty cart for first-time visitors.
 const loadCartFromStorage = (): CartItem[] => {
-  if (typeof window === 'undefined') return initialItems;
+  if (typeof window === 'undefined') return [];
   try {
     const stored = localStorage.getItem('cart_items');
     if (stored) {
       const parsed = JSON.parse(stored);
+      if (!Array.isArray(parsed)) return [];
       // Convert prescription data back to proper format
       return parsed.map((item: CartItem) => ({
         ...item,
@@ -94,7 +69,7 @@ const loadCartFromStorage = (): CartItem[] => {
   } catch (error) {
     console.error('Failed to load cart from storage:', error);
   }
-  return initialItems;
+  return [];
 };
 
 // Save cart to localStorage

@@ -4,6 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
+import { useAuth } from "@/lib/context/AuthContext";
+import { applyCustomerDiscount } from "@/utils/pricing";
 
 export interface ProductCardProps {
   id: number;
@@ -35,9 +37,19 @@ export default function ProductCard({
   inStock = true,
 }: ProductCardProps) {
   const { addItem } = useCart();
+  const { customerProfile } = useAuth();
 
-  const hasDiscount =
+  const customerDiscountPct = Number(customerProfile?.discount_percentage) || 0;
+  const { discountedPrice: priceAfterCustomerDiscount, originalPrice: basePrice } =
+    applyCustomerDiscount(price, customerDiscountPct);
+
+  const displayPrice = customerDiscountPct > 0 ? priceAfterCustomerDiscount : price;
+  const showCustomerDiscountBadge = customerDiscountPct > 0 && basePrice > priceAfterCustomerDiscount;
+  const hasProductDiscount =
     discountPercent != null && discountPercent > 0 && originalPrice != null && originalPrice > price;
+  const hasDiscount = showCustomerDiscountBadge || hasProductDiscount;
+  const badgePercent = showCustomerDiscountBadge ? customerDiscountPct : discountPercent;
+  const originalPriceForDisplay = showCustomerDiscountBadge ? basePrice : originalPrice;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     if (!inStock) return;
@@ -48,7 +60,7 @@ export default function ProductCard({
       name,
       variation,
       quantity,
-      price,
+      price: displayPrice,
       image,
       qty: 1,
       unit_type: unitType,
@@ -68,9 +80,9 @@ export default function ProductCard({
           sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
         />
 
-        {hasDiscount && (
+        {hasDiscount && badgePercent != null && badgePercent > 0 && (
           <span className="absolute top-2.5 right-2.5 bg-[#1F3B5C] text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-md">
-            {Math.round(discountPercent)}% OFF
+            {Math.round(badgePercent)}% OFF
           </span>
         )}
 
@@ -90,11 +102,11 @@ export default function ProductCard({
         {/* Price */}
         <div className="flex items-baseline gap-2 mb-3">
           <span className="text-sm md:text-base font-bold text-[#1F3B5C]">
-            Rs. {price.toFixed(price % 1 === 0 ? 0 : 2)}
+            Rs. {displayPrice.toFixed(displayPrice % 1 === 0 ? 0 : 2)}
           </span>
-          {hasDiscount && (
+          {hasDiscount && originalPriceForDisplay != null && originalPriceForDisplay > displayPrice && (
             <span className="text-xs text-gray-400 line-through">
-              Rs. {originalPrice.toFixed(originalPrice % 1 === 0 ? 0 : 2)}
+              Rs. {originalPriceForDisplay.toFixed(originalPriceForDisplay % 1 === 0 ? 0 : 2)}
             </span>
           )}
         </div>

@@ -16,6 +16,12 @@ export interface OrderAddress {
   city: string;
 }
 
+export interface OrderItemPrescription {
+  id: number;
+  file_name?: string | null;
+  object_key?: string | null;
+}
+
 export interface OrderItem {
   id: number;
   product_id: number;
@@ -31,6 +37,7 @@ export interface OrderItem {
   line_total: string;
   image_url?: string | null;
   requires_prescription?: boolean;
+  prescriptions?: OrderItemPrescription[];
 }
 
 export interface Order {

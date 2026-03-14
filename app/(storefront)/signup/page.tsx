@@ -4,10 +4,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, Phone, MapPin } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+
+const CITIES = ['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Other'];
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -22,6 +24,11 @@ export default function SignUpPage() {
     phone: '',
     password: '',
     confirmPassword: '',
+    house_apt: '',
+    street: '',
+    block_locality: '',
+    city: '',
+    gender: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,13 +37,25 @@ export default function SignUpPage() {
       setError("Passwords don't match");
       return;
     }
+    if (!formData.house_apt.trim() || !formData.street.trim() || !formData.block_locality.trim() || !formData.city.trim()) {
+      setError('Please fill in all address fields.');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
+    const address = [formData.house_apt.trim(), formData.street.trim(), formData.block_locality.trim()]
+      .filter(Boolean)
+      .join(', ');
+
     try {
       if (register) {
-        await register(formData);
+        await register({
+          ...formData,
+          address,
+          city: formData.city.trim(),
+        });
       }
       router.push('/profile');
     } catch (err: unknown) {
@@ -155,6 +174,62 @@ export default function SignUpPage() {
                       className="w-full bg-white border border-gray-200 rounded-xl py-3.5 pl-12 pr-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
                       placeholder="+1 (555) 000-0000"
                     />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-2 text-[#374151]">
+                  <MapPin className="w-4 h-4 text-[#01AC28]" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Delivery address</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">House / Apt *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.house_apt}
+                      onChange={(e) => setFormData({ ...formData, house_apt: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                      placeholder="House 12, Apt 4B"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">Street *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.street}
+                      onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                      placeholder="Street 7"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">Block or Locality *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.block_locality}
+                      onChange={(e) => setFormData({ ...formData, block_locality: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                      placeholder="F-7 Markaz"
+                    />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">City *</label>
+                    <select
+                      required
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                    >
+                      <option value="">Select city</option>
+                      {CITIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>

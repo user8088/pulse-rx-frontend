@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -30,11 +30,11 @@ const recommendedProducts = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, customerProfile } = useAuth();
   const { cartItems, cartTotal, uploadPrescription, prescriptionsPending, canPlaceOrder, clearCart } = useCart();
 
-  const [customerName, setCustomerName] = useState(isAuthenticated && user?.name ? user.name : '');
-  const [customerEmail, setCustomerEmail] = useState(isAuthenticated && user?.email ? user.email : '');
+  const [customerName, setCustomerName] = useState(() => (isAuthenticated && user?.name ? user.name : ''));
+  const [customerEmail, setCustomerEmail] = useState(() => (isAuthenticated && user?.email ? user.email : ''));
   const [phone, setPhone] = useState('');
   const [houseApt, setHouseApt] = useState('');
   const [street, setStreet] = useState('');
@@ -44,6 +44,21 @@ export default function CheckoutPage() {
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
+
+  // Prefill from customer profile when signed in
+  useEffect(() => {
+    if (!isAuthenticated || !customerProfile) return;
+    if (customerProfile.name) setCustomerName(customerProfile.name);
+    if (customerProfile.email) setCustomerEmail(customerProfile.email);
+    if (customerProfile.phone) setPhone(customerProfile.phone);
+    if (customerProfile.city) setCity(customerProfile.city);
+    if (customerProfile.address) {
+      const parts = customerProfile.address.split(',').map((s) => s.trim()).filter(Boolean);
+      if (parts[0]) setHouseApt(parts[0]);
+      if (parts[1]) setStreet(parts[1]);
+      if (parts[2]) setBlockLocality(parts[2]);
+    }
+  }, [isAuthenticated, customerProfile]);
 
   const subtotal = cartTotal;
   const shipping = deliveryMethod === 'express' ? 15 : 0;

@@ -1,168 +1,170 @@
-## Prescription-required products & prescription uploads — backend APIs for frontend
+# Customer Management Feature – Frontend Flow and API Reference
 
-### Product-level flag
+Use this document as context for building the dashboard UI screens and integrating with the backend APIs for the Customer Management feature.
 
-- Products now include a boolean `requires_prescription` field derived from the Excel `Narcotic(s)` column in `Data Template.xlsx`.
-  - `Narcotic(s)` values of `TRUE`/`true` → `requires_prescription = true`.
-  - `FALSE`/`false` or empty → `requires_prescription = false`.
-- This field is available on all product JSON payloads (e.g. `/products`, `/products/{id}`) so the frontend can:
-  - Mark products as prescription-only in listings/product detail.
-  - Enforce prescription upload UX in cart/checkout when such products are present.
+---
 
-### Data model for prescriptions
+## Overview
 
-- New `Prescription` model with table `prescriptions` (tenant-scoped).
-- Each row is linked to:
-  - `product_id` (the product the prescription is for).
-  - `order_id` and `order_item_id` (the specific order + line item).
-  - `customer_id` (for logged-in customers) or `guest_phone`/`guest_name` (for guests).
-  - `file_key` (object storage key on the `s3` disk).
-  - `status` (`pending` | `approved` | `rejected`).
-  - `reviewed_by_user_id`, `reviewed_at`, `notes` for dashboard review.
+The Customer Management feature allows admins to:
 
-You generally don’t need to touch this directly from the frontend; use the APIs below.
+1. **Import customers** from the "User Data" sheet of Data Template.xlsx (or any xlsx with that sheet).
+2. **Edit and delete** customer details (existing CRUD).
+3. **View order history** and **prescriptions per order** for each customer.
+4. **Manage medical profiles** per customer: create profiles (e.g. "Diabetes", "Blood pressure"), add products to each profile (from the customer’s orders or from the product catalog), and attach prescriptions (from orders or upload).
+5. **Set a customer discount** (percentage applied to all products for that customer).
 
-### Object storage layout
+All dashboard endpoints require: `Authorization: Bearer <token>`, and the user must have role `admin` or `staff`. The tenant is resolved from the authenticated user.
 
-- All prescriptions are stored on the `s3` disk using this pattern:
+---
 
-```text
-tenants/{tenant_id}/users/{folder_id}/{filename}
-```
+## Screens to Build
 
-- `folder_id` strategies:
-  - **Authenticated customer**: `customer-{customer_id}-{slug(customer_name)}`
-  - **Guest**: `guest-{normalized_phone}` (phone stripped to digits)
-- Filenames are timestamp + random suffix, e.g. `20260310T120102-ABCD1234.pdf`.
-- Files are **not** made publicly visible; dashboard access uses short-lived signed URLs (see below).
+### 1. Customer list (dashboard)
 
-### Customer APIs (authenticated, per order item)
+- Table of customers with search/filter (e.g. by name, phone, email).
+- Actions: "Import customers" (navigate to import screen), "View" / "Edit" (navigate to customer detail).
+- Pagination (use `per_page` and `page` from API).
 
-All routes below live under the existing customer group:
+### 2. Customer import
 
-- Base prefix: `auth:sanctum`, `tenant.resolve`, `tenant.schema`, `role:customer`.
+- Upload area for Excel file (xlsx/xls). Use the same **Data Template.xlsx** file that has the "User Data" sheet (and optionally "Item List" for products).
+- On success: show summary (total_rows, created_count, updated_count, skipped_count) and a link to view the import log (errors) by `import_uuid`.
+- On error: show validation or server error message.
 
-Endpoints:
+### 3. Customer detail
 
-- `GET /customer/orders/{order}/items/{item}/prescriptions`
-  - **Purpose**: List prescriptions the logged-in customer has uploaded for a specific order item.
-  - **Auth**: Customer must own the `order`; `item` must belong to that `order`.
-  - **Response**: Paginated list of `Prescription` objects for that `order_item`.
+- Tabs or sections:
+  - **Info**: Edit customer (name, email, phone, external_id, gender, address, city, coordinates, discount_percentage), Delete customer.
+  - **Discount**: Display and edit `discount_percentage` (same as Info; can be a dedicated card).
+  - **Order history**: List of orders for this customer (with status, date); click an order to open order detail (see below).
+  - **Medical profiles**: List of profiles; "Add profile"; per profile: name, list of products (with quantity), list of prescriptions (view/delete, upload, "Add from order").
 
-- `POST /customer/orders/{order}/items/{item}/prescriptions`
-  - **Purpose**: Upload a new prescription file for a specific order item.
-  - **Auth / guards**:
-    - The authenticated user must be the owner of the `order`.
-    - The `item` must belong to the `order`.
-    - The `item`’s product must have `requires_prescription = true`. Otherwise returns `422`.
-  - **Request (multipart/form-data)**:
-    - `file` (required): `jpg`, `jpeg`, `png`, or `pdf`; max size 8 MB.
-    - `notes` (optional): string, max 2000 chars.
-  - **Behavior**:
-    - File is stored via `PrescriptionStorageService` under the customer’s folder.
-    - A `Prescription` row is created with `status = "pending"`.
-  - **Response**: `201 Created` + the created `Prescription` JSON.
+### 4. Order history (per customer)
 
-- `DELETE /customer/orders/{order}/items/{item}/prescriptions/{prescription}`
-  - **Purpose**: Allow customers to delete their own pending prescriptions (before review / processing).
-  - **Auth / guards**:
-    - Same ownership checks as above.
-    - `prescription` must belong to that `order`, `order_item`, and `customer`.
-    - Only `status = "pending"` can be deleted; otherwise returns `422`.
-  - **Response**: `204 No Content` on success.
+- List: GET customer’s orders (paginated). Show order number, status, date, total.
+- Order detail: When user clicks an order, call GET single order; show line items and **prescriptions per line item** (so admin can later "Add to profile" from here). Each item may have an `prescriptions` array.
 
-### Guest APIs (by order number + phone, per order item)
+### 5. Medical profiles section (within customer detail)
 
-Guest flows are tenant-aware but do not require auth; they use order number + phone for identity:
+- **Profiles** are admin-created (e.g. "Diabetes", "Blood pressure") to track what the customer needs or typically buys.
+- **Per profile**:
+  - **Products**: List products with quantity. Actions: "Add from catalog" (search products, pick product + quantity), "Add from order" (pick one of the customer’s orders and optionally select which line items to add; then call from-order API).
+  - **Prescriptions**: List attached prescriptions (view/download via file URL, delete). Actions: "Upload" (file picker), "Add from order" (pick a prescription that the customer uploaded on an order; then call from-order API).
 
-- Group middlewares: `tenant.resolve`, `tenant.schema`.
+---
 
-Endpoints:
+## API Reference (Base URL: `/api`)
 
-- `GET /orders/{orderNumber}/items/{orderItemId}/prescriptions?phone=...`
-  - **Purpose**: List prescriptions uploaded for a specific order item by a guest.
-  - **Query**:
-    - `phone` (required): must match the order’s `delivery_phone`.
-  - **Behavior**:
-    - Finds `Order` by `order_number` + `delivery_phone`.
-    - Ensures `orderItemId` belongs to that order.
-  - **Response**: Paginated list of `Prescription` objects for that `order_item`.
+All dashboard routes are under `/api/dashboard`. Send `Accept: application/json` and `Content-Type: application/json` (except for file uploads).
 
-- `POST /orders/{orderNumber}/items/{orderItemId}/prescriptions?phone=...`
-  - **Purpose**: Guest upload of a prescription for a specific order item.
-  - **Query**:
-    - `phone` (required): must match the order’s `delivery_phone`.
-  - **Request (multipart/form-data)**:
-    - `file` (required): `jpg`, `jpeg`, `png`, or `pdf`; max size 8 MB.
-    - `notes` (optional): string, max 2000 chars.
-  - **Behavior**:
-    - Resolves `Order` by `order_number` + `delivery_phone`.
-    - Resolves `OrderItem` by `orderItemId` under that order.
-    - Ensures related product has `requires_prescription = true` (422 otherwise).
-    - Stores file via `PrescriptionStorageService` under `guest-{normalized_phone}` folder.
-    - Creates `Prescription` row with:
-      - `guest_phone` (from query),
-      - `guest_name` (`order.delivery_name` snapshot),
-      - `status = "pending"`.
-  - **Response**: `201 Created` + created `Prescription` JSON.
+### Customers (existing CRUD)
 
-### Dashboard APIs (admin/staff)
+- **GET** `/api/dashboard/customers`  
+  List customers (paginated). Query: `page`, `per_page`.
+- **POST** `/api/dashboard/customers`  
+  Create customer. Body: `name` (required), `email`, `phone`, `external_id`, `gender`, `address`, `city`, `latitude`, `longitude`, `discount_percentage`.
+- **GET** `/api/dashboard/customers/{customer}`  
+  Get one customer. Path: `customer` = customer ID.
+- **PUT/PATCH** `/api/dashboard/customers/{customer}`  
+  Update customer. Same body as create (all optional except as required by validation).
+- **DELETE** `/api/dashboard/customers/{customer}`  
+  Delete customer. Returns 204.
 
-All routes under:
+### Customer import
 
-- Prefix: `/dashboard`
-- Middlewares: `auth:sanctum`, `tenant.resolve`, `tenant.schema`, `role:admin,staff`.
+- **POST** `/api/dashboard/customers/import`  
+  **Content-Type:** `multipart/form-data`.  
+  **Body:** `file` = Excel file (xlsx or xls).  
+  **Response (200):**  
+  `{ "import_uuid": "...", "log_saved": true, "total_rows": N, "created_count": N, "updated_count": N, "skipped_count": N, "errors": [ { "row": 2, "reason": "...", "message": "...", "data": { ... } }, ... ] }`  
+  Use `import_uuid` to fetch the full log (including errors) from the import-logs endpoint.
 
-Endpoints:
+- **GET** `/api/dashboard/customers/import-logs`  
+  List import logs (paginated). Query: `per_page` (optional, 1–100).
+- **GET** `/api/dashboard/customers/import-logs/{import_uuid}`  
+  Get one import log by UUID (includes full `errors` array).
 
-- `GET /dashboard/prescriptions`
-  - **Purpose**: List/filter prescriptions for review.
-  - **Query filters** (all optional):
-    - `status`: `pending` | `approved` | `rejected`.
-    - `product_id`
-    - `order_id`
-    - `customer_id`
-    - `guest_phone`
-    - `per_page` (default 15).
-  - **Response**: Paginated list with related product/order/orderItem/customer/reviewer eagerly loaded.
+### Customer orders
 
-- `GET /dashboard/prescriptions/{prescription}`
-  - **Purpose**: Fetch a single prescription with full details.
-  - **Response**: `Prescription` JSON with relations:
-    - `product`, `order`, `orderItem`, `customer`, `reviewer`.
+- **GET** `/api/dashboard/customers/{customer}/orders`  
+  List orders for this customer (paginated). Query: `page`, `per_page`, `status`, `from_date`, `to_date`.  
+  Response: standard Laravel paginator; each order includes `items` and `customer`. Optionally items include `prescriptions` (confirm with backend).
 
-- `PATCH /dashboard/prescriptions/{prescription}`
-  - **Purpose**: Approve or reject a prescription (or mark as pending).
-  - **Request JSON**:
-    - `status` (required): `pending` | `approved` | `rejected`.
-    - `notes` (optional): string, max 2000 chars.
-  - **Behavior**:
-    - Updates `status` and `notes`.
-    - Sets `reviewed_by_user_id` to the current dashboard user.
-    - Sets `reviewed_at` to `now()`.
-  - **Response**: Updated `Prescription` JSON with relations.
+- **GET** `/api/dashboard/orders/{order}`  
+  Get one order (order ID is global in tenant). Response includes `items` and each item has `prescriptions` array. Use this when user clicks an order from the customer’s order list.
 
-- `DELETE /dashboard/prescriptions/{prescription}`
-  - **Purpose**: Hard-delete a prescription (cleanup/administrative).
-  - **Response**: `204 No Content`.
+### Medical profiles
 
-- `GET /dashboard/prescriptions/{prescription}/file`
-  - **Purpose**: Get a short-lived URL to view/download the prescription file.
-  - **Behavior**:
-    - Uses `Storage::disk('s3')->temporaryUrl(file_key, now()->addMinutes(10))`.
-  - **Response**:
-    - `200 OK` with `{ "url": "<signed-url>" }` for direct use in dashboard UI (e.g. open in new tab).
+- **GET** `/api/dashboard/customers/{customer}/profiles`  
+  List profiles. Query: `with_products`, `with_prescriptions` (boolean) to include nested data.
+- **POST** `/api/dashboard/customers/{customer}/profiles`  
+  Create profile. Body: `name` (required), `sort_order` (optional).
+- **GET** `/api/dashboard/customers/{customer}/profiles/{profile}`  
+  Get one profile with products and prescriptions loaded.
+- **PATCH** `/api/dashboard/customers/{customer}/profiles/{profile}`  
+  Update profile. Body: `name`, `sort_order`.
+- **DELETE** `/api/dashboard/customers/{customer}/profiles/{profile}`  
+  Delete profile (cascades to profile products and prescriptions). Returns 204.
 
-### Frontend integration notes
+### Profile products
 
-- **When to prompt for upload**:
-  - During checkout or in order detail/confirmation/tracking views, inspect each order item’s `product.requires_prescription`.
-  - If `true`, render “Upload prescription” UI and call the appropriate endpoint:
-    - Logged-in customers: `POST /customer/orders/{order}/items/{item}/prescriptions`.
-    - Guests: `POST /orders/{orderNumber}/items/{orderItemId}/prescriptions?phone=...`.
-- **Handling status**:
-  - Use the list endpoints to show whether a prescription is:
-    - Pending review, approved, or rejected (and show `notes` when present).
-  - For guests, ensure the phone used in the query matches the one they used when ordering.
-- **Security**:
-  - Only dashboard routes can fetch file URLs; customer and guest flows never receive direct file links by design. If you want user-visible previews later, we can add dedicated read endpoints with appropriate ACLs.
+- **GET** `/api/dashboard/customers/{customer}/profiles/{profile}/products`  
+  List products on the profile (each item includes `product` and `quantity`).
+- **POST** `/api/dashboard/customers/{customer}/profiles/{profile}/products`  
+  Add product from catalog (or update quantity). Body: `product_id` (required), `quantity` (optional, default 1).
+- **POST** `/api/dashboard/customers/{customer}/profiles/{profile}/products/from-order`  
+  Add products from a customer order. Body: `order_id` (required), `order_item_ids` (optional array of order_item IDs). If `order_item_ids` is omitted, all items of the order are added. Quantities are merged if the product is already on the profile.
+- **DELETE** `/api/dashboard/customers/{customer}/profiles/{profile}/products/{product}`  
+  Remove product from profile. Path: `product` = product ID. Returns 204.
+
+### Profile prescriptions
+
+- **GET** `/api/dashboard/customers/{customer}/profiles/{profile}/prescriptions`  
+  List prescriptions attached to the profile. Each item includes `name` (optional label).
+- **POST** `/api/dashboard/customers/{customer}/profiles/{profile}/prescriptions`  
+  Upload a prescription file. **Content-Type:** `multipart/form-data`. Body: `file` (required; image or PDF, max 10 MB), `name` (optional; string, max 255 – label for the prescription).
+- **POST** `/api/dashboard/customers/{customer}/profiles/{profile}/prescriptions/from-order`  
+  Attach a prescription from an order. Body: `prescription_id` (required), `name` (optional; string, max 255 – label for the prescription). Backend copies the file to the profile; profile owns the copy.
+- **PATCH** `/api/dashboard/customers/{customer}/profiles/{profile}/prescriptions/{profile_prescription}`  
+  Update a profile prescription. Body: `name` (optional), `status` (optional: pending/approved/rejected), `notes` (optional). Use this to set or change the prescription name.
+- **DELETE** `/api/dashboard/customers/{customer}/profiles/{profile}/prescriptions/{profile_prescription}`  
+  Remove prescription from profile. Path: `profile_prescription` = profile prescription ID. Returns 204.
+- **GET** `/api/dashboard/customers/{customer}/profiles/{profile}/prescriptions/{profile_prescription}/file`  
+  Get a temporary URL to view/download the file. Response: `{ "url": "..." }`. Use this URL in a new tab or iframe to show the file.
+
+---
+
+## Data Template (User Data sheet)
+
+For customer import, the Excel file must have a sheet named **"User Data"** (or the first sheet if the workbook has only one sheet). Row 1 is the header row. Supported columns (case-insensitive, trimmed):
+
+| Column         | Maps to / behavior                                      |
+|----------------|---------------------------------------------------------|
+| User ID        | `external_id` (unique per tenant)                       |
+| Name           | `name` (required if Contact # is empty)                |
+| Contact #      | `phone` (required if Name is empty)                    |
+| Gender         | `gender` (normalize to male/female/other)              |
+| Address        | `address`                                              |
+| City           | `city`                                                 |
+| Coordinates    | Split into `latitude`, `longitude` (e.g. "31.52,74.35") |
+| Profile I      | Name of first medical profile to create                |
+| Profile II     | Name of second profile                                 |
+| Profile III    | Name of third profile                                  |
+| Profile IV     | Name of fourth profile                                 |
+| Profile V      | Name of fifth profile                                  |
+| User Discount  | `discount_percentage` (0–100)                          |
+
+Upsert key: **phone** if present; otherwise **User ID** (external_id). Profile I–V create up to 5 **medical profiles** with the given names; products and prescriptions for those profiles are added later in the app (from orders or catalog/upload).
+
+---
+
+## Auth and errors
+
+- **Auth:** All dashboard requests must send `Authorization: Bearer <token>` (Sanctum token from dashboard login).
+- **403:** User is not admin or staff.
+- **404:** Resource not found (e.g. customer, profile, order not in tenant or not belonging to customer).
+- **422:** Validation error; response body includes `errors` object.
+- **500:** Server error (e.g. tenant context missing, S3 unavailable).
+
+Use the existing dashboard login flow to obtain the token and pass it on every request.

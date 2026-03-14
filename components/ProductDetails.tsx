@@ -6,8 +6,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { X, Plus, Minus, AlertCircle, ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
+import { useAuth } from "@/lib/context/AuthContext";
 import { getProduct, getProductVariations } from "@/lib/api/products";
 import { bucketUrl } from "@/lib/bucketUrl";
+import { applyCustomerDiscount } from "@/utils/pricing";
 import type { Product } from "@/types/product";
 
 interface ProductDetailsProps {
@@ -27,6 +29,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const [expandedFaq, setExpandedFaq] = useState<number | null>(1);
   const [infoTab, setInfoTab] = useState<"description" | "usage" | "ingredients" | "reviews">("description");
   const { addItem } = useCart();
+  const { customerProfile } = useAuth();
+  const customerDiscountPct = Number(customerProfile?.discount_percentage) || 0;
 
   useEffect(() => {
     const fetchProductData = async () => {
@@ -129,12 +133,13 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       resolvedUnitType = effectiveType;
     }
 
+    const { discountedPrice: priceToAdd } = applyCustomerDiscount(safePrice, customerDiscountPct);
     addItem({
       id: selectedVariation.id,
       name: selectedVariation.item_name,
       variation: selectedVariation.variation_value || "",
       quantity: quantityLabel,
-      price: safePrice,
+      price: priceToAdd,
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
       unit_type: resolvedUnitType,
@@ -195,13 +200,14 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       resolvedUnitType = effectiveType;
     }
 
+    const { discountedPrice: priceToAdd } = applyCustomerDiscount(safePrice, customerDiscountPct);
     addItem(
       {
         id: selectedVariation.id,
         name: selectedVariation.item_name,
         variation: selectedVariation.variation_value || "",
         quantity: quantityLabel,
-        price: safePrice,
+        price: priceToAdd,
         image: selectedVariation.images?.[0]
           ? bucketUrl(selectedVariation.images[0].object_key)
           : "/assets/home/product-1.png",
@@ -284,6 +290,12 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       : unitType === "box" && canSellBox
         ? boxPrice
         : secondaryPrice;
+
+  const { discountedPrice: displayPrice, originalPrice: originalDisplayPrice } = applyCustomerDiscount(
+    selectedPrice,
+    customerDiscountPct
+  );
+  const showCustomerDiscount = customerDiscountPct > 0 && originalDisplayPrice > displayPrice;
 
   return (
     <div className="w-full">
@@ -379,9 +391,21 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                     </div>
                   )}
                 </div>
-                <span className="text-xl md:text-2xl font-bold text-[#374151] pt-2">
-                  Rs. {Number.isFinite(selectedPrice) ? selectedPrice.toFixed(2) : "0.00"}
-                </span>
+                <div className="flex flex-col items-end pt-2">
+                  {showCustomerDiscount && (
+                    <span className="text-xs text-gray-400 line-through">
+                      Rs. {originalDisplayPrice.toFixed(2)}
+                    </span>
+                  )}
+                  <span className="text-xl md:text-2xl font-bold text-[#374151]">
+                    Rs. {Number.isFinite(displayPrice) ? displayPrice.toFixed(2) : "0.00"}
+                  </span>
+                  {showCustomerDiscount && (
+                    <span className="text-[10px] font-bold text-[#01AC28] uppercase tracking-wider mt-0.5">
+                      {Math.round(customerDiscountPct)}% your discount
+                    </span>
+                  )}
+                </div>
               </div>
 
               <p className="text-sm md:text-base text-[#6B7280] mb-10 mt-6 leading-relaxed max-w-xl">
@@ -422,61 +446,77 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                   </span>
                   <div className="flex flex-wrap gap-2">
                     {usePackagingDisplay ? (
-                      packOptions.map((opt, idx) => (
-                        <button
-                          key={opt.tier}
-                          type="button"
-                          onClick={() => setSelectedPackOptionIndex(idx)}
-                          className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
-                            selectedPackOptionIndex === idx
-                              ? "bg-[#374151] text-white border-[#374151]"
-                              : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
-                          }`}
-                        >
-                          {opt.description} · Rs. {opt.price}
-                        </button>
-                      ))
+                      packOptions.map((opt, idx) => {
+                        const optPrice = Number.parseFloat(opt.price ?? "0") || 0;
+                        const { discountedPrice: optDisplayPrice } = applyCustomerDiscount(
+                          optPrice,
+                          customerDiscountPct
+                        );
+                        return (
+                          <button
+                            key={opt.tier}
+                            type="button"
+                            onClick={() => setSelectedPackOptionIndex(idx)}
+                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                              selectedPackOptionIndex === idx
+                                ? "bg-[#374151] text-white border-[#374151]"
+                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                            }`}
+                          >
+                            {opt.description} · Rs. {optDisplayPrice.toFixed(2)}
+                          </button>
+                        );
+                      })
                     ) : (
                       <>
-                        {canSellItem && Number.isFinite(itemPrice) && itemPrice > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setUnitType("item")}
-                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
-                              unitType === "item"
-                                ? "bg-[#374151] text-white border-[#374151]"
-                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
-                            }`}
-                          >
-                            {baseUnitLabel} · Rs. {itemPrice.toFixed(2)}
-                          </button>
-                        )}
-                        {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setUnitType("secondary")}
-                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
-                              unitType === "secondary"
-                                ? "bg-[#374151] text-white border-[#374151]"
-                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
-                            }`}
-                          >
-                            {secondaryLabel} · Rs. {secondaryPrice.toFixed(2)}
-                          </button>
-                        )}
-                        {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setUnitType("box")}
-                            className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
-                              unitType === "box"
-                                ? "bg-[#374151] text-white border-[#374151]"
-                                : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
-                            }`}
-                          >
-                            {boxUnitLabel} · Rs. {boxPrice.toFixed(2)}
-                          </button>
-                        )}
+                        {canSellItem && Number.isFinite(itemPrice) && itemPrice > 0 && (() => {
+                          const { discountedPrice: p } = applyCustomerDiscount(itemPrice, customerDiscountPct);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setUnitType("item")}
+                              className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                                unitType === "item"
+                                  ? "bg-[#374151] text-white border-[#374151]"
+                                  : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                              }`}
+                            >
+                              {baseUnitLabel} · Rs. {p.toFixed(2)}
+                            </button>
+                          );
+                        })()}
+                        {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (() => {
+                          const { discountedPrice: p } = applyCustomerDiscount(secondaryPrice, customerDiscountPct);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setUnitType("secondary")}
+                              className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                                unitType === "secondary"
+                                  ? "bg-[#374151] text-white border-[#374151]"
+                                  : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                              }`}
+                            >
+                              {secondaryLabel} · Rs. {p.toFixed(2)}
+                            </button>
+                          );
+                        })()}
+                        {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (() => {
+                          const { discountedPrice: p } = applyCustomerDiscount(boxPrice, customerDiscountPct);
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setUnitType("box")}
+                              className={`px-4 py-2 rounded-md text-[10px] font-bold tracking-widest transition-all border ${
+                                unitType === "box"
+                                  ? "bg-[#374151] text-white border-[#374151]"
+                                  : "bg-white text-gray-400 border-gray-100 hover:border-gray-200"
+                              }`}
+                            >
+                              {boxUnitLabel} · Rs. {p.toFixed(2)}
+                            </button>
+                          );
+                        })()}
                       </>
                     )}
                   </div>

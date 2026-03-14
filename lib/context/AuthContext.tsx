@@ -145,6 +145,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       setCustomerProfile(res.customer);
       setTenant(DEMO_TENANT);
+      // If login response didn't include discount_percentage, refetch profile so we have it (e.g. 20% customer discount)
+      const discountInResponse = res.customer?.discount_percentage;
+      const missingDiscount = discountInResponse === undefined || discountInResponse === null;
+      if (res.customer && missingDiscount) {
+        try {
+          const profile = await customerAuthApi.getProfile();
+          setCustomerProfile(profile);
+        } catch {
+          // keep res.customer if getProfile fails
+        }
+      }
     } catch (error: unknown) {
       if (isNetworkError(error)) {
         console.warn('Backend not detected. Enabling demo mode for preview...');
@@ -162,7 +173,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: data.email,
         password: data.password,
         password_confirmation: data.confirmPassword || data.password_confirmation || data.password,
-        phone: data.phone,
+        phone: data.phone?.trim() || undefined,
+        address: data.address?.trim() || undefined,
+        city: data.city?.trim() || undefined,
+        gender: data.gender?.trim() || undefined,
       });
       storeToken(res.token);
       setToken(res.token);

@@ -42,7 +42,7 @@ export function computeLineDiscount(
   const productDiscount = productPct > 0 ? Math.round(lineTotalBeforeDiscount * (productPct / 100) * 100) / 100 : 0;
   const customerPct = Number.isFinite(customerDiscountPercent) ? Math.min(100, Math.max(0, customerDiscountPercent)) : 0;
   const customerDiscount = customerPct > 0 ? Math.round(lineTotalBeforeDiscount * (customerPct / 100) * 100) / 100 : 0;
-  const offerPct = Number.isFinite(offerDiscountPercent) ? Math.min(100, Math.max(0, offerDiscountPercent)) : 0;
+  const offerPct = Number.isFinite(offerDiscountPercent ?? 0) ? Math.min(100, Math.max(0, offerDiscountPercent ?? 0)) : 0;
   const offerDiscount = offerPct > 0 ? Math.round(lineTotalBeforeDiscount * (offerPct / 100) * 100) / 100 : 0;
   const discount = Math.max(productDiscount, customerDiscount, offerDiscount);
   return Math.round(discount * 100) / 100;
@@ -67,7 +67,7 @@ export function effectiveDiscountPerUnit(
   const productAmount = productPct > 0 ? Math.round(unitPrice * (productPct / 100) * 100) / 100 : 0;
   const customerPct = Number.isFinite(customerDiscountPercent) ? Math.min(100, Math.max(0, customerDiscountPercent)) : 0;
   const customerAmount = customerPct > 0 ? Math.round(unitPrice * (customerPct / 100) * 100) / 100 : 0;
-  const offerPct = Number.isFinite(offerDiscountPercent) ? Math.min(100, Math.max(0, offerDiscountPercent)) : 0;
+  const offerPct = Number.isFinite(offerDiscountPercent ?? 0) ? Math.min(100, Math.max(0, offerDiscountPercent ?? 0)) : 0;
   const offerAmount = offerPct > 0 ? Math.round(unitPrice * (offerPct / 100) * 100) / 100 : 0;
   const best = Math.max(productAmount, customerAmount, offerAmount);
   const effectivePercent = unitPrice > 0 ? Math.round((best / unitPrice) * 100) : 0;

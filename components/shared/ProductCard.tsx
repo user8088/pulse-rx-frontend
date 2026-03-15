@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
 import { useAuth } from "@/lib/context/AuthContext";
-import { applyCustomerDiscount } from "@/utils/pricing";
+import { effectiveDiscountPerUnit } from "@/utils/pricing";
 
 export interface ProductCardProps {
   id: number;
@@ -13,6 +13,12 @@ export interface ProductCardProps {
   price: number;
   originalPrice?: number;
   discountPercent?: number;
+  /** Product discount percentage (item_discount 0–100). Applied only on product's top tier. */
+  itemDiscount?: number;
+  /** Best offer discount % for this product's category/subcategory (0–100). Applied only on top tier. */
+  offerPercent?: number;
+  /** Product's top tier: box if can_sell_box, else secondary, else item. */
+  topTier?: "item" | "secondary" | "box";
   image: string;
   variation?: string;
   quantity?: string;
@@ -28,6 +34,9 @@ export default function ProductCard({
   price,
   originalPrice,
   discountPercent,
+  itemDiscount = 0,
+  offerPercent = 0,
+  topTier = "item",
   image,
   variation = "",
   quantity = "1 Unit",
@@ -40,16 +49,18 @@ export default function ProductCard({
   const { customerProfile } = useAuth();
 
   const customerDiscountPct = Number(customerProfile?.discount_percentage) || 0;
-  const { discountedPrice: priceAfterCustomerDiscount, originalPrice: basePrice } =
-    applyCustomerDiscount(price, customerDiscountPct);
-
-  const displayPrice = customerDiscountPct > 0 ? priceAfterCustomerDiscount : price;
-  const showCustomerDiscountBadge = customerDiscountPct > 0 && basePrice > priceAfterCustomerDiscount;
-  const hasProductDiscount =
-    discountPercent != null && discountPercent > 0 && originalPrice != null && originalPrice > price;
-  const hasDiscount = showCustomerDiscountBadge || hasProductDiscount;
-  const badgePercent = showCustomerDiscountBadge ? customerDiscountPct : discountPercent;
-  const originalPriceForDisplay = showCustomerDiscountBadge ? basePrice : originalPrice;
+  const baseUnitPrice = originalPrice ?? price;
+  const isTopTier = unitType === topTier;
+  const { amount: effectiveDiscount, isCustomerDiscount, source, effectivePercent } = effectiveDiscountPerUnit(
+    baseUnitPrice,
+    itemDiscount,
+    customerDiscountPct,
+    isTopTier,
+    offerPercent
+  );
+  const displayPrice = Math.round((baseUnitPrice - effectiveDiscount) * 100) / 100;
+  const hasDiscount = effectiveDiscount > 0;
+  const originalPriceForDisplay = hasDiscount ? baseUnitPrice : undefined;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     if (!inStock) return;
@@ -60,7 +71,10 @@ export default function ProductCard({
       name,
       variation,
       quantity,
-      price: displayPrice,
+      price: baseUnitPrice,
+      item_discount: itemDiscount,
+      offer_percent: offerPercent,
+      top_tier: topTier,
       image,
       qty: 1,
       unit_type: unitType,
@@ -80,9 +94,13 @@ export default function ProductCard({
           sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
         />
 
-        {hasDiscount && badgePercent != null && badgePercent > 0 && (
+        {hasDiscount && (
           <span className="absolute top-2.5 right-2.5 bg-[#1F3B5C] text-white text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-md">
-            {Math.round(badgePercent)}% OFF
+            {isCustomerDiscount
+              ? `${effectivePercent}% your discount`
+              : source === "offer"
+                ? `${effectivePercent}% off`
+                : `${effectivePercent}% off${unitType === "box" ? " per box" : unitType === "secondary" ? " per pack" : ""}`}
           </span>
         )}
 

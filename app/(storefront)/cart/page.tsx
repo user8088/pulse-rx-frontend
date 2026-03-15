@@ -7,13 +7,26 @@ import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { useCart, cartItemKey } from '@/lib/context/CartContext';
+import { useAuth } from '@/lib/context/AuthContext';
+import { computeLineDiscount } from '@/utils/pricing';
 
 export default function CartPage() {
   const { cartItems, updateQty, removeItem, cartTotal } = useCart();
+  const { customerProfile, isAuthenticated } = useAuth();
+  const customerPct = Number(customerProfile?.discount_percentage) || 0;
 
-  const subtotal = cartTotal;
-  const shipping = subtotal > 199 ? 0 : 15.00;
-  const total = subtotal + shipping;
+  const estimatedDiscount = cartItems.reduce((sum, item) => sum + computeLineDiscount(
+    item.price,
+    item.qty,
+    item.item_discount ?? 0,
+    isAuthenticated ? customerPct : 0,
+    item.unit_type,
+    item.top_tier ?? item.unit_type
+  ), 0);
+  const subtotalBeforeDiscount = cartTotal;
+  const subtotalAfterDiscount = Math.round((subtotalBeforeDiscount - estimatedDiscount) * 100) / 100;
+  const shipping = subtotalAfterDiscount > 199 ? 0 : 15.00;
+  const total = Math.round((subtotalAfterDiscount + shipping) * 100) / 100;
 
   return (
     <main className="min-h-screen bg-white">
@@ -51,6 +64,8 @@ export default function CartPage() {
 
                 {cartItems.map((item) => {
                   const key = cartItemKey(item);
+                  const lineDiscount = computeLineDiscount(item.price, item.qty, item.item_discount ?? 0, isAuthenticated ? customerPct : 0, item.unit_type, item.top_tier ?? item.unit_type);
+                  const lineTotal = Math.round((item.price * item.qty - lineDiscount) * 100) / 100;
                   return (
                   <div key={key} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-6 border-b border-gray-100 items-center group">
                     {/* Product Details */}
@@ -63,6 +78,9 @@ export default function CartPage() {
                         <p className="text-xs text-[#6B7280] font-medium uppercase tracking-wider">
                           {item.variation} • {item.quantity}
                         </p>
+                        {lineDiscount > 0 && (
+                          <p className="text-[10px] font-bold text-green-600 mt-0.5">You saved Rs. {lineDiscount.toFixed(2)}</p>
+                        )}
                         {item.requiresPrescription && (
                           <div className="mt-2 flex items-center gap-1.5">
                             {item.prescription?.status === 'approved' && (
@@ -127,7 +145,7 @@ export default function CartPage() {
                     {/* Item Total */}
                     <div className="col-span-1 md:col-span-2 text-right">
                       <span className="text-lg font-bold text-[#01AC28] md:text-[#374151] md:group-hover:text-[#01AC28] transition-colors">
-                        Rs. {(item.price * item.qty).toFixed(2)}
+                        Rs. {lineTotal.toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -150,8 +168,14 @@ export default function CartPage() {
                   <div className="space-y-4 mb-8">
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Subtotal</span>
-                      <span className="text-[#374151] font-bold">Rs. {subtotal.toFixed(2)}</span>
+                      <span className="text-[#374151] font-bold">Rs. {subtotalBeforeDiscount.toFixed(2)}</span>
                     </div>
+                    {estimatedDiscount > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-[#6B7280] font-medium">Discount</span>
+                        <span className="font-bold text-green-600">-Rs. {estimatedDiscount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-[#6B7280] font-medium">Shipping Fee</span>
                       <span className={`${shipping === 0 ? 'text-[#01AC28]' : 'text-[#374151]'} font-bold`}>
@@ -159,7 +183,7 @@ export default function CartPage() {
                       </span>
                     </div>
                     {shipping > 0 && (
-                      <p className="text-[10px] text-[#6B7280] italic">Add Rs. {(199 - subtotal).toFixed(2)} more for FREE shipping</p>
+                      <p className="text-[10px] text-[#6B7280] italic">Add Rs. {(199 - subtotalAfterDiscount).toFixed(2)} more for FREE shipping</p>
                     )}
                     <div className="pt-4 border-t border-gray-200 flex justify-between items-center">
                       <span className="text-lg font-bold text-[#374151]">Total</span>

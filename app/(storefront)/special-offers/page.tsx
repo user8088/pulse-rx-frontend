@@ -2,45 +2,137 @@ import Header from "@/components/Header";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductGrid from "@/components/ProductGrid";
-import FilterSidebar from "@/components/FilterSidebar";
+import OfferBannerDetail from "@/components/OfferBannerDetail";
 import Link from "next/link";
 import { ChevronRight, Tag } from "lucide-react";
+import { getOffers } from "@/lib/api/offers";
+import { getProducts } from "@/lib/api/products";
+import { getCategories } from "@/lib/api/categories";
+import { bucketUrl } from "@/lib/bucketUrl";
+import type { Offer } from "@/types/offer";
+import type { Product as BackendProduct, PaginatedProducts } from "@/types/product";
+import type { Category } from "@/types/category";
+import type { ProductGridItem } from "@/components/ProductGrid";
 
-const getSpecialOfferProducts = () => {
-  const productImages = [
-    '/assets/home/product-1.png',
-    '/assets/home/product-2.png',
-    '/assets/home/product-3.png',
-    '/assets/home/product-4.png',
-    '/assets/home/product-5.png',
-    '/assets/home/product-6.png',
-    '/assets/home/product-7.png',
-  ];
+function mapProductToGridItem(p: BackendProduct, offerPercent: number): ProductGridItem {
+  const opts = p.packaging_display?.options ?? [];
+  const usePackagingDisplay = opts.length > 0;
 
-  return Array.from({ length: 24 }, (_, i) => {
-    const originalPrice = Math.round((Math.random() * 60 + 20) * 100) / 100;
-    const discountPercent = Math.floor(Math.random() * 30 + 10);
-    const discountedPrice = Math.round((originalPrice * (1 - discountPercent / 100)) * 100) / 100;
-    
-    return {
-      id: i + 1,
-      name: `Special Offer Product ${i + 1} - Premium Quality Medicine with ${discountPercent}% Off`,
-      price: discountedPrice,
-      originalPrice: originalPrice,
-      discountPercent,
-      image: productImages[i % productImages.length],
-    };
-  });
+  let displayPrice: number;
+  let quantityLabel: string;
+  let unitType: "item" | "secondary" | "box" = "item";
+
+  if (usePackagingDisplay) {
+    const first = opts[0];
+    displayPrice = Number.parseFloat(first?.price ?? "0") || 0;
+    quantityLabel = first?.label ? `1 ${first.label}` : "1 Unit";
+    if (first?.tier === "box" || first?.tier === "secondary" || first?.tier === "item") {
+      unitType = first.tier;
+    }
+  } else {
+    const canSellItem = !!p.can_sell_item;
+    const canSellBox = !!p.can_sell_box;
+    const itemPrice = Number.parseFloat(String(p.retail_price_item ?? "0"));
+    const boxPrice = Number.parseFloat((p.retail_price_box as unknown as string) ?? "0");
+    const secondaryPrice = Number.parseFloat((p.retail_price_secondary as unknown as string) ?? "0");
+    const baseLabel = p.base_unit_label ?? "Unit";
+    if (canSellItem && Number.isFinite(itemPrice) && itemPrice > 0) {
+      displayPrice = itemPrice;
+      quantityLabel = `1 ${baseLabel}`;
+      unitType = "item";
+    } else if (canSellBox && Number.isFinite(boxPrice) && boxPrice > 0) {
+      displayPrice = boxPrice;
+      quantityLabel = p.box_unit_label ? `1 ${p.box_unit_label}` : "1 Box";
+      unitType = "box";
+    } else {
+      displayPrice = secondaryPrice;
+      quantityLabel = p.secondary_unit_label ? `1 ${p.secondary_unit_label}` : "1 Unit";
+      unitType = "secondary";
+    }
+  }
+
+  const itemDiscountPct = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
+  const topTier: "item" | "secondary" | "box" = p.can_sell_box ? "box" : p.can_sell_secondary ? "secondary" : "item";
+  const originalPrice =
+    (itemDiscountPct > 0 || offerPercent > 0) && unitType === topTier
+      ? displayPrice / (1 - Math.max(itemDiscountPct, offerPercent) / 100)
+      : undefined;
+  const discountPercent =
+    originalPrice && originalPrice > 0 ? (1 - displayPrice / originalPrice) * 100 : undefined;
+  const inStock = p.availability === "yes" || p.availability === "short";
+
+  return {
+    id: p.id,
+    name: p.item_name,
+    price: displayPrice,
+    originalPrice,
+    discountPercent,
+    itemDiscount: itemDiscountPct,
+    offerPercent,
+    topTier,
+    image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
+    variation: p.variation_value ?? p.secondary_unit_label ?? "",
+    quantity: quantityLabel,
+    unitType,
+    inStock,
+    requiresPrescription: !!p.requires_prescription,
+  };
+}
+
+async function getProductsForOffer(
+  offer: Offer,
+  categories: Category[]
+): Promise<ProductGridItem[]> {
+  const categoryId = offer.category_id ?? offer.subcategory?.category_id;
+  const category = categories.find((c) => c.id === categoryId);
+  const categoryName = offer.category?.category_name ?? category?.category_name;
+  if (!categoryName) return [];
+
+  let data: PaginatedProducts = { data: [], total: 0, per_page: 100, current_page: 1, last_page: 1, from: null, to: null };
+  try {
+    data = await getProducts({ q: categoryName, per_page: 100 });
+  } catch {
+    return [];
+  }
+
+  const filtered = offer.category_id
+    ? data.data.filter((p: BackendProduct) => p.category_id === offer.category_id)
+    : data.data.filter((p: BackendProduct) =>
+        p.subcategories?.some((s) => s.id === offer.subcategory_id)
+      );
+
+  return filtered.map((p: BackendProduct) =>
+    mapProductToGridItem(p, Number(offer.discount_percentage) || 0)
+  );
+}
+
+export const metadata = {
+  title: "Special Offers | Pulse RX",
+  description: "Current offers and discounts on categories and products",
 };
 
-export default function SpecialOffersPage() {
-  const products = getSpecialOfferProducts();
+export default async function SpecialOffersPage() {
+  let offers: Offer[] = [];
+  let categories: Category[] = [];
+  try {
+    const [offersRes, categoriesRes] = await Promise.all([getOffers(), getCategories({ per_page: 100 })]);
+    offers = offersRes;
+    categories = categoriesRes.data ?? [];
+  } catch {
+    // continue with empty
+  }
+
+  const offerSections: { offer: Offer; products: ProductGridItem[] }[] = [];
+  for (const offer of offers) {
+    const products = await getProductsForOffer(offer, categories);
+    offerSections.push({ offer, products });
+  }
 
   return (
     <main className="min-h-screen bg-white">
       <Header />
       <Navbar />
-      
+
       <div className="bg-[#EFEFEF] py-4 md:py-6">
         <div className="container mx-auto px-4 md:px-6 lg:px-12">
           <nav className="flex items-center gap-2 text-sm md:text-base">
@@ -65,48 +157,40 @@ export default function SpecialOffersPage() {
                   Special Offers
                 </h1>
                 <p className="text-[#6B7280] text-sm md:text-base">
-                  {products.length} products on sale
+                  {offers.length} active offer{offers.length !== 1 ? "s" : ""}
                 </p>
               </div>
             </div>
-            
-            <div className="lg:hidden">
-              <FilterSidebar showCategoryFilter={true} />
-            </div>
           </div>
 
-          <div className="flex gap-6 lg:gap-8">
-            <div className="hidden lg:block w-56 flex-shrink-0">
-              <FilterSidebar showCategoryFilter={true} />
+          {offerSections.length === 0 ? (
+            <div className="text-center py-16 rounded-2xl border border-gray-200 bg-gray-50">
+              <p className="text-gray-500 text-lg">No active offers right now.</p>
+              <Link href="/products" className="mt-4 inline-block text-[#01AC28] font-semibold hover:underline">
+                Browse all products
+              </Link>
             </div>
-
-            <div className="flex-1">
-              <div className="mb-8 md:mb-12 bg-gradient-to-r from-[#01AC28] to-[#5C9D40] rounded-2xl p-6 md:p-8 text-white">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div>
-                    <h2 className="text-2xl md:text-3xl font-bold mb-2">
-                      Limited Time Offers
-                    </h2>
-                    <p className="text-white/90 text-sm md:text-base">
-                      Save up to 40% on selected products. Don&apos;t miss out on these amazing deals!
-                    </p>
-                  </div>
-                  <div className="text-center md:text-right">
-                    <div className="text-4xl md:text-5xl font-black mb-1">40%</div>
-                    <div className="text-sm md:text-base text-white/80">MAX DISCOUNT</div>
+          ) : (
+            <div className="space-y-12 md:space-y-16">
+              {offerSections.map(({ offer, products }) => (
+                <div key={offer.id}>
+                  <OfferBannerDetail offer={offer} />
+                  <div className="mt-6 md:mt-8">
+                    {products.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No products in this offer.</p>
+                    ) : (
+                      <>
+                        <h2 className="text-lg font-semibold text-[#374151] mb-4">
+                          Products on offer ({products.length})
+                        </h2>
+                        <ProductGrid products={products} />
+                      </>
+                    )}
                   </div>
                 </div>
-              </div>
-
-              <ProductGrid products={products} />
-
-              <div className="mt-12 md:mt-16 text-center">
-                <button className="bg-[#01AC28] hover:bg-[#044644] text-white px-8 py-3 rounded-lg font-semibold transition-colors">
-                  Load More Products
-                </button>
-              </div>
+              ))}
             </div>
-          </div>
+          )}
         </div>
       </section>
 

@@ -13,6 +13,7 @@ import PrescriptionUpload from '@/components/PrescriptionUpload';
 import { useCart, cartItemKey } from '@/lib/context/CartContext';
 import { useAuth } from '@/lib/context/AuthContext';
 import { placeOrder } from '@/lib/api/orders';
+import { computeLineDiscount } from '@/utils/pricing';
 import {
   uploadPrescription as apiUploadRx,
   uploadGuestPrescription as apiGuestUploadRx,
@@ -60,9 +61,19 @@ export default function CheckoutPage() {
     }
   }, [isAuthenticated, customerProfile]);
 
-  const subtotal = cartTotal;
+  const customerPct = Number(customerProfile?.discount_percentage) || 0;
+  const estimatedDiscount = cartItems.reduce((sum, item) => sum + computeLineDiscount(
+    item.price,
+    item.qty,
+    item.item_discount ?? 0,
+    isAuthenticated ? customerPct : 0,
+    item.unit_type,
+    item.top_tier ?? item.unit_type
+  ), 0);
+  const subtotalBeforeDiscount = cartTotal;
+  const subtotalAfterDiscount = Math.round((subtotalBeforeDiscount - estimatedDiscount) * 100) / 100;
   const shipping = deliveryMethod === 'express' ? 15 : 0;
-  const total = subtotal + shipping;
+  const total = Math.round((subtotalAfterDiscount + shipping) * 100) / 100;
 
   const prescriptionRequiredItems = cartItems.filter(item => item.requiresPrescription);
 
@@ -428,8 +439,11 @@ export default function CheckoutPage() {
               <div className="bg-[#374151] rounded-3xl p-6 md:p-8 text-white sticky top-[150px] shadow-2xl">
                 <h2 className="text-xl md:text-2xl font-bold mb-8">Order Summary</h2>
                 <div className="space-y-6 mb-8 max-h-[300px] overflow-y-auto pr-2 scrollbar-hide">
-                  {cartItems.map((item) => (
-                    <div key={item.id} className="flex gap-4 items-center">
+                  {cartItems.map((item) => {
+                    const lineDiscount = computeLineDiscount(item.price, item.qty, item.item_discount ?? 0, isAuthenticated ? customerPct : 0, item.unit_type, item.top_tier ?? item.unit_type);
+                    const lineTotal = Math.round((item.price * item.qty - lineDiscount) * 100) / 100;
+                    return (
+                    <div key={cartItemKey(item)} className="flex gap-4 items-center">
                       <div className="relative w-16 h-16 rounded-xl bg-white/10 flex-shrink-0 overflow-hidden border border-white/10">
                         <Image src={item.image} alt={item.name} fill className="object-contain p-2" />
                       </div>
@@ -439,8 +453,11 @@ export default function CheckoutPage() {
                           <span className="text-[10px] font-bold text-white/50 uppercase tracking-wider">
                             {item.variation} • {item.quantity} • Qty: {item.qty}
                           </span>
-                          <span className="text-sm font-bold">Rs. {(item.price * item.qty).toFixed(2)}</span>
+                          <span className="text-sm font-bold">Rs. {lineTotal.toFixed(2)}</span>
                         </div>
+                        {lineDiscount > 0 && (
+                          <p className="text-[10px] text-green-400 font-bold mt-0.5">You saved Rs. {lineDiscount.toFixed(2)}</p>
+                        )}
                         {item.requiresPrescription && (
                           <div className="mt-1">
                             {item.prescription?.file
@@ -451,13 +468,20 @@ export default function CheckoutPage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <div className="space-y-4 pt-6 border-t border-white/10 mb-8">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Subtotal</span>
-                    <span className="font-bold">Rs. {subtotal.toFixed(2)}</span>
+                    <span className="font-bold">Rs. {subtotalBeforeDiscount.toFixed(2)}</span>
                   </div>
+                  {estimatedDiscount > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-white/60 font-medium">Discount</span>
+                      <span className="font-bold text-green-400">-Rs. {estimatedDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-white/60 font-medium">Shipping Fee</span>
                     <span className={shipping === 0 ? 'text-[#01AC28] font-bold' : 'font-bold'}>{shipping === 0 ? 'FREE' : `Rs. ${shipping.toFixed(2)}`}</span>

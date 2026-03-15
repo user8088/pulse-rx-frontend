@@ -7,7 +7,9 @@ import { Pagination } from "@/components/ui/Pagination";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getProducts } from "@/lib/api/products";
+import { getOffers } from "@/lib/api/offers";
 import { bucketUrl } from "@/lib/bucketUrl";
+import { getBestOfferPercentForProduct } from "@/utils/offers";
 import type { Product as BackendProduct, PaginatedProducts } from "@/types/product";
 
 interface ProductsPageProps {
@@ -50,6 +52,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     console.error("Failed to fetch products:", error);
   }
 
+  let offers: Awaited<ReturnType<typeof getOffers>> = [];
+  try {
+    offers = await getOffers();
+  } catch {
+    // Offers are optional for display
+  }
+
   const mappedProducts = productsData.data.map((p: BackendProduct) => {
     const opts = p.packaging_display?.options ?? [];
     const usePackagingDisplay = opts.length > 0;
@@ -87,15 +96,20 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       }
     }
 
-    const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
-    const originalPrice = discount > 0 ? displayPrice + discount : undefined;
-    const discountPercent =
-      originalPrice && originalPrice > 0 ? (discount / originalPrice) * 100 : undefined;
+    const itemDiscountPct = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
+    const topTier: "item" | "secondary" | "box" = p.can_sell_box ? "box" : p.can_sell_secondary ? "secondary" : "item";
+    const originalPrice = itemDiscountPct > 0 && unitType === topTier ? displayPrice / (1 - itemDiscountPct / 100) : undefined;
+    const discountPercent = itemDiscountPct > 0 && unitType === topTier ? itemDiscountPct : undefined;
 
     const primaryImage = p.images?.find((img) => img.is_primary) || p.images?.[0];
 
     const inStock =
       p.availability === "yes" || p.availability === "short";
+
+    const offerPercent = getBestOfferPercentForProduct(offers, {
+      category_id: p.category_id ?? null,
+      subcategories: p.subcategories ?? undefined,
+    });
 
     return {
       id: p.id,
@@ -103,6 +117,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       price: displayPrice,
       originalPrice,
       discountPercent,
+      itemDiscount: itemDiscountPct,
+      offerPercent,
+      topTier,
       image: primaryImage ? bucketUrl(primaryImage.object_key) : "/assets/home/product-1.png",
       variation: p.variation_value ?? p.secondary_unit_label ?? "",
       quantity: quantityLabel,

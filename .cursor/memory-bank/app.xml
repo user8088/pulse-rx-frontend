@@ -60,9 +60,26 @@ The content is organized as follows:
 (storefront)/signup/page.tsx
 (storefront)/special-offers/page.tsx
 (storefront)/track/page.tsx
+api/dashboard/customers/[customerId]/profiles/[profileId]/prescriptions/[prescriptionId]/file/route.ts
+api/dashboard/orders/[id]/route.ts
 api/dashboard/prescriptions/[id]/file/route.ts
 api/dashboard/prescriptions/[id]/route.ts
 api/dashboard/prescriptions/route.ts
+dashboard/(app)/customers/[id]/AddProfileForm.tsx
+dashboard/(app)/customers/[id]/CustomerDetailTabs.tsx
+dashboard/(app)/customers/[id]/CustomerInfoTab.tsx
+dashboard/(app)/customers/[id]/CustomerOrdersTab.tsx
+dashboard/(app)/customers/[id]/CustomerProfilesTab.tsx
+dashboard/(app)/customers/[id]/page.tsx
+dashboard/(app)/customers/[id]/ProfilePrescriptionsSection.tsx
+dashboard/(app)/customers/[id]/ProfileProductsSection.tsx
+dashboard/(app)/customers/[id]/ProfilesTableWithModal.tsx
+dashboard/(app)/customers/actions.ts
+dashboard/(app)/customers/CustomersToolbar.tsx
+dashboard/(app)/customers/import-logs/[import_uuid]/page.tsx
+dashboard/(app)/customers/import-logs/page.tsx
+dashboard/(app)/customers/import/page.tsx
+dashboard/(app)/customers/page.tsx
 dashboard/(app)/inventory/actions.ts
 dashboard/(app)/inventory/categories/actions.ts
 dashboard/(app)/inventory/categories/CategoryEditCell.tsx
@@ -677,7 +694,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 <file path="(storefront)/checkout/page.tsx">
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -707,11 +724,11 @@ const recommendedProducts = [
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, customerProfile } = useAuth();
   const { cartItems, cartTotal, uploadPrescription, prescriptionsPending, canPlaceOrder, clearCart } = useCart();
 
-  const [customerName, setCustomerName] = useState(isAuthenticated && user?.name ? user.name : '');
-  const [customerEmail, setCustomerEmail] = useState(isAuthenticated && user?.email ? user.email : '');
+  const [customerName, setCustomerName] = useState(() => (isAuthenticated && user?.name ? user.name : ''));
+  const [customerEmail, setCustomerEmail] = useState(() => (isAuthenticated && user?.email ? user.email : ''));
   const [phone, setPhone] = useState('');
   const [houseApt, setHouseApt] = useState('');
   const [street, setStreet] = useState('');
@@ -721,6 +738,21 @@ export default function CheckoutPage() {
   const [deliveryMethod, setDeliveryMethod] = useState<'standard' | 'express'>('standard');
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'card'>('cod');
   const [placing, setPlacing] = useState(false);
+
+  // Prefill from customer profile when signed in
+  useEffect(() => {
+    if (!isAuthenticated || !customerProfile) return;
+    if (customerProfile.name) setCustomerName(customerProfile.name);
+    if (customerProfile.email) setCustomerEmail(customerProfile.email);
+    if (customerProfile.phone) setPhone(customerProfile.phone);
+    if (customerProfile.city) setCity(customerProfile.city);
+    if (customerProfile.address) {
+      const parts = customerProfile.address.split(',').map((s) => s.trim()).filter(Boolean);
+      if (parts[0]) setHouseApt(parts[0]);
+      if (parts[1]) setStreet(parts[1]);
+      if (parts[2]) setBlockLocality(parts[2]);
+    }
+  }, [isAuthenticated, customerProfile]);
 
   const subtotal = cartTotal;
   const shipping = deliveryMethod === 'express' ? 15 : 0;
@@ -2796,10 +2828,12 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/context/AuthContext';
-import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, Phone } from 'lucide-react';
+import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, Phone, MapPin } from 'lucide-react';
 import Header from '@/components/Header';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+
+const CITIES = ['Islamabad', 'Rawalpindi', 'Lahore', 'Karachi', 'Other'];
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -2814,6 +2848,11 @@ export default function SignUpPage() {
     phone: '',
     password: '',
     confirmPassword: '',
+    house_apt: '',
+    street: '',
+    block_locality: '',
+    city: '',
+    gender: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -2822,13 +2861,25 @@ export default function SignUpPage() {
       setError("Passwords don't match");
       return;
     }
+    if (!formData.house_apt.trim() || !formData.street.trim() || !formData.block_locality.trim() || !formData.city.trim()) {
+      setError('Please fill in all address fields.');
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
 
+    const address = [formData.house_apt.trim(), formData.street.trim(), formData.block_locality.trim()]
+      .filter(Boolean)
+      .join(', ');
+
     try {
       if (register) {
-        await register(formData);
+        await register({
+          ...formData,
+          address,
+          city: formData.city.trim(),
+        });
       }
       router.push('/profile');
     } catch (err: unknown) {
@@ -2947,6 +2998,62 @@ export default function SignUpPage() {
                       className="w-full bg-white border border-gray-200 rounded-xl py-3.5 pl-12 pr-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
                       placeholder="+1 (555) 000-0000"
                     />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2 border-t border-gray-100">
+                <div className="flex items-center gap-2 text-[#374151]">
+                  <MapPin className="w-4 h-4 text-[#01AC28]" />
+                  <span className="text-[10px] font-bold uppercase tracking-widest">Delivery address</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">House / Apt *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.house_apt}
+                      onChange={(e) => setFormData({ ...formData, house_apt: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                      placeholder="House 12, Apt 4B"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">Street *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.street}
+                      onChange={(e) => setFormData({ ...formData, street: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                      placeholder="Street 7"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">Block or Locality *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.block_locality}
+                      onChange={(e) => setFormData({ ...formData, block_locality: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                      placeholder="F-7 Markaz"
+                    />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[10px] font-bold text-[#374151] uppercase tracking-widest ml-1">City *</label>
+                    <select
+                      required
+                      value={formData.city}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className="w-full bg-white border border-gray-200 rounded-xl py-3.5 px-5 text-sm focus:ring-2 focus:ring-[#01AC28] transition-all shadow-sm"
+                    >
+                      <option value="">Select city</option>
+                      {CITIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -3453,6 +3560,50 @@ export default function TrackOrderPage() {
 }
 </file>
 
+<file path="api/dashboard/customers/[customerId]/profiles/[profileId]/prescriptions/[prescriptionId]/file/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { dashboardFetch } from "@/lib/dashboardApi";
+
+export async function GET(
+  _req: NextRequest,
+  {
+    params,
+  }: { params: Promise<{ customerId: string; profileId: string; prescriptionId: string }> }
+) {
+  const { customerId, profileId, prescriptionId } = await params;
+  const res = await dashboardFetch(
+    `/dashboard/customers/${customerId}/profiles/${profileId}/prescriptions/${prescriptionId}/file`,
+    { cache: "no-store" }
+  );
+  if (!res.ok) {
+    return NextResponse.json(
+      { error: "Could not retrieve prescription file URL" },
+      { status: res.status }
+    );
+  }
+  const data = await res.json();
+  return NextResponse.json(data);
+}
+</file>
+
+<file path="api/dashboard/orders/[id]/route.ts">
+import { NextRequest, NextResponse } from "next/server";
+import { dashboardFetch } from "@/lib/dashboardApi";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  if (!id) {
+    return NextResponse.json({ error: "Order ID required" }, { status: 400 });
+  }
+  const res = await dashboardFetch(`/dashboard/orders/${id}`, { cache: "no-store" });
+  const body = await res.json();
+  return NextResponse.json(body, { status: res.status });
+}
+</file>
+
 <file path="api/dashboard/prescriptions/[id]/file/route.ts">
 import { NextRequest, NextResponse } from "next/server";
 import { dashboardFetch } from "@/lib/dashboardApi";
@@ -3523,6 +3674,2460 @@ export async function GET(req: NextRequest) {
   );
   const body = await res.json();
   return NextResponse.json(body, { status: res.status });
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/AddProfileForm.tsx">
+"use client";
+
+import { useState } from "react";
+import { createProfileAction } from "../actions";
+import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
+import { Plus } from "lucide-react";
+
+export function AddProfileForm({ customerId }: { customerId: number | string }) {
+  const [name, setName] = useState("");
+
+  return (
+    <form
+      action={createProfileAction}
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={() => setName("")}
+    >
+      <input type="hidden" name="customer_id" value={customerId} />
+      <input
+        type="text"
+        name="name"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Profile name (e.g. Diabetes)"
+        required
+        className="h-10 rounded-xl border border-gray-200 px-3 text-sm w-48 focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+      />
+      <PendingSubmitButton
+        pendingText="Adding…"
+        className="inline-flex items-center gap-2 h-10 rounded-xl bg-[#01AC28] hover:bg-[#044644] text-white px-4 text-sm font-bold tracking-wider"
+      >
+        Add profile
+      </PendingSubmitButton>
+    </form>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/CustomerDetailTabs.tsx">
+"use client";
+
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { cn } from "@/utils/cn";
+import { User, Percent, ShoppingCart, FolderHeart } from "lucide-react";
+
+const TABS = [
+  { key: "info", label: "Info", icon: User },
+  { key: "discount", label: "Discount", icon: Percent },
+  { key: "orders", label: "Order history", icon: ShoppingCart },
+  { key: "profiles", label: "Medical profiles", icon: FolderHeart },
+] as const;
+
+export function CustomerDetailTabs({
+  customerId,
+  currentTab,
+}: {
+  customerId: number | string;
+  currentTab: string;
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const base = `/dashboard/customers/${customerId}`;
+
+  return (
+    <nav className="flex flex-wrap gap-1 border-b border-gray-200">
+      {TABS.map(({ key, label, icon: Icon }) => {
+        const isActive = currentTab === key;
+        const href = key === "info" ? base : `${base}?tab=${key}`;
+        return (
+          <Link
+            key={key}
+            href={href}
+            className={cn(
+              "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors",
+              isActive
+                ? "border-[#01AC28] text-[#01AC28]"
+                : "border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300"
+            )}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/CustomerInfoTab.tsx">
+"use client";
+
+import { updateCustomerAction, deleteCustomerAction } from "../actions";
+import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
+import { ConfirmingSubmitButton } from "@/components/ui/ConfirmingSubmitButton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import type { Customer } from "@/types/customer";
+
+export function CustomerInfoTab({ customer }: { customer: Customer }) {
+  return (
+    <div className="space-y-6">
+      <Card className="border border-gray-200 shadow-sm rounded-2xl">
+        <CardHeader className="p-5 border-b border-gray-100">
+          <CardTitle className="text-sm font-extrabold text-[#374151]">
+            Edit customer
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
+          <form action={updateCustomerAction} className="space-y-4">
+            <input type="hidden" name="id" value={customer.id} />
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="info-name"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Name *
+                </label>
+                <input
+                  id="info-name"
+                  type="text"
+                  name="name"
+                  defaultValue={customer.name}
+                  required
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="info-phone"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Phone
+                </label>
+                <input
+                  id="info-phone"
+                  type="text"
+                  name="phone"
+                  defaultValue={customer.phone ?? ""}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor="info-email"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Email
+                </label>
+                <input
+                  id="info-email"
+                  type="email"
+                  name="email"
+                  defaultValue={customer.email ?? ""}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="info-external_id"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  External ID (User ID)
+                </label>
+                <input
+                  id="info-external_id"
+                  type="text"
+                  name="external_id"
+                  defaultValue={customer.external_id ?? ""}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="info-gender"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Gender
+                </label>
+                <select
+                  id="info-gender"
+                  name="gender"
+                  defaultValue={customer.gender ?? ""}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                >
+                  <option value="">—</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label
+                  htmlFor="info-address"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Address
+                </label>
+                <input
+                  id="info-address"
+                  type="text"
+                  name="address"
+                  defaultValue={customer.address ?? ""}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="info-city"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  City
+                </label>
+                <input
+                  id="info-city"
+                  type="text"
+                  name="city"
+                  defaultValue={customer.city ?? ""}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="info-coords"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Coordinates (lat, lng)
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="info-latitude"
+                    type="text"
+                    name="latitude"
+                    placeholder="Latitude"
+                    defaultValue={
+                      customer.latitude != null ? String(customer.latitude) : ""
+                    }
+                    className="flex-1 h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                  />
+                  <input
+                    id="info-longitude"
+                    type="text"
+                    name="longitude"
+                    placeholder="Longitude"
+                    defaultValue={
+                      customer.longitude != null ? String(customer.longitude) : ""
+                    }
+                    className="flex-1 h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                  />
+                </div>
+              </div>
+              <div>
+                <label
+                  htmlFor="info-discount"
+                  className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1"
+                >
+                  Discount %
+                </label>
+                <input
+                  id="info-discount"
+                  type="number"
+                  name="discount_percentage"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  defaultValue={customer.discount_percentage ?? 0}
+                  className="w-full h-10 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <PendingSubmitButton pendingText="Saving…">Save changes</PendingSubmitButton>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-red-100 shadow-sm rounded-2xl">
+        <CardHeader className="p-5 border-b border-gray-100">
+          <CardTitle className="text-sm font-extrabold text-red-700">
+            Delete customer
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
+          <p className="text-sm text-gray-600 mb-4">
+            Permanently delete this customer. This cannot be undone.
+          </p>
+          <form action={deleteCustomerAction}>
+            <input type="hidden" name="id" value={customer.id} />
+            <ConfirmingSubmitButton
+              confirmMessage="Are you sure you want to delete this customer? This cannot be undone."
+              pendingText="Deleting…"
+              className="rounded-xl bg-red-600 hover:bg-red-700 text-white px-4 py-2 text-sm font-bold uppercase tracking-wider"
+            >
+              Delete customer
+            </ConfirmingSubmitButton>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/CustomerOrdersTab.tsx">
+import Link from "next/link";
+import { getCustomerOrders } from "@/lib/api/dashboardCustomers";
+import { Badge } from "@/components/ui/Badge";
+import { Pagination } from "@/components/ui/Pagination";
+import type { Order } from "@/types/order";
+
+const STATUS_VARIANTS: Record<Order["status"], "success" | "warning" | "danger" | "neutral"> = {
+  pending: "warning",
+  confirmed: "neutral",
+  processing: "neutral",
+  out_for_delivery: "neutral",
+  delivered: "success",
+  cancelled: "danger",
+};
+
+const STATUS_LABELS: Record<Order["status"], string> = {
+  pending: "Pending",
+  confirmed: "Confirmed",
+  processing: "Processing",
+  out_for_delivery: "Out for Delivery",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+function formatDate(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString();
+}
+
+export async function CustomerOrdersTab({
+  customerId,
+  page,
+}: {
+  customerId: number | string;
+  page: number;
+}) {
+  const data = await getCustomerOrders(customerId, { page, per_page: 10 });
+  const orders = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const currentPage = data?.current_page ?? 1;
+  const lastPage = data?.last_page ?? 1;
+  const from = data?.from ?? null;
+  const to = data?.to ?? null;
+
+  return (
+    <div className="space-y-4">
+      {orders.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50/50 p-8 text-center text-sm text-gray-600">
+          No orders for this customer yet.
+        </div>
+      ) : (
+        <>
+          <div className="rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50/50">
+                    <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      Order #
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      Total
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr
+                      key={order.id}
+                      className="border-b border-gray-50 hover:bg-gray-50/30 transition-colors"
+                    >
+                      <td className="px-4 py-3 font-mono font-semibold text-[#374151]">
+                        {order.order_number}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-gray-900">
+                        Rs. {order.total}
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge variant={STATUS_VARIANTS[order.status]}>
+                          {STATUS_LABELS[order.status]}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 hidden sm:table-cell">
+                        {formatDate(order.created_at)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/dashboard/orders/${order.id}`}
+                          className="text-xs font-bold text-[#01AC28] hover:underline uppercase tracking-wider"
+                        >
+                          View
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {lastPage > 1 && (
+            <Pagination
+              basePath={`/dashboard/customers/${customerId}`}
+              currentPage={currentPage}
+              lastPage={lastPage}
+              total={total}
+              from={from}
+              to={to}
+              params={{ tab: "orders" }}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/CustomerProfilesTab.tsx">
+import {
+  getCustomerProfiles,
+  getCustomerOrders,
+  getProfileProducts,
+  getProfilePrescriptions,
+} from "@/lib/api/dashboardCustomers";
+import { getDashboardProducts } from "@/lib/api/dashboardProducts";
+import { AddProfileForm } from "@/app/dashboard/(app)/customers/[id]/AddProfileForm";
+import { ProfilesTableWithModal } from "@/app/dashboard/(app)/customers/[id]/ProfilesTableWithModal";
+
+export async function CustomerProfilesTab({
+  customerId,
+}: {
+  customerId: number | string;
+}) {
+  const [profiles, productsData, ordersData] = await Promise.all([
+    getCustomerProfiles(customerId, { with_products: true, with_prescriptions: true }),
+    getDashboardProducts({ per_page: 200 }),
+    getCustomerOrders(customerId, { per_page: 50 }),
+  ]);
+
+  const products = productsData?.data ?? [];
+  const orders = ordersData?.data ?? [];
+
+  // Fetch products and prescriptions per profile from dedicated endpoints so we always show the latest
+  const profilesWithDetails = await Promise.all(
+    profiles.map(async (profile) => {
+      const [profileProducts, profilePrescriptions] = await Promise.all([
+        getProfileProducts(customerId, profile.id),
+        getProfilePrescriptions(customerId, profile.id),
+      ]);
+      return {
+        ...profile,
+        products: profileProducts.length > 0 ? profileProducts : (profile.products ?? []),
+        prescriptions:
+          profilePrescriptions.length > 0 ? profilePrescriptions : (profile.prescriptions ?? []),
+      };
+    })
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-gray-600">
+          Medical profiles (e.g. Diabetes, Blood pressure) with products and prescriptions.
+        </p>
+        <AddProfileForm customerId={customerId} />
+      </div>
+
+      {profilesWithDetails.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50/50 p-8 text-center text-sm text-gray-600">
+          No medical profiles yet. Add a profile to get started.
+        </div>
+      ) : (
+        <ProfilesTableWithModal
+          customerId={customerId}
+          profiles={profilesWithDetails}
+          products={products}
+          orders={orders}
+        />
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/page.tsx">
+import Link from "next/link";
+import { getCustomer, getCustomerOrders } from "@/lib/api/dashboardCustomers";
+import { CustomerDetailTabs } from "./CustomerDetailTabs";
+import { CustomerInfoTab } from "./CustomerInfoTab";
+import { CustomerOrdersTab } from "./CustomerOrdersTab";
+import { CustomerProfilesTab } from "./CustomerProfilesTab";
+
+export default async function CustomerDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams?: Promise<{ tab?: string; message?: string; error?: string }>;
+}) {
+  const { id } = await params;
+  const sp = (await searchParams) ?? {};
+  const tab = (sp.tab ?? "info").toLowerCase();
+  const message = sp.message;
+  const error = sp.error;
+  const ordersPage = Math.max(1, parseInt((sp as { page?: string }).page ?? "1", 10) || 1);
+
+  const customer = await getCustomer(id);
+
+  if (!customer) {
+    return (
+      <div className="space-y-6">
+        <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-800">
+          Customer not found.
+        </div>
+        <Link
+          href="/dashboard/customers"
+          className="text-sm font-semibold text-[#01AC28] hover:underline"
+        >
+          ← Back to Customers
+        </Link>
+      </div>
+    );
+  }
+
+  const validTab =
+    tab === "info" || tab === "discount" || tab === "orders" || tab === "profiles"
+      ? tab
+      : "info";
+
+  return (
+    <div className="flex h-full flex-col gap-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard/customers"
+            className="text-sm font-semibold text-gray-500 hover:text-[#01AC28] transition-colors"
+          >
+            ← Customers
+          </Link>
+          <div>
+            <h1 className="text-2xl font-black text-[#374151]">{customer.name}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {customer.phone || customer.email || "No contact"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {(message || error) && (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+            error
+              ? "border-red-100 bg-red-50 text-red-700"
+              : "border-green-100 bg-green-50 text-green-700"
+          }`}
+        >
+          {message || error}
+        </div>
+      )}
+
+      <CustomerDetailTabs customerId={id} currentTab={validTab} />
+
+      {validTab === "info" && <CustomerInfoTab customer={customer} />}
+
+      {validTab === "discount" && (
+        <div className="rounded-2xl border border-gray-200 bg-white p-6">
+          <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest">
+            Customer discount
+          </div>
+          <p className="mt-2 text-2xl font-bold text-[#374151]">
+            {customer.discount_percentage != null && customer.discount_percentage > 0
+              ? `${customer.discount_percentage}%`
+              : "0%"}
+          </p>
+          <p className="mt-1 text-sm text-gray-600">
+            This percentage is applied to all products for this customer. Edit in the Info tab.
+          </p>
+          <Link
+            href={`/dashboard/customers/${id}?tab=info`}
+            className="mt-4 inline-block text-sm font-semibold text-[#01AC28] hover:underline"
+          >
+            Edit customer info →
+          </Link>
+        </div>
+      )}
+
+      {validTab === "orders" && (
+        <CustomerOrdersTab customerId={id} page={ordersPage} />
+      )}
+
+      {validTab === "profiles" && <CustomerProfilesTab customerId={id} />}
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/ProfilePrescriptionsSection.tsx">
+"use client";
+
+import { useState, useEffect } from "react";
+import {
+  uploadProfilePrescriptionAction,
+  removeProfilePrescriptionAction,
+  addProfilePrescriptionFromOrderAction,
+  updateProfilePrescriptionAction,
+} from "../actions";
+import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
+import { ConfirmingSubmitButton } from "@/components/ui/ConfirmingSubmitButton";
+import type { ProfilePrescription } from "@/types/customer";
+import type { Order } from "@/types/order";
+
+function PrescriptionListItem({
+  prescription: pr,
+  customerId,
+  profileId,
+  onRemove,
+  onUpdateName,
+}: {
+  prescription: ProfilePrescription;
+  customerId: number | string;
+  profileId: number;
+  onRemove: (formData: FormData) => Promise<unknown>;
+  onUpdateName: (formData: FormData) => Promise<unknown>;
+}) {
+  const [editingName, setEditingName] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const displayName = pr.name?.trim() || pr.file_name || `Prescription #${pr.id}`;
+
+  async function handlePreview() {
+    setPreviewLoading(true);
+    try {
+      const res = await fetch(
+        `/api/dashboard/customers/${customerId}/profiles/${profileId}/prescriptions/${pr.id}/file`
+      );
+      if (!res.ok) throw new Error("Could not load file");
+      const data = (await res.json()) as { url: string };
+      if (data.url) window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch {
+      // Could show a toast; for now fail silently or alert
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-gray-100 bg-gray-50/50 px-3 py-2 text-sm">
+      <div className="flex-1 min-w-0">
+        {editingName ? (
+          <form
+            action={async (formData) => {
+              await onUpdateName(formData);
+              setEditingName(false);
+            }}
+            className="flex items-center gap-2"
+            onSubmit={() => setEditingName(false)}
+          >
+            <input type="hidden" name="customer_id" value={customerId} />
+            <input type="hidden" name="profile_id" value={profileId} />
+            <input type="hidden" name="prescription_id" value={pr.id} />
+            <input
+              type="text"
+              name="name"
+              defaultValue={pr.name ?? ""}
+              placeholder="Name (optional)"
+              maxLength={255}
+              className="h-8 flex-1 min-w-0 max-w-xs rounded-lg border border-gray-200 px-2 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+              autoFocus
+            />
+            <PendingSubmitButton pendingText="Saving…" className="text-xs font-semibold text-[#01AC28] hover:text-[#044644]">
+              Save
+            </PendingSubmitButton>
+            <button
+              type="button"
+              onClick={() => setEditingName(false)}
+              className="text-xs font-semibold text-gray-500 hover:text-gray-700"
+            >
+              Cancel
+            </button>
+          </form>
+        ) : (
+          <span className="font-medium text-gray-900">{displayName}</span>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        {!editingName && (
+          <>
+            <button
+              type="button"
+              onClick={handlePreview}
+              disabled={previewLoading}
+              className="text-xs font-semibold text-gray-600 hover:text-[#01AC28] disabled:opacity-50"
+            >
+              {previewLoading ? "Opening…" : "Preview"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditingName(true)}
+              className="text-xs font-semibold text-gray-600 hover:text-[#01AC28]"
+            >
+              Edit name
+            </button>
+          </>
+        )}
+        <form action={async (formData) => {
+          await onRemove(formData);
+        }}>
+          <input type="hidden" name="customer_id" value={customerId} />
+          <input type="hidden" name="profile_id" value={profileId} />
+          <input type="hidden" name="prescription_id" value={pr.id} />
+          <ConfirmingSubmitButton
+            confirmMessage="Remove this prescription from the profile?"
+            pendingText="Removing…"
+            className="text-xs font-semibold text-red-600 hover:text-red-700"
+          >
+            Remove
+          </ConfirmingSubmitButton>
+        </form>
+      </div>
+    </li>
+  );
+}
+
+export function ProfilePrescriptionsSection({
+  customerId,
+  profileId,
+  profileName,
+  initialPrescriptions,
+  orders,
+}: {
+  customerId: number | string;
+  profileId: number;
+  profileName: string;
+  initialPrescriptions: ProfilePrescription[];
+  orders: Order[];
+}) {
+  void profileName; // reserved for section heading
+  const [showFromOrder, setShowFromOrder] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [orderDetail, setOrderDetail] = useState<Order | null>(null);
+  const [loadingOrder, setLoadingOrder] = useState(false);
+
+  useEffect(() => {
+    if (!selectedOrderId) {
+      const t = setTimeout(() => setOrderDetail(null), 0);
+      return () => clearTimeout(t);
+    }
+    let cancelled = false;
+    const loadId = setTimeout(() => setLoadingOrder(true), 0);
+    fetch(`/api/dashboard/orders/${selectedOrderId}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setOrderDetail(data ?? null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingOrder(false);
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(loadId);
+    };
+  }, [selectedOrderId]);
+
+  const prescriptionsFromOrder = orderDetail?.items?.flatMap((item) =>
+    (item.prescriptions ?? []).map((pr) => ({
+      ...pr,
+      order_item_name: item.item_name,
+    }))
+  ) ?? [];
+
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">
+        Prescriptions
+      </div>
+      {initialPrescriptions.length === 0 ? (
+        <p className="text-sm text-gray-500">No prescriptions attached.</p>
+      ) : (
+        <ul className="space-y-2">
+          {initialPrescriptions.map((pr) => (
+            <PrescriptionListItem
+              key={pr.id}
+              prescription={pr}
+              customerId={customerId}
+              profileId={profileId}
+              onRemove={removeProfilePrescriptionAction}
+              onUpdateName={updateProfilePrescriptionAction}
+            />
+          ))}
+        </ul>
+      )}
+
+      {/* Upload */}
+      <div className="mt-3">
+        <p className="text-xs font-semibold text-gray-600 mb-1">Upload file</p>
+        <form action={uploadProfilePrescriptionAction} className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="customer_id" value={customerId} />
+          <input type="hidden" name="profile_id" value={profileId} />
+          <div className="flex flex-col">
+            <label htmlFor="rx-upload-name" className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+              Name (optional)
+            </label>
+            <input
+              id="rx-upload-name"
+              type="text"
+              name="name"
+              placeholder="e.g. Metformin 500mg"
+              maxLength={255}
+              className="h-9 w-48 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+            />
+          </div>
+          <input
+            type="file"
+            name="file"
+            accept="image/*,.pdf"
+            required
+            className="text-sm text-gray-700 file:mr-2 file:rounded-xl file:border-0 file:bg-gray-200 file:px-4 file:py-2 file:text-xs file:font-bold file:text-gray-700 file:uppercase file:tracking-wider hover:file:bg-gray-300"
+          />
+          <PendingSubmitButton
+            pendingText="Uploading…"
+            className="h-9 rounded-xl bg-[#01AC28] text-white px-4 text-xs font-bold uppercase tracking-wider hover:bg-[#044644] focus:ring-2 focus:ring-[#01AC28] focus:ring-offset-2"
+          >
+            Upload
+          </PendingSubmitButton>
+        </form>
+      </div>
+
+      {/* Add from order */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={() => setShowFromOrder((v) => !v)}
+          className="text-xs font-semibold text-[#01AC28] hover:underline"
+        >
+          {showFromOrder ? "− Hide" : "+ Add from order"}
+        </button>
+        {showFromOrder && (
+          <div className="mt-3 space-y-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Choose order (with prescriptions)
+              </label>
+              <select
+                value={selectedOrderId}
+                onChange={(e) => setSelectedOrderId(e.target.value)}
+                className="w-full max-w-xs h-9 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+              >
+                <option value="">Select an order…</option>
+                {orders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    #{o.order_number} — {new Date(o.created_at).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {loadingOrder && <p className="text-xs text-gray-500">Loading order…</p>}
+            {selectedOrderId && !loadingOrder && (
+              <>
+                {prescriptionsFromOrder.length === 0 ? (
+                  <p className="text-xs text-gray-500">
+                    No prescriptions found on this order. Upload prescriptions on the order first.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold text-gray-600">
+                      Prescriptions on this order — add to profile
+                    </p>
+                    {prescriptionsFromOrder.map((pr) => (
+                      <div
+                        key={pr.id}
+                        className="flex flex-wrap items-end gap-2 rounded-lg border border-gray-100 bg-white px-3 py-2 text-sm"
+                      >
+                        <span className="text-gray-900 flex-1 min-w-0">
+                          {pr.file_name ?? `Prescription #${pr.id}`}
+                          {pr.order_item_name && (
+                            <span className="text-gray-500"> (from {pr.order_item_name})</span>
+                          )}
+                        </span>
+                        <form action={addProfilePrescriptionFromOrderAction} className="flex flex-wrap items-end gap-2">
+                          <input type="hidden" name="customer_id" value={customerId} />
+                          <input type="hidden" name="profile_id" value={profileId} />
+                          <input type="hidden" name="prescription_id" value={pr.id} />
+                          <div className="flex flex-col">
+                            <label htmlFor={`rx-from-order-name-${pr.id}`} className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+                              Name (optional)
+                            </label>
+                            <input
+                              id={`rx-from-order-name-${pr.id}`}
+                              type="text"
+                              name="name"
+                              placeholder="e.g. Blood sugar report"
+                              maxLength={255}
+                              className="h-8 w-40 rounded-lg border border-gray-200 px-2 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+                            />
+                          </div>
+                          <PendingSubmitButton
+                            pendingText="Adding…"
+                            className="h-8 rounded-lg bg-[#01AC28] text-white px-3 text-xs font-bold uppercase tracking-wider hover:bg-[#044644]"
+                          >
+                            Add to profile
+                          </PendingSubmitButton>
+                        </form>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/ProfileProductsSection.tsx">
+"use client";
+
+import { useState, useMemo } from "react";
+import { removeProfileProductAction, addProfileProductAction, addProfileProductsFromOrderAction } from "../actions";
+import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
+import { ConfirmingSubmitButton } from "@/components/ui/ConfirmingSubmitButton";
+import type { ProfileProduct } from "@/types/customer";
+import type { Product } from "@/types/product";
+import type { Order } from "@/types/order";
+
+export function ProfileProductsSection({
+  customerId,
+  profileId,
+  profileName,
+  initialProducts,
+  products,
+  orders,
+}: {
+  customerId: number | string;
+  profileId: number;
+  profileName: string;
+  initialProducts: ProfileProduct[];
+  products: Product[];
+  orders: Order[];
+}) {
+  const [productSearch, setProductSearch] = useState("");
+  const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+  const [quantity, setQuantity] = useState(1);
+  const [showFromOrder, setShowFromOrder] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState<string>("");
+  const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
+
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return products.slice(0, 50);
+    const q = productSearch.trim().toLowerCase();
+    return products
+      .filter(
+        (p) =>
+          p.item_name?.toLowerCase().includes(q) ||
+          p.item_id?.toLowerCase().includes(q) ||
+          p.brand?.toLowerCase().includes(q)
+      )
+      .slice(0, 50);
+  }, [products, productSearch]);
+
+  return (
+    <div>
+      <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-2">
+        Products
+      </div>
+      {initialProducts.length === 0 ? (
+        <p className="text-sm text-gray-500">No products in this profile.</p>
+      ) : (
+        <ul className="space-y-2">
+          {initialProducts.map((pp) => (
+            <li
+              key={`${pp.product_id}-${pp.quantity}`}
+              className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/50 px-3 py-2 text-sm"
+            >
+              <span className="font-medium text-gray-900">
+                {pp.product?.item_name ?? `Product #${pp.product_id}`}
+                {pp.quantity > 1 ? ` × ${pp.quantity}` : ""}
+              </span>
+              <form action={removeProfileProductAction}>
+                <input type="hidden" name="customer_id" value={customerId} />
+                <input type="hidden" name="profile_id" value={profileId} />
+                <input type="hidden" name="product_id" value={pp.product_id} />
+                <ConfirmingSubmitButton
+                  confirmMessage="Remove this product from the profile?"
+                  pendingText="Removing…"
+                  className="text-xs font-semibold text-red-600 hover:text-red-700"
+                >
+                  Remove
+                </ConfirmingSubmitButton>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Add from catalog: searchable product list */}
+      <div className="mt-4 space-y-2">
+        <p className="text-xs font-semibold text-gray-600">Add from catalog</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="relative min-w-[200px] flex flex-col">
+            <label htmlFor="profile-product-search" className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+              Product
+            </label>
+            <input
+              id="profile-product-search"
+              type="text"
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              onFocus={() => setProductDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setProductDropdownOpen(false), 200)}
+              placeholder="Search by name or ID…"
+              className="h-9 w-full rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+            />
+            {productDropdownOpen && filteredProducts.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-48 overflow-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                {filteredProducts.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-gray-500">No products match</div>
+                ) : (
+                  filteredProducts.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        setSelectedProductId(String(p.id));
+                        setProductSearch(p.item_name ?? "");
+                        setProductDropdownOpen(false);
+                      }}
+                      className={`block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 ${
+                        selectedProductId === String(p.id) ? "bg-gray-100 font-medium" : ""
+                      }`}
+                    >
+                      {p.item_name} <span className="text-gray-400">({p.item_id})</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col">
+            <label htmlFor="profile-product-qty" className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-0.5">
+              Qty
+            </label>
+            <input
+              id="profile-product-qty"
+              type="number"
+              min={1}
+              value={quantity}
+              onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              className="h-9 w-20 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+            />
+          </div>
+          <form action={addProfileProductAction} className="inline">
+            <input type="hidden" name="customer_id" value={customerId} />
+            <input type="hidden" name="profile_id" value={profileId} />
+            <input type="hidden" name="product_id" value={selectedProductId || ""} />
+            <input type="hidden" name="quantity" value={quantity} />
+            <PendingSubmitButton
+              pendingText="Adding…"
+              disabled={!selectedProductId}
+              className="h-9 rounded-xl bg-[#01AC28] text-white px-4 text-xs font-bold uppercase tracking-wider hover:bg-[#044644] focus:ring-2 focus:ring-[#01AC28] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Add
+            </PendingSubmitButton>
+          </form>
+        </div>
+      </div>
+
+      {/* Add from order */}
+      <div className="mt-4 pt-4 border-t border-gray-100">
+        <button
+          type="button"
+          onClick={() => setShowFromOrder((v) => !v)}
+          className="text-xs font-semibold text-[#01AC28] hover:underline"
+        >
+          {showFromOrder ? "− Hide" : "+ Add from order"}
+        </button>
+        {showFromOrder && (
+          <div className="mt-3 space-y-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Choose order</label>
+              <select
+                value={selectedOrderId}
+                onChange={(e) => {
+                  setSelectedOrderId(e.target.value);
+                  setSelectedItemIds([]);
+                }}
+                className="w-full max-w-xs h-9 rounded-xl border border-gray-200 px-3 text-sm focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+              >
+                <option value="">Select an order…</option>
+                {orders.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    #{o.order_number} — Rs. {o.total} — {new Date(o.created_at).toLocaleDateString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedOrderId && orders.find((o) => String(o.id) === selectedOrderId) && (
+              <form action={addProfileProductsFromOrderAction}>
+                <input type="hidden" name="customer_id" value={customerId} />
+                <input type="hidden" name="profile_id" value={profileId} />
+                <input type="hidden" name="order_id" value={selectedOrderId} />
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-600">Select items to add</p>
+                  {orders
+                    .find((o) => String(o.id) === selectedOrderId)
+                    ?.items?.map((item) => (
+                      <label key={item.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="order_item_ids[]"
+                          value={item.id}
+                          checked={selectedItemIds.includes(item.id)}
+                          onChange={(e) =>
+                            setSelectedItemIds((prev) =>
+                              e.target.checked
+                                ? [...prev, item.id]
+                                : prev.filter((id) => id !== item.id)
+                            )
+                          }
+                        />
+                        <span>
+                          {item.item_name} × {item.quantity} — Rs. {item.line_total}
+                        </span>
+                      </label>
+                    ))}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  Leave all unchecked to add all items from this order.
+                </p>
+                <PendingSubmitButton
+                  pendingText="Adding…"
+                  className="mt-2 h-9 rounded-xl bg-[#01AC28] text-white px-4 text-xs font-bold uppercase tracking-wider hover:bg-[#044644]"
+                >
+                  Add selected to profile
+                </PendingSubmitButton>
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/[id]/ProfilesTableWithModal.tsx">
+"use client";
+
+import { useState } from "react";
+import { Modal } from "@/components/ui/Modal";
+import { ProfileProductsSection } from "@/app/dashboard/(app)/customers/[id]/ProfileProductsSection";
+import { ProfilePrescriptionsSection } from "@/app/dashboard/(app)/customers/[id]/ProfilePrescriptionsSection";
+import type { MedicalProfile, ProfileProduct, ProfilePrescription } from "@/types/customer";
+import type { Product } from "@/types/product";
+import type { Order } from "@/types/order";
+import { Settings2 } from "lucide-react";
+
+type ProfileWithDetails = MedicalProfile & {
+  products?: ProfileProduct[];
+  prescriptions?: ProfilePrescription[];
+};
+
+function formatDate(s: string | undefined): string {
+  if (!s) return "—";
+  try {
+    const d = new Date(s);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+function productSummary(pp: ProfileProduct): string {
+  const name = pp.product?.item_name ?? `Product #${pp.product_id}`;
+  return pp.quantity > 1 ? `${name} × ${pp.quantity}` : name;
+}
+
+function prescriptionDisplayName(pr: ProfilePrescription): string {
+  return (pr.name?.trim() || pr.file_name || `Prescription #${pr.id}`).slice(0, 40);
+}
+
+export function ProfilesTableWithModal({
+  customerId,
+  profiles,
+  products,
+  orders,
+}: {
+  customerId: number | string;
+  profiles: ProfileWithDetails[];
+  products: Product[];
+  orders: Order[];
+}) {
+  const [managedProfile, setManagedProfile] = useState<ProfileWithDetails | null>(null);
+
+  return (
+    <>
+      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <table className="w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-100 bg-gray-50/80">
+              <th className="px-5 py-4 font-bold uppercase tracking-wider text-[#374151] min-w-[140px]">
+                Profile
+              </th>
+              <th className="px-5 py-4 font-bold uppercase tracking-wider text-[#374151] min-w-[200px]">
+                Products
+              </th>
+              <th className="px-5 py-4 font-bold uppercase tracking-wider text-[#374151] min-w-[180px]">
+                Prescriptions
+              </th>
+              <th className="px-5 py-4 font-bold uppercase tracking-wider text-[#374151] w-28">
+                Updated
+              </th>
+              <th className="px-5 py-4 font-bold uppercase tracking-wider text-[#374151] text-right w-32">
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {profiles.map((profile) => {
+              const profileProducts = profile.products ?? [];
+              const profilePrescriptions = profile.prescriptions ?? [];
+              const maxShow = 3;
+              const productSlice = profileProducts.slice(0, maxShow);
+              const prescriptionSlice = profilePrescriptions.slice(0, maxShow);
+              const moreProducts = profileProducts.length > maxShow;
+              const morePrescriptions = profilePrescriptions.length > maxShow;
+              return (
+                <tr
+                  key={profile.id}
+                  className="border-b border-gray-100 transition-colors hover:bg-gray-50/50 last:border-b-0"
+                >
+                  <td className="px-5 py-4">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-[#374151]">{profile.name}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-gray-400">
+                        ID {profile.id}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 align-top">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-gray-500">
+                        {profileProducts.length} {profileProducts.length === 1 ? "product" : "products"}
+                      </span>
+                      {productSlice.length > 0 ? (
+                        <ul className="text-xs text-gray-600 space-y-0.5">
+                          {productSlice.map((pp) => (
+                            <li
+                              key={`${pp.product_id}-${pp.quantity}`}
+                              className="truncate max-w-[220px]"
+                              title={productSummary(pp)}
+                            >
+                              {productSummary(pp)}
+                            </li>
+                          ))}
+                          {moreProducts && (
+                            <li className="text-gray-400 italic">
+                              +{profileProducts.length - maxShow} more
+                            </li>
+                          )}
+                        </ul>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 align-top">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs font-semibold text-gray-500">
+                        {profilePrescriptions.length} {profilePrescriptions.length === 1 ? "prescription" : "prescriptions"}
+                      </span>
+                      {prescriptionSlice.length > 0 ? (
+                        <ul className="text-xs text-gray-600 space-y-0.5">
+                          {prescriptionSlice.map((pr) => (
+                            <li
+                              key={pr.id}
+                              className="truncate max-w-[200px]"
+                              title={prescriptionDisplayName(pr)}
+                            >
+                              {prescriptionDisplayName(pr)}
+                            </li>
+                          ))}
+                          {morePrescriptions && (
+                            <li className="text-gray-400 italic">
+                              +{profilePrescriptions.length - maxShow} more
+                            </li>
+                          )}
+                        </ul>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-gray-600 whitespace-nowrap text-xs">
+                    {formatDate(profile.updated_at)}
+                  </td>
+                  <td className="px-5 py-4 text-right align-middle">
+                    <button
+                      type="button"
+                      onClick={() => setManagedProfile(profile)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-[#01AC28] bg-white px-3 py-2 text-xs font-bold uppercase tracking-wider text-[#01AC28] hover:bg-[#01AC28] hover:text-white focus:outline-none focus:ring-2 focus:ring-[#01AC28] focus:ring-offset-2"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Manage
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <Modal
+        open={!!managedProfile}
+        title={managedProfile?.name ?? "Profile"}
+        description="Add or remove products and prescriptions for this medical profile."
+        onClose={() => setManagedProfile(null)}
+        className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+      >
+        <div className="overflow-y-auto max-h-[calc(90vh-8rem)] space-y-8 -mt-2">
+          {managedProfile && (
+            <>
+              <ProfileProductsSection
+                customerId={customerId}
+                profileId={managedProfile.id}
+                profileName={managedProfile.name}
+                initialProducts={managedProfile.products ?? []}
+                products={products}
+                orders={orders}
+              />
+              <ProfilePrescriptionsSection
+                customerId={customerId}
+                profileId={managedProfile.id}
+                profileName={managedProfile.name}
+                initialPrescriptions={managedProfile.prescriptions ?? []}
+                orders={orders}
+              />
+            </>
+          )}
+        </div>
+      </Modal>
+    </>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/actions.ts">
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { dashboardFetch } from "@/lib/dashboardApi";
+import { readErrorMessage } from "@/lib/api/readErrorMessage";
+import type { CreateCustomerBody } from "@/types/customer";
+
+function toNum(value: FormDataEntryValue | null): number | undefined {
+  if (value === null) return undefined;
+  const s = String(value).trim();
+  if (!s) return undefined;
+  const n = Number.parseFloat(s);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+export async function createCustomerAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) {
+    return redirect("/dashboard/customers?error=missing&message=Name is required.");
+  }
+
+  const body: CreateCustomerBody = { name };
+  const email = String(formData.get("email") ?? "").trim();
+  if (email) body.email = email;
+  const phone = String(formData.get("phone") ?? "").trim();
+  if (phone) body.phone = phone;
+  const external_id = String(formData.get("external_id") ?? "").trim();
+  if (external_id) body.external_id = external_id;
+  const gender = String(formData.get("gender") ?? "").trim().toLowerCase();
+  if (gender && ["male", "female", "other"].includes(gender)) body.gender = gender;
+  const address = String(formData.get("address") ?? "").trim();
+  if (address) body.address = address;
+  const city = String(formData.get("city") ?? "").trim();
+  if (city) body.city = city;
+  const lat = toNum(formData.get("latitude"));
+  if (lat != null) body.latitude = lat;
+  const lng = toNum(formData.get("longitude"));
+  if (lng != null) body.longitude = lng;
+  const discount = toNum(formData.get("discount_percentage"));
+  if (discount != null) body.discount_percentage = discount;
+
+  let res: Response;
+  try {
+    res = await dashboardFetch("/dashboard/customers", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/customers?error=network&message=${encodeURIComponent(message)}`);
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/customers?error=failed&message=${encodeURIComponent(message)}`);
+  }
+
+  const data = await res.json();
+  revalidatePath("/dashboard/customers");
+  return redirect(`/dashboard/customers?message=Customer created.`);
+}
+
+export async function updateCustomerAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    return redirect("/dashboard/customers?error=missing&message=Customer ID is required.");
+  }
+
+  const body: Partial<CreateCustomerBody> = {};
+  const name = String(formData.get("name") ?? "").trim();
+  if (name) body.name = name;
+  if (formData.has("email")) body.email = String(formData.get("email") ?? "").trim() || null;
+  if (formData.has("phone")) body.phone = String(formData.get("phone") ?? "").trim() || null;
+  if (formData.has("external_id")) body.external_id = String(formData.get("external_id") ?? "").trim() || null;
+  if (formData.has("gender")) {
+    const g = String(formData.get("gender") ?? "").trim().toLowerCase();
+    body.gender = ["male", "female", "other"].includes(g) ? g : null;
+  }
+  if (formData.has("address")) body.address = String(formData.get("address") ?? "").trim() || null;
+  if (formData.has("city")) body.city = String(formData.get("city") ?? "").trim() || null;
+  if (formData.has("latitude")) {
+    const v = toNum(formData.get("latitude"));
+    body.latitude = v ?? null;
+  }
+  if (formData.has("longitude")) {
+    const v = toNum(formData.get("longitude"));
+    body.longitude = v ?? null;
+  }
+  if (formData.has("discount_percentage")) {
+    const v = toNum(formData.get("discount_percentage"));
+    body.discount_percentage = v ?? 0;
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/dashboard/customers/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/customers/${id}?error=network&message=${encodeURIComponent(message)}`);
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/customers/${id}?error=failed&message=${encodeURIComponent(message)}`);
+  }
+
+  revalidatePath("/dashboard/customers");
+  revalidatePath(`/dashboard/customers/${id}`);
+  return redirect(`/dashboard/customers/${id}?message=Customer updated.`);
+}
+
+export async function deleteCustomerAction(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    return redirect("/dashboard/customers?error=missing&message=Customer ID is required.");
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/dashboard/customers/${id}`, { method: "DELETE" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/customers/${id}?error=network&message=${encodeURIComponent(message)}`);
+  }
+
+  if (!res.ok && res.status !== 204) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/customers/${id}?error=failed&message=${encodeURIComponent(message)}`);
+  }
+
+  revalidatePath("/dashboard/customers");
+  return redirect("/dashboard/customers?message=Customer deleted.");
+}
+
+export async function importCustomersAction(formData: FormData) {
+  const file = formData.get("file");
+  if (!(file instanceof File) || !file.name) {
+    return redirect("/dashboard/customers/import?error=missing&message=Please choose an Excel file.");
+  }
+
+  const payload = new FormData();
+  payload.set("file", file);
+
+  let res: Response;
+  try {
+    res = await dashboardFetch("/dashboard/customers/import", { method: "POST", body: payload });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/customers/import?error=network&message=${encodeURIComponent(message)}`);
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/customers/import?error=failed&message=${encodeURIComponent(message)}`);
+  }
+
+  const result = await res.json();
+  const importUuid = result.import_uuid ?? "";
+  const msg = `Import complete: ${result.created_count} created, ${result.updated_count} updated, ${result.skipped_count} skipped.`;
+  revalidatePath("/dashboard/customers");
+  revalidatePath("/dashboard/customers/import");
+  return redirect(
+    `/dashboard/customers/import?message=${encodeURIComponent(msg)}&import_uuid=${encodeURIComponent(importUuid)}`
+  );
+}
+
+// --- Medical profile actions (for customer detail page) ---
+
+export async function createProfileAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  if (!customerId || !name) {
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=missing&message=Profile name is required.`
+    );
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/dashboard/customers/${customerId}/profiles`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(`/dashboard/customers/${customerId}?tab=profiles&message=Profile added.`);
+}
+
+export async function addProfileProductAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const product_id = Number(formData.get("product_id"));
+  const quantity = Number(formData.get("quantity")) || 1;
+  if (!customerId || !profileId || !Number.isFinite(product_id)) {
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=missing&message=Customer, profile, and product are required.`
+    );
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/products`,
+      { method: "POST", body: JSON.stringify({ product_id, quantity }) }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(`/dashboard/customers/${customerId}?tab=profiles&message=Product added to profile.`);
+}
+
+export async function removeProfileProductAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const productId = String(formData.get("product_id") ?? "").trim();
+  if (!customerId || !profileId || !productId) {
+    return redirect(`/dashboard/customers/${customerId}?tab=profiles&error=missing`);
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/products/${productId}`,
+      { method: "DELETE" }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok && res.status !== 204) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(`/dashboard/customers/${customerId}?tab=profiles&message=Product removed.`);
+}
+
+export async function uploadProfilePrescriptionAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const file = formData.get("file");
+  if (!customerId || !profileId) {
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=missing&message=Customer and profile are required.`
+    );
+  }
+  if (!(file instanceof File) || !file.name) {
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=missing&message=Please choose a file.`
+    );
+  }
+
+  const payload = new FormData();
+  payload.set("file", file);
+  const name = String(formData.get("name") ?? "").trim();
+  if (name) payload.set("name", name);
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/prescriptions`,
+      { method: "POST", body: payload }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(`/dashboard/customers/${customerId}?tab=profiles&message=Prescription uploaded.`);
+}
+
+export async function removeProfilePrescriptionAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const prescriptionId = String(formData.get("prescription_id") ?? "").trim();
+  if (!customerId || !profileId || !prescriptionId) {
+    return redirect(`/dashboard/customers/${customerId}?tab=profiles&error=missing`);
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/prescriptions/${prescriptionId}`,
+      { method: "DELETE" }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok && res.status !== 204) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(`/dashboard/customers/${customerId}?tab=profiles&message=Prescription removed.`);
+}
+
+export async function addProfileProductsFromOrderAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const orderIdRaw = formData.get("order_id");
+  const order_id = orderIdRaw != null ? Number(orderIdRaw) : NaN;
+  const order_item_idsRaw = formData.getAll("order_item_ids[]");
+  const order_item_ids = order_item_idsRaw
+    .map((v) => Number(v))
+    .filter((n) => Number.isFinite(n));
+
+  if (!customerId || !profileId || !Number.isFinite(order_id)) {
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=missing&message=Customer, profile, and order are required.`
+    );
+  }
+
+  const body = order_item_ids.length > 0 ? { order_id, order_item_ids } : { order_id };
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/products/from-order`,
+      { method: "POST", body: JSON.stringify(body) }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(
+    `/dashboard/customers/${customerId}?tab=profiles&message=Products from order added to profile.`
+  );
+}
+
+export async function addProfilePrescriptionFromOrderAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const prescriptionIdRaw = formData.get("prescription_id");
+  const prescription_id = prescriptionIdRaw != null ? Number(prescriptionIdRaw) : NaN;
+
+  if (!customerId || !profileId || !Number.isFinite(prescription_id)) {
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=missing&message=Customer, profile, and prescription are required.`
+    );
+  }
+
+  const name = String(formData.get("name") ?? "").trim();
+  const body: { prescription_id: number; name?: string } = { prescription_id };
+  if (name) body.name = name;
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/prescriptions/from-order`,
+      { method: "POST", body: JSON.stringify(body) }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(
+    `/dashboard/customers/${customerId}?tab=profiles&message=Prescription from order added to profile.`
+  );
+}
+
+export async function updateProfilePrescriptionAction(formData: FormData) {
+  const customerId = String(formData.get("customer_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const prescriptionId = String(formData.get("prescription_id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!customerId || !profileId || !prescriptionId) {
+    return redirect(`/dashboard/customers/${customerId}?tab=profiles&error=missing`);
+  }
+
+  const body: { name?: string | null } = {};
+  body.name = name || null;
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(
+      `/dashboard/customers/${customerId}/profiles/${profileId}/prescriptions/${prescriptionId}`,
+      { method: "PATCH", body: JSON.stringify(body) }
+    );
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=network&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(
+      `/dashboard/customers/${customerId}?tab=profiles&error=failed&message=${encodeURIComponent(message)}`
+    );
+  }
+
+  revalidatePath(`/dashboard/customers/${customerId}`);
+  return redirect(`/dashboard/customers/${customerId}?tab=profiles&message=Prescription updated.`);
+}
+</file>
+
+<file path="dashboard/(app)/customers/CustomersToolbar.tsx">
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { X, Upload } from "lucide-react";
+
+export function CustomersToolbar({
+  query,
+  total,
+  showing,
+}: {
+  query: string;
+  total: number;
+  showing: number;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const [draft, setDraft] = useState(() => query);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (focused) return;
+    const t = setTimeout(() => setDraft(query), 0);
+    return () => clearTimeout(t);
+  }, [query, focused]);
+
+  const commit = (updates: Record<string, string | undefined>) => {
+    const sp = new URLSearchParams(searchParams?.toString());
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) sp.set(k, v);
+      else sp.delete(k);
+    }
+    sp.delete("page");
+    const qs = sp.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname ?? "/dashboard/customers");
+  };
+
+  useEffect(() => {
+    const trimmed = draft.trim();
+    if (trimmed === query.trim()) return;
+    const t = window.setTimeout(() => commit({ q: trimmed || undefined }), 450);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft, query]);
+
+  return (
+    <div className="p-4 border-b border-gray-100 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-wrap items-center gap-3 flex-1">
+        <div className="relative">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commit({ q: draft.trim() || undefined });
+              }
+            }}
+            placeholder="Search by name, phone, email..."
+            className="h-10 rounded-xl border border-gray-200 px-3 pr-9 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-[#01AC28] focus:border-transparent"
+          />
+          {draft ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDraft("");
+                commit({ q: undefined });
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+        <Link
+          href="/dashboard/customers/import"
+          className="inline-flex items-center gap-2 h-10 rounded-xl border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-[#01AC28]"
+        >
+          <Upload className="h-4 w-4" />
+          Import customers
+        </Link>
+      </div>
+      <div className="text-xs text-gray-500">
+        Showing <span className="font-semibold text-gray-900">{showing}</span> of{" "}
+        <span className="font-semibold text-gray-900">{total}</span>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/import-logs/[import_uuid]/page.tsx">
+import Link from "next/link";
+import { getCustomerImportLog } from "@/lib/api/dashboardCustomers";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+
+function formatDate(value?: string) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+export default async function CustomerImportLogDetailPage({
+  params,
+}: {
+  params: Promise<{ import_uuid: string }>;
+}) {
+  const { import_uuid } = await params;
+  const uuid = decodeURIComponent(import_uuid);
+
+  const log = await getCustomerImportLog(uuid);
+
+  return (
+    <div className="flex h-full flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+            Customer import logs
+          </div>
+          <h2 className="mt-1 text-2xl font-black text-[#374151]">Import run</h2>
+          <div className="mt-2 text-sm font-bold text-gray-700">
+            <span className="font-mono break-all">{uuid}</span>
+          </div>
+        </div>
+
+        <Link
+          href="/dashboard/customers/import-logs"
+          className="text-xs font-semibold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-widest"
+        >
+          ← Back
+        </Link>
+      </div>
+
+      {!log ? (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          Import log not found.
+        </div>
+      ) : (
+        <>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-xs text-gray-600">
+                  Saved:{" "}
+                  <span className="font-bold text-gray-700">
+                    {formatDate(log.created_at)}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant={
+                      Array.isArray(log.errors) && log.errors.length ? "warning" : "success"
+                    }
+                  >
+                    {Array.isArray(log.errors) && log.errors.length
+                      ? `${log.errors.length} issue${log.errors.length === 1 ? "" : "s"}`
+                      : "OK"}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="mt-3 text-xs font-bold text-gray-700">
+                {typeof log.created_count === "number" ? log.created_count : "—"} created ·{" "}
+                {typeof log.updated_count === "number" ? log.updated_count : "—"} updated ·{" "}
+                {typeof log.skipped_count === "number" ? log.skipped_count : "—"} skipped ·{" "}
+                {typeof log.total_rows === "number" ? log.total_rows : "—"} total rows
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+            <div className="border-b border-gray-100 px-4 py-3">
+              <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+                Rejected rows / issues
+              </div>
+              <div className="mt-1 text-sm text-gray-600">
+                {Array.isArray(log.errors) && log.errors.length
+                  ? "These rows were skipped or errored during import."
+                  : "No issues recorded for this import."}
+              </div>
+            </div>
+
+            {Array.isArray(log.errors) && log.errors.length ? (
+              <div className="divide-y divide-gray-100">
+                {log.errors.map((e, idx) => (
+                  <div key={`${e.row}-${idx}`} className="px-4 py-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                          Row {e.row}
+                        </div>
+                        <div className="mt-1 text-sm font-bold text-[#374151]">{e.message}</div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          Reason: <span className="font-mono">{e.reason}</span>
+                        </div>
+                      </div>
+                      <Badge variant="neutral">{e.reason}</Badge>
+                    </div>
+                    {e.data && typeof e.data === "object" && Object.keys(e.data).length > 0 ? (
+                      <details className="mt-3 group">
+                        <summary className="cursor-pointer text-[10px] font-semibold text-gray-400 uppercase tracking-widest hover:text-gray-600 transition-colors">
+                          Raw data
+                        </summary>
+                        <pre className="mt-2 overflow-auto rounded-xl bg-gray-50 border border-gray-200 p-3 text-xs text-gray-700">
+                          {JSON.stringify(e.data, null, 2)}
+                        </pre>
+                      </details>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="px-4 py-6 text-sm text-gray-600">Nothing to show.</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/import-logs/page.tsx">
+import Link from "next/link";
+import { getCustomerImportLogs } from "@/lib/api/dashboardCustomers";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+import { Pagination } from "@/components/ui/Pagination";
+
+function formatDate(value?: string) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+export default async function CustomerImportLogsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const page = sp.page ? Number.parseInt(sp.page, 10) : undefined;
+
+  const data = await getCustomerImportLogs({ page, per_page: 15 });
+  const logs = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const currentPage = data?.current_page ?? 1;
+  const lastPage = data?.last_page ?? 1;
+  const from = data?.from ?? null;
+  const to = data?.to ?? null;
+
+  return (
+    <div className="flex h-full flex-col gap-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">
+            Customers
+          </div>
+          <h2 className="mt-1 text-2xl font-black text-[#374151]">Customer import logs</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Review logs for each customer import run (by <span className="font-mono">import_uuid</span>).
+          </p>
+        </div>
+        <Link
+          href="/dashboard/customers"
+          className="text-xs font-semibold text-gray-400 hover:text-[#01AC28] transition-colors uppercase tracking-widest"
+        >
+          ← Customers
+        </Link>
+      </div>
+
+      {logs.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 text-sm text-gray-600">
+          No customer import logs found yet.
+        </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4">
+            {logs.map((log) => {
+              const issues = Array.isArray(log.errors) ? log.errors.length : 0;
+              const badgeVariant = issues ? "warning" : "success";
+              const badgeText = issues ? `${issues} issue${issues === 1 ? "" : "s"}` : "OK";
+
+              return (
+                <Card key={log.import_uuid}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/dashboard/customers/import-logs/${encodeURIComponent(log.import_uuid)}`}
+                            className="text-sm font-black text-[#111827] truncate hover:text-[#01AC28]"
+                          >
+                            <span className="font-mono">{log.import_uuid}</span>
+                          </Link>
+                          <Badge variant={badgeVariant}>{badgeText}</Badge>
+                        </div>
+
+                        <div className="mt-1 text-xs text-gray-500">
+                          {formatDate(log.created_at)}
+                        </div>
+
+                        <div className="mt-2 text-xs font-bold text-gray-700">
+                          {typeof log.created_count === "number" ? log.created_count : "—"} created ·{" "}
+                          {typeof log.updated_count === "number" ? log.updated_count : "—"} updated ·{" "}
+                          {typeof log.skipped_count === "number" ? log.skipped_count : "—"} skipped
+                        </div>
+                      </div>
+
+                      <Link
+                        href={`/dashboard/customers/import-logs/${encodeURIComponent(log.import_uuid)}`}
+                        className="text-xs font-semibold text-[#01AC28] hover:underline uppercase tracking-wider"
+                      >
+                        View log →
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {lastPage > 1 && (
+            <Pagination
+              basePath="/dashboard/customers/import-logs"
+              currentPage={currentPage}
+              lastPage={lastPage}
+              total={total}
+              from={from}
+              to={to}
+            />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/import/page.tsx">
+import Link from "next/link";
+import { importCustomersAction } from "../actions";
+import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+
+export default async function CustomerImportPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ message?: string; error?: string; import_uuid?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const message = sp.message;
+  const error = sp.error;
+  const importUuid = sp.import_uuid;
+
+  return (
+    <div className="flex h-full flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <div className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">
+          Customers
+        </div>
+        <h2 className="mt-0.5 text-2xl font-bold text-gray-900">Import customers</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Upload the &quot;User Data&quot; sheet from Data Template.xlsx (or any xlsx with that sheet).
+        </p>
+      </div>
+
+      {(message || error) && (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+            error
+              ? "border-red-100 bg-red-50 text-red-700"
+              : "border-green-100 bg-green-50 text-green-700"
+          }`}
+        >
+          {message || error}
+        </div>
+      )}
+
+      {importUuid && message && (
+        <div className="rounded-2xl border border-gray-200 bg-gray-50/50 p-4">
+          <p className="text-sm font-medium text-gray-700">
+            View full import log (errors and details):
+          </p>
+          <Link
+            href={`/dashboard/customers/import-logs/${encodeURIComponent(importUuid)}`}
+            className="mt-2 inline-block text-sm font-semibold text-[#01AC28] hover:underline"
+          >
+            View import log →
+          </Link>
+        </div>
+      )}
+
+      <Card className="border border-gray-200 shadow-sm rounded-2xl">
+        <CardHeader className="p-5 border-b border-gray-100">
+          <CardTitle className="text-sm font-extrabold text-[#374151]">
+            Upload Excel file
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
+          <form action={importCustomersAction} className="space-y-4">
+            <div>
+              <label
+                htmlFor="customer-import-file"
+                className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2"
+              >
+                File (xlsx or xls)
+              </label>
+              <input
+                id="customer-import-file"
+                type="file"
+                name="file"
+                accept=".xlsx,.xls"
+                required
+                className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-xl file:border file:border-gray-200 file:bg-gray-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-gray-700 hover:file:bg-gray-100"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <PendingSubmitButton pendingText="Importing…">
+                Import customers
+              </PendingSubmitButton>
+              <Link
+                href="/dashboard/customers"
+                className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              >
+                Cancel
+              </Link>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card className="border border-gray-200 shadow-sm rounded-2xl">
+        <CardHeader className="p-5 border-b border-gray-100">
+          <CardTitle className="text-sm font-extrabold text-[#374151]">
+            Import logs
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5">
+          <p className="text-sm text-gray-600">
+            After importing, you can view past import logs and any row-level errors.
+          </p>
+          <Link
+            href="/dashboard/customers/import-logs"
+            className="mt-3 inline-block text-sm font-semibold text-[#01AC28] hover:underline"
+          >
+            View all import logs →
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+</file>
+
+<file path="dashboard/(app)/customers/page.tsx">
+import Link from "next/link";
+import { getCustomers } from "@/lib/api/dashboardCustomers";
+import { Card, CardContent } from "@/components/ui/Card";
+import { Pagination } from "@/components/ui/Pagination";
+import { CustomersToolbar } from "./CustomersToolbar";
+
+export default async function DashboardCustomersPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ page?: string; q?: string; message?: string; error?: string }>;
+}) {
+  const sp = (await searchParams) ?? {};
+  const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
+  const q = (sp.q ?? "").trim();
+  const message = sp.message;
+  const error = sp.error;
+
+  const data = await getCustomers({ page, per_page: 15, q: q || undefined });
+  const customers = data?.data ?? [];
+  const total = data?.total ?? 0;
+  const currentPage = data?.current_page ?? 1;
+  const lastPage = data?.last_page ?? 1;
+  const from = data?.from ?? null;
+  const to = data?.to ?? null;
+
+  const paginationParams: Record<string, string> = {};
+  if (q) paginationParams.q = q;
+
+  return (
+    <div className="flex h-full flex-col gap-6">
+      <div className="flex flex-col gap-1">
+        <div className="text-[10px] font-medium text-gray-400 uppercase tracking-widest">
+          Customers
+        </div>
+        <h2 className="mt-0.5 text-2xl font-bold text-gray-900">Customer list</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          View, edit, and import customers. Manage medical profiles and order history.
+        </p>
+      </div>
+
+      {(message || error) && (
+        <div
+          className={`rounded-2xl border px-4 py-3 text-sm font-medium ${
+            error
+              ? "border-red-100 bg-red-50 text-red-700"
+              : "border-green-100 bg-green-50 text-green-700"
+          }`}
+        >
+          {message || error}
+        </div>
+      )}
+
+      <Card className="border border-gray-200 shadow-sm overflow-hidden">
+        <CustomersToolbar query={q} total={total} showing={customers.length} />
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                  Name
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden sm:table-cell">
+                  Phone
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden md:table-cell">
+                  Email
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest hidden lg:table-cell">
+                  City
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                  Discount
+                </th>
+                <th className="px-4 py-3 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {customers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-gray-500 text-sm">
+                    No customers found.
+                  </td>
+                </tr>
+              ) : (
+                customers.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="border-b border-gray-50 hover:bg-gray-50/30 transition-colors"
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-900">{c.name || "—"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 hidden sm:table-cell">
+                      {c.phone || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                      {c.email || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
+                      {c.city || "—"}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-700">
+                      {c.discount_percentage != null && c.discount_percentage > 0
+                        ? `${c.discount_percentage}%`
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/dashboard/customers/${c.id}`}
+                        className="text-xs font-bold text-[#01AC28] hover:underline uppercase tracking-wider"
+                      >
+                        View
+                      </Link>
+                      <span className="mx-2 text-gray-300">|</span>
+                      <Link
+                        href={`/dashboard/customers/${c.id}?tab=info`}
+                        className="text-xs font-bold text-gray-600 hover:text-gray-900 uppercase tracking-wider"
+                      >
+                        Edit
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {data && lastPage > 1 ? (
+          <div className="p-4 border-t border-gray-100">
+            <Pagination
+              basePath="/dashboard/customers"
+              currentPage={currentPage}
+              lastPage={lastPage}
+              total={total}
+              from={from}
+              to={to}
+              params={Object.keys(paginationParams).length ? paginationParams : undefined}
+            />
+          </div>
+        ) : null}
+      </Card>
+    </div>
+  );
 }
 </file>
 

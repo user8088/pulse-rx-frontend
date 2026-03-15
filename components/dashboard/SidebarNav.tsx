@@ -4,13 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/utils/cn";
-import { Boxes, LayoutGrid, ShoppingCart, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Boxes, LayoutGrid, ShoppingCart, Users, Tag, ChevronLeft, ChevronRight } from "lucide-react";
 
 const SIDEBAR_COLLAPSED_KEY = "pulse-rx-sidebar-collapsed";
 
 const navItems = [
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/inventory", label: "Inventory", icon: Boxes },
+  { href: "/dashboard/offers", label: "Offers", icon: Tag },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
 ];
 

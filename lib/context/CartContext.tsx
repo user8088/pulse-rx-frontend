@@ -1,6 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from '@/lib/context/AuthContext';
+import { computeLineDiscount } from '@/utils/pricing';
 
 export type PrescriptionStatus = 'pending' | 'approved' | 'rejected' | null;
 
@@ -17,7 +19,14 @@ export interface CartItem {
   name: string;
   variation: string;
   quantity: string;
+  /** Base unit price (before any discount) for the chosen tier. */
   price: number;
+  /** Product discount percentage (item_discount 0–100). Applied only when unit_type is the product's top tier. */
+  item_discount?: number;
+  /** Best offer % for this product's category/subcategory (0–100). Applied only on top tier. */
+  offer_percent?: number;
+  /** Product's top tier: box if can_sell_box, else secondary if can_sell_secondary, else item. */
+  top_tier?: "item" | "secondary" | "box";
   image: string;
   qty: number;
   unit_type: "item" | "secondary" | "box";
@@ -93,6 +102,8 @@ const saveCartToStorage = (items: CartItem[]) => {
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>(loadCartFromStorage);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const { customerProfile } = useAuth();
+  const customerDiscountPct = Number(customerProfile?.discount_percentage) || 0;
 
   // Save to localStorage whenever cart changes
   useEffect(() => {
@@ -158,7 +169,19 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
-  const cartTotal = cartItems.reduce((acc, item) => acc + (item.price * item.qty), 0);
+  const cartTotal = cartItems.reduce((acc, item) => {
+    const lineTotal = item.price * item.qty;
+    const discount = computeLineDiscount(
+      item.price,
+      item.qty,
+      item.item_discount ?? 0,
+      customerDiscountPct,
+      item.unit_type ?? 'item',
+      item.top_tier ?? 'item',
+      item.offer_percent
+    );
+    return acc + (lineTotal - discount);
+  }, 0);
 
   const prescriptionsPending = cartItems.some(
     item => item.requiresPrescription && !item.prescription?.file

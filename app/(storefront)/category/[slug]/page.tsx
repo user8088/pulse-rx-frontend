@@ -9,7 +9,10 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getCategories, getSubcategories } from "@/lib/api/categories";
 import { getProducts } from "@/lib/api/products";
+import { getOffers } from "@/lib/api/offers";
 import { bucketUrl } from "@/lib/bucketUrl";
+import { getBestOfferPercentForProduct, getOfferForCategoryPage } from "@/utils/offers";
+import OfferBannerDetail from "@/components/OfferBannerDetail";
 import type { Product as BackendProduct, PaginatedProducts } from "@/types/product";
 import type { Category, Subcategory } from "@/types/category";
 
@@ -87,6 +90,13 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     console.error("Failed to fetch products:", error);
   }
 
+  let offers: Awaited<ReturnType<typeof getOffers>> = [];
+  try {
+    offers = await getOffers();
+  } catch {
+    // optional
+  }
+
   // Filter to only products that actually belong to this category
   const categoryProducts = productsData.data.filter(
     (p: BackendProduct) => p.category_id === category.id
@@ -98,6 +108,12 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
         p.subcategories?.some((s) => s.id === activeSubcategory.id)
       )
     : categoryProducts;
+
+  const applicableOffer = getOfferForCategoryPage(
+    offers,
+    category.id,
+    activeSubcategory?.id ?? null
+  );
 
   const mappedProducts = filteredProducts.map((p: BackendProduct) => {
     const opts = p.packaging_display?.options ?? [];
@@ -136,15 +152,20 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       }
     }
 
-  const discount = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
-  const originalPrice = discount > 0 ? displayPrice + discount : undefined;
-  const discountPercent =
-    originalPrice && originalPrice > 0
-      ? (discount / originalPrice) * 100
-      : undefined;
+  const itemDiscountPct = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
+  const topTier: "item" | "secondary" | "box" = p.can_sell_box ? "box" : p.can_sell_secondary ? "secondary" : "item";
+  const originalPrice = itemDiscountPct > 0 && unitType === topTier
+    ? displayPrice / (1 - itemDiscountPct / 100)
+    : undefined;
+  const discountPercent = originalPrice && originalPrice > 0 ? (1 - displayPrice / originalPrice) * 100 : undefined;
 
   const inStock =
     p.availability === "yes" || p.availability === "short";
+
+  const offerPercent = getBestOfferPercentForProduct(offers, {
+    category_id: p.category_id ?? null,
+    subcategories: p.subcategories ?? undefined,
+  });
 
   return {
       id: p.id,
@@ -152,6 +173,9 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       price: displayPrice,
       originalPrice,
       discountPercent,
+      itemDiscount: itemDiscountPct,
+      offerPercent,
+      topTier,
       image: p.images?.[0] ? bucketUrl(p.images[0].object_key) : "/assets/home/product-1.png",
       variation: p.variation_value ?? p.secondary_unit_label ?? "",
       quantity: quantityLabel,
@@ -218,10 +242,12 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
           {/* Products Section */}
           <div className="mt-8">
 
-              {/* Top Promotional Banner */}
-              <div className="mb-8 md:mb-12">
-                <OfferBanner />
-              </div>
+              {/* Offer banner when this category/subcategory has an active offer */}
+              {applicableOffer && (
+                <div className="mb-8 md:mb-12">
+                  <OfferBannerDetail offer={applicableOffer} />
+                </div>
+              )}
 
               {/* Products Grid - First Batch */}
               <ProductGrid products={mappedProducts.slice(0, 10)} />

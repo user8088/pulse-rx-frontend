@@ -8,6 +8,12 @@ export interface ProductGridItem {
   price: number;
   originalPrice?: number;
   discountPercent?: number;
+  /** Product discount percentage (item_discount 0–100). Applied only on product's top tier. */
+  itemDiscount?: number;
+  /** Best offer % for this product's category/subcategory (0–100). Applied only on top tier. */
+  offerPercent?: number;
+  /** Product's top tier: box if can_sell_box, else secondary, else item. */
+  topTier?: "item" | "secondary" | "box";
   image: string;
   variation?: string;
   quantity?: string;
@@ -31,6 +37,9 @@ export default function ProductGrid({ products }: ProductGridProps) {
           price={product.price}
           originalPrice={product.originalPrice}
           discountPercent={product.discountPercent}
+          itemDiscount={product.itemDiscount}
+          offerPercent={product.offerPercent}
+          topTier={product.topTier}
           image={product.image}
           variation={product.variation}
           quantity={product.quantity}

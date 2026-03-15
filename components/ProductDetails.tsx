@@ -8,9 +8,12 @@ import { X, Plus, Minus, AlertCircle, ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
 import { useAuth } from "@/lib/context/AuthContext";
 import { getProduct, getProductVariations } from "@/lib/api/products";
+import { getOffers } from "@/lib/api/offers";
 import { bucketUrl } from "@/lib/bucketUrl";
-import { applyCustomerDiscount } from "@/utils/pricing";
+import { effectiveDiscountPerUnit } from "@/utils/pricing";
+import { getBestOfferPercentForProduct } from "@/utils/offers";
 import type { Product } from "@/types/product";
+import type { Offer } from "@/types/offer";
 
 interface ProductDetailsProps {
   productId: string;
@@ -19,6 +22,7 @@ interface ProductDetailsProps {
 export default function ProductDetails({ productId }: ProductDetailsProps) {
   const router = useRouter();
   const [product, setProduct] = useState<Product | null>(null);
+  const [offers, setOffers] = useState<Offer[]>([]);
   const [variations, setVariations] = useState<Product[]>([]);
   const [selectedVariation, setSelectedVariation] = useState<Product | null>(null);
   const [unitType, setUnitType] = useState<"item" | "secondary" | "box">("secondary");
@@ -36,9 +40,13 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
     const fetchProductData = async () => {
       setLoading(true);
       try {
-        const productData = await getProduct(productId);
+        const [productData, offersData] = await Promise.all([
+          getProduct(productId),
+          getOffers().catch(() => []),
+        ]);
         setProduct(productData);
         setSelectedVariation(productData);
+        setOffers(offersData);
 
         const opts = productData.packaging_display?.options ?? [];
         if (opts.length > 0) {
@@ -133,13 +141,21 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       resolvedUnitType = effectiveType;
     }
 
-    const { discountedPrice: priceToAdd } = applyCustomerDiscount(safePrice, customerDiscountPct);
+    const itemDiscountPct = Number.parseFloat((selectedVariation.item_discount as unknown as string) ?? "0") || 0;
+    const topTier: "item" | "secondary" | "box" = canSellBox ? "box" : canSellSecondary ? "secondary" : "item";
+    const offerPercent = getBestOfferPercentForProduct(offers, {
+      category_id: selectedVariation.category_id ?? null,
+      subcategories: selectedVariation.subcategories ?? undefined,
+    });
     addItem({
       id: selectedVariation.id,
       name: selectedVariation.item_name,
       variation: selectedVariation.variation_value || "",
       quantity: quantityLabel,
-      price: priceToAdd,
+      price: safePrice,
+      item_discount: itemDiscountPct,
+      offer_percent: offerPercent,
+      top_tier: topTier,
       image: selectedVariation.images?.[0] ? bucketUrl(selectedVariation.images[0].object_key) : "/assets/home/product-1.png",
       qty: quantity,
       unit_type: resolvedUnitType,
@@ -200,14 +216,22 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       resolvedUnitType = effectiveType;
     }
 
-    const { discountedPrice: priceToAdd } = applyCustomerDiscount(safePrice, customerDiscountPct);
+    const itemDiscountPct = Number.parseFloat((selectedVariation.item_discount as unknown as string) ?? "0") || 0;
+    const topTier: "item" | "secondary" | "box" = canSellBox ? "box" : canSellSecondary ? "secondary" : "item";
+    const offerPercent = getBestOfferPercentForProduct(offers, {
+      category_id: selectedVariation.category_id ?? null,
+      subcategories: selectedVariation.subcategories ?? undefined,
+    });
     addItem(
       {
         id: selectedVariation.id,
         name: selectedVariation.item_name,
         variation: selectedVariation.variation_value || "",
         quantity: quantityLabel,
-        price: priceToAdd,
+        price: safePrice,
+        item_discount: itemDiscountPct,
+        offer_percent: offerPercent,
+        top_tier: topTier,
         image: selectedVariation.images?.[0]
           ? bucketUrl(selectedVariation.images[0].object_key)
           : "/assets/home/product-1.png",
@@ -291,11 +315,24 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
         ? boxPrice
         : secondaryPrice;
 
-  const { discountedPrice: displayPrice, originalPrice: originalDisplayPrice } = applyCustomerDiscount(
+  const itemDiscountPct = Number.parseFloat((selectedVariation.item_discount as unknown as string) ?? "0") || 0;
+  const topTier: "item" | "secondary" | "box" = canSellBox ? "box" : canSellSecondary ? "secondary" : "item";
+  const selectedTier: "item" | "secondary" | "box" = usePackagingDisplay
+    ? (packOptions[selectedPackOptionIndex]?.tier ?? "item")
+    : unitType;
+  const offerPercent = getBestOfferPercentForProduct(offers, {
+    category_id: selectedVariation.category_id ?? null,
+    subcategories: selectedVariation.subcategories ?? undefined,
+  });
+  const { amount: effectiveDiscount, isCustomerDiscount, source, effectivePercent } = effectiveDiscountPerUnit(
     selectedPrice,
-    customerDiscountPct
+    itemDiscountPct,
+    customerDiscountPct,
+    selectedTier === topTier,
+    offerPercent
   );
-  const showCustomerDiscount = customerDiscountPct > 0 && originalDisplayPrice > displayPrice;
+  const displayPrice = Math.round((selectedPrice - effectiveDiscount) * 100) / 100;
+  const showCustomerDiscount = effectiveDiscount > 0 && isCustomerDiscount;
 
   return (
     <div className="w-full">
@@ -392,17 +429,21 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                   )}
                 </div>
                 <div className="flex flex-col items-end pt-2">
-                  {showCustomerDiscount && (
+                  {effectiveDiscount > 0 && (
                     <span className="text-xs text-gray-400 line-through">
-                      Rs. {originalDisplayPrice.toFixed(2)}
+                      Rs. {selectedPrice.toFixed(2)}
                     </span>
                   )}
                   <span className="text-xl md:text-2xl font-bold text-[#374151]">
                     Rs. {Number.isFinite(displayPrice) ? displayPrice.toFixed(2) : "0.00"}
                   </span>
-                  {showCustomerDiscount && (
+                  {effectiveDiscount > 0 && (
                     <span className="text-[10px] font-bold text-[#01AC28] uppercase tracking-wider mt-0.5">
-                      {Math.round(customerDiscountPct)}% your discount
+                      {showCustomerDiscount
+                        ? `${effectivePercent}% your discount`
+                        : source === "offer"
+                          ? `${effectivePercent}% off`
+                          : `${effectivePercent}% off${selectedTier === "box" ? " per box" : selectedTier === "secondary" ? " per pack" : ""}`}
                     </span>
                   )}
                 </div>
@@ -448,10 +489,9 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                     {usePackagingDisplay ? (
                       packOptions.map((opt, idx) => {
                         const optPrice = Number.parseFloat(opt.price ?? "0") || 0;
-                        const { discountedPrice: optDisplayPrice } = applyCustomerDiscount(
-                          optPrice,
-                          customerDiscountPct
-                        );
+                        const optTier: "item" | "secondary" | "box" = opt.tier ?? "item";
+                        const { amount: optDiscount } = effectiveDiscountPerUnit(optPrice, itemDiscountPct, customerDiscountPct, optTier === topTier, offerPercent);
+                        const optDisplayPrice = Math.round((optPrice - optDiscount) * 100) / 100;
                         return (
                           <button
                             key={opt.tier}
@@ -470,7 +510,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                     ) : (
                       <>
                         {canSellItem && Number.isFinite(itemPrice) && itemPrice > 0 && (() => {
-                          const { discountedPrice: p } = applyCustomerDiscount(itemPrice, customerDiscountPct);
+                          const { amount: d } = effectiveDiscountPerUnit(itemPrice, itemDiscountPct, customerDiscountPct, "item" === topTier, offerPercent);
+                          const p = Math.round((itemPrice - d) * 100) / 100;
                           return (
                             <button
                               type="button"
@@ -486,7 +527,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                           );
                         })()}
                         {canSellSecondary && Number.isFinite(secondaryPrice) && secondaryPrice > 0 && (() => {
-                          const { discountedPrice: p } = applyCustomerDiscount(secondaryPrice, customerDiscountPct);
+                          const { amount: d } = effectiveDiscountPerUnit(secondaryPrice, itemDiscountPct, customerDiscountPct, "secondary" === topTier, offerPercent);
+                          const p = Math.round((secondaryPrice - d) * 100) / 100;
                           return (
                             <button
                               type="button"
@@ -502,7 +544,8 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
                           );
                         })()}
                         {canSellBox && Number.isFinite(boxPrice) && boxPrice > 0 && (() => {
-                          const { discountedPrice: p } = applyCustomerDiscount(boxPrice, customerDiscountPct);
+                          const { amount: d } = effectiveDiscountPerUnit(boxPrice, itemDiscountPct, customerDiscountPct, "box" === topTier, offerPercent);
+                          const p = Math.round((boxPrice - d) * 100) / 100;
                           return (
                             <button
                               type="button"

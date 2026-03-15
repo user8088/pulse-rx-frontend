@@ -35,6 +35,8 @@ export interface OrderItem {
   unit_price: string;
   quantity: number;
   line_total: string;
+  /** Discount applied to this line only (e.g. "5.00"). */
+  discount_amount?: string | null;
   image_url?: string | null;
   requires_prescription?: boolean;
   prescriptions?: OrderItemPrescription[];
@@ -61,7 +63,14 @@ export interface Order {
   subtotal: string;
   tax: string;
   shipping: string;
+  /** Total discount applied (sum of line discounts). Prefer over discount when present. */
+  discount_amount?: string | null;
+  /** Customer's discount % at time of order (display only). */
+  discount_percentage?: number | null;
+  /** @deprecated use discount_amount when available */
   discount?: string | null;
+  /** Delivery fee (may be sent instead of shipping). */
+  delivery_fee?: string | null;
   total: string;
   notes?: string | null;
   items: OrderItem[];

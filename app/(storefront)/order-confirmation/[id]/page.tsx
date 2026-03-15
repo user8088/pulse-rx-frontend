@@ -199,6 +199,7 @@ export default function OrderConfirmationPage({
                 {order.items.map((item) => {
                   const name = item.item_name || item.product_name || `Product #${item.product_id}`;
                   const unitLabel = item.unit_label || item.tier_label || 'Unit';
+                  const itemDiscount = item.discount_amount != null ? Number(item.discount_amount) : 0;
                   return (
                     <li key={item.id} className="py-4 flex gap-4 items-center">
                       {item.image_url ? (
@@ -215,6 +216,9 @@ export default function OrderConfirmationPage({
                         <p className="text-xs text-gray-500">
                           {item.quantity} x {unitLabel}
                         </p>
+                        {itemDiscount > 0 && (
+                          <p className="text-[10px] font-bold text-green-600 mt-0.5">You saved Rs. {itemDiscount.toFixed(2)}</p>
+                        )}
                       </div>
                       <span className="font-bold text-[#01AC28]">Rs. {item.line_total}</span>
                     </li>
@@ -228,12 +232,14 @@ export default function OrderConfirmationPage({
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Shipping</span>
-                  <span className="font-medium">Rs. {order.shipping}</span>
+                  <span className="font-medium">Rs. {order.delivery_fee ?? order.shipping ?? '0'}</span>
                 </div>
-                {order.discount && Number(order.discount) > 0 && (
+                {(order.discount_amount != null ? Number(order.discount_amount) : order.discount != null ? Number(order.discount) : 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Discount</span>
-                    <span className="font-medium text-green-600">-Rs. {order.discount}</span>
+                    <span className="font-medium text-green-600">
+                      -Rs. {(order.discount_amount != null ? order.discount_amount : order.discount) ?? '0'}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold pt-2">

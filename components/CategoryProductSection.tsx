@@ -4,14 +4,17 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { getProducts } from "@/lib/api/products";
+import { getOffers } from "@/lib/api/offers";
 import { getSubcategories } from "@/lib/api/categories";
 import { bucketUrl } from "@/lib/bucketUrl";
+import { getBestOfferPercentForProduct } from "@/utils/offers";
 import ProductCard from "@/components/shared/ProductCard";
 import { useCity } from "@/lib/context/CityContext";
 import type { Category } from "@/types/category";
 import type { Product } from "@/types/product";
+import type { Offer } from "@/types/offer";
 
-function mapProductToCard(product: Product) {
+function mapProductToCard(product: Product, offers: Offer[]) {
   const primaryImage = product.images?.find(img => img.is_primary) || product.images?.[0];
   const imageUrl = primaryImage ? bucketUrl(primaryImage.object_key) : "/assets/home/product-1.png";
 
@@ -51,15 +54,18 @@ function mapProductToCard(product: Product) {
     }
   }
 
-  const discount = Number.parseFloat(product.item_discount ?? "0");
-  const originalPrice = discount > 0 ? displayPrice + discount : undefined;
-  const discountPercent =
-    originalPrice && originalPrice > 0
-      ? (discount / originalPrice) * 100
-      : undefined;
+  const itemDiscountPct = Number.parseFloat(product.item_discount ?? "0");
+  const topTier: "item" | "secondary" | "box" = product.can_sell_box ? "box" : product.can_sell_secondary ? "secondary" : "item";
+  const originalPrice = itemDiscountPct > 0 && unitType === topTier ? displayPrice / (1 - itemDiscountPct / 100) : undefined;
+  const discountPercent = itemDiscountPct > 0 && unitType === topTier ? itemDiscountPct : undefined;
 
   const inStock =
     product.availability === "yes" || product.availability === "short";
+
+  const offerPercent = getBestOfferPercentForProduct(offers, {
+    category_id: product.category_id ?? null,
+    subcategories: product.subcategories ?? undefined,
+  });
 
   return {
     id: product.id,
@@ -67,6 +73,9 @@ function mapProductToCard(product: Product) {
     price: Number.isFinite(displayPrice) ? displayPrice : 0,
     originalPrice,
     discountPercent,
+    itemDiscount: itemDiscountPct,
+    offerPercent,
+    topTier,
     image: imageUrl,
     variation: product.variation_value ?? product.secondary_unit_label ?? "",
     quantity: quantityLabel,
@@ -99,6 +108,13 @@ export default function CategoryProductSection({ category }: CategoryProductSect
   const products = (data?.data ?? [])
     .filter((p) => p.category_id === category.id)
     .slice(0, 8);
+
+  const { data: offersData } = useQuery({
+    queryKey: ["offers"],
+    queryFn: getOffers,
+    staleTime: 60 * 1000,
+  });
+  const offers = offersData ?? [];
 
   const { data: subcategoriesData } = useQuery({
     queryKey: ["subcategories", category.id],
@@ -147,7 +163,7 @@ export default function CategoryProductSection({ category }: CategoryProductSect
                 <div key={i} className="animate-pulse bg-gray-50 rounded-xl aspect-[3/4]" />
               ))
             : products.map((product) => {
-                const props = mapProductToCard(product);
+                const props = mapProductToCard(product, offers);
                 return <ProductCard key={props.id} {...props} />;
               })}
         </div>

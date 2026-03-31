@@ -30,8 +30,7 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
-  const [expandedFaq, setExpandedFaq] = useState<number | null>(1);
-  const [infoTab, setInfoTab] = useState<"description" | "usage" | "ingredients" | "reviews">("description");
+  const [infoTab, setInfoTab] = useState<string>("");
   const { addItem } = useCart();
   const { customerProfile } = useAuth();
   const customerDiscountPct = Number(customerProfile?.discount_percentage) || 0;
@@ -244,10 +243,6 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
     router.push("/checkout");
   };
 
-  const toggleFaq = (id: number) => {
-    setExpandedFaq(expandedFaq === id ? null : id);
-  };
-
   if (loading) return (
     <div className="container mx-auto px-4 py-20 text-center">
       <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#01AC28] mx-auto"></div>
@@ -272,16 +267,14 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
   const isInStock =
     selectedVariation.availability === "yes" ||
     selectedVariation.availability === "short";
-  const descriptionRaw = selectedVariation.description ?? null;
-  const usageRaw = selectedVariation.usage_instructions ?? null;
-  const descriptionText =
-    typeof descriptionRaw === "string" && descriptionRaw.trim().length > 0
-      ? descriptionRaw.trim()
-      : "Not available";
-  const usageText =
-    typeof usageRaw === "string" && usageRaw.trim().length > 0
-      ? usageRaw.trim()
-      : "Not available";
+  const detailSections = [...(selectedVariation.detail_sections ?? [])]
+    .filter((section) => !!section?.key && !!section?.label)
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const hasDynamicDetails = detailSections.length > 0;
+  const activeTab =
+    detailSections.find((section) => section.key === infoTab)?.key ??
+    detailSections[0]?.key ??
+    "";
   const packOptions = selectedVariation.packaging_display?.options ?? [];
   const usePackagingDisplay = packOptions.length > 0;
   const baseUnitLabel =
@@ -623,65 +616,43 @@ export default function ProductDetails({ productId }: ProductDetailsProps) {
       <section className="py-16 px-4 md:px-6 lg:px-12 border-t border-gray-100">
         <div className="container mx-auto max-w-7xl">
           <div className="bg-white rounded-3xl shadow-sm border border-gray-100">
-            {/* Tabs */}
-            <div className="flex border-b border-gray-100 px-6 pt-4">
-              {[
-                { id: "description", label: "Description" },
-                { id: "usage", label: "Usage" },
-                { id: "ingredients", label: "Ingredients" },
-                { id: "reviews", label: "Reviews" },
-              ].map((tab) => {
-                const active = infoTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setInfoTab(tab.id as typeof infoTab)}
-                    className={`relative px-4 pb-3 pt-2 text-sm font-medium transition-colors ${
-                      active
-                        ? "text-[#059669]"
-                        : "text-gray-500 hover:text-gray-700"
-                    }`}
-                  >
-                    {tab.label}
-                    {active && (
-                      <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#059669] rounded-full" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            {hasDynamicDetails ? (
+              <>
+                {/* Dynamic tabs from backend detail_sections */}
+                <div className="flex border-b border-gray-100 px-6 pt-4">
+                  {detailSections.map((tab) => {
+                    const active = activeTab === tab.key;
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setInfoTab(tab.key)}
+                        className={`relative px-4 pb-3 pt-2 text-sm font-medium transition-colors ${
+                          active
+                            ? "text-[#059669]"
+                            : "text-gray-500 hover:text-gray-700"
+                        }`}
+                      >
+                        {tab.label}
+                        {active && (
+                          <span className="absolute left-0 right-0 -bottom-px h-0.5 bg-[#059669] rounded-full" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
 
-            {/* Tab content */}
-            <div className="px-6 py-6">
-              {infoTab === "description" && (
-                <p className="text-sm text-gray-600">
-                  {descriptionText !== "Not available"
-                    ? descriptionText
-                    : "No description added yet"}
-                </p>
-              )}
-
-              {infoTab === "usage" && (
-                <p className="text-sm text-gray-600">
-                  {usageText !== "Not available"
-                    ? usageText
-                    : "No usage information added yet"}
-                </p>
-              )}
-
-              {infoTab === "ingredients" && (
-                <p className="text-sm text-gray-600">
-                  No ingredients added yet.
-                </p>
-              )}
-
-              {infoTab === "reviews" && (
-                <p className="text-sm text-gray-600">
-                  No reviews added yet.
-                </p>
-              )}
-            </div>
+                <div className="px-6 py-6">
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                    {detailSections.find((section) => section.key === activeTab)?.content ?? ""}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="px-6 py-6">
+                <p className="text-sm text-gray-600">No description added yet</p>
+              </div>
+            )}
           </div>
         </div>
       </section>

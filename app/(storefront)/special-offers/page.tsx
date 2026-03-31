@@ -53,20 +53,12 @@ function mapProductToGridItem(p: BackendProduct, offerPercent: number): ProductG
 
   const itemDiscountPct = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
   const topTier: "item" | "secondary" | "box" = p.can_sell_box ? "box" : p.can_sell_secondary ? "secondary" : "item";
-  const originalPrice =
-    (itemDiscountPct > 0 || offerPercent > 0) && unitType === topTier
-      ? displayPrice / (1 - Math.max(itemDiscountPct, offerPercent) / 100)
-      : undefined;
-  const discountPercent =
-    originalPrice && originalPrice > 0 ? (1 - displayPrice / originalPrice) * 100 : undefined;
   const inStock = p.availability === "yes" || p.availability === "short";
 
   return {
     id: p.id,
     name: p.item_name,
     price: displayPrice,
-    originalPrice,
-    discountPercent,
     itemDiscount: itemDiscountPct,
     offerPercent,
     topTier,

@@ -98,8 +98,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
 
     const itemDiscountPct = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
     const topTier: "item" | "secondary" | "box" = p.can_sell_box ? "box" : p.can_sell_secondary ? "secondary" : "item";
-    const originalPrice = itemDiscountPct > 0 && unitType === topTier ? displayPrice / (1 - itemDiscountPct / 100) : undefined;
-    const discountPercent = itemDiscountPct > 0 && unitType === topTier ? itemDiscountPct : undefined;
 
     const primaryImage = p.images?.find((img) => img.is_primary) || p.images?.[0];
 
@@ -115,8 +113,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
       id: p.id,
       name: p.item_name,
       price: displayPrice,
-      originalPrice,
-      discountPercent,
       itemDiscount: itemDiscountPct,
       offerPercent,
       topTier,

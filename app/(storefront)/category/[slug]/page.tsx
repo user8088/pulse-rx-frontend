@@ -154,10 +154,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const itemDiscountPct = Number.parseFloat((p.item_discount as unknown as string) ?? "0");
   const topTier: "item" | "secondary" | "box" = p.can_sell_box ? "box" : p.can_sell_secondary ? "secondary" : "item";
-  const originalPrice = itemDiscountPct > 0 && unitType === topTier
-    ? displayPrice / (1 - itemDiscountPct / 100)
-    : undefined;
-  const discountPercent = originalPrice && originalPrice > 0 ? (1 - displayPrice / originalPrice) * 100 : undefined;
 
   const inStock =
     p.availability === "yes" || p.availability === "short";
@@ -171,8 +167,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
       id: p.id,
       name: p.item_name,
       price: displayPrice,
-      originalPrice,
-      discountPercent,
       itemDiscount: itemDiscountPct,
       offerPercent,
       topTier,

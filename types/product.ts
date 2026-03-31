@@ -30,6 +30,13 @@ export interface Product {
   strip_qty: number | null;
   description?: string | null;
   usage_instructions?: string | null;
+  detail_sections?: Array<{
+    key: string;
+    label: string;
+    content: string;
+    sort_order?: number | null;
+  }> | null;
+  details_synced_at?: string | null;
   can_sell_item?: boolean;
   can_sell_secondary?: boolean;
   can_sell_box?: boolean;

@@ -169,19 +169,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   };
 
   const cartCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
-  const cartTotal = cartItems.reduce((acc, item) => {
-    const lineTotal = item.price * item.qty;
-    const discount = computeLineDiscount(
-      item.price,
-      item.qty,
-      item.item_discount ?? 0,
-      customerDiscountPct,
-      item.unit_type ?? 'item',
-      item.top_tier ?? 'item',
-      item.offer_percent
-    );
-    return acc + (lineTotal - discount);
-  }, 0);
+  // Subtotal *before* any discounts; pages compute discounts explicitly.
+  const cartTotal = cartItems.reduce((acc, item) => acc + item.price * item.qty, 0);
 
   const prescriptionsPending = cartItems.some(
     item => item.requiresPrescription && !item.prescription?.file

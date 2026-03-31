@@ -56,8 +56,6 @@ function mapProductToCard(product: Product, offers: Offer[]) {
 
   const itemDiscountPct = Number.parseFloat(product.item_discount ?? "0");
   const topTier: "item" | "secondary" | "box" = product.can_sell_box ? "box" : product.can_sell_secondary ? "secondary" : "item";
-  const originalPrice = itemDiscountPct > 0 && unitType === topTier ? displayPrice / (1 - itemDiscountPct / 100) : undefined;
-  const discountPercent = itemDiscountPct > 0 && unitType === topTier ? itemDiscountPct : undefined;
 
   const inStock =
     product.availability === "yes" || product.availability === "short";
@@ -71,8 +69,6 @@ function mapProductToCard(product: Product, offers: Offer[]) {
     id: product.id,
     name: product.item_name,
     price: Number.isFinite(displayPrice) ? displayPrice : 0,
-    originalPrice,
-    discountPercent,
     itemDiscount: itemDiscountPct,
     offerPercent,
     topTier,

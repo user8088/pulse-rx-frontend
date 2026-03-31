@@ -66,6 +66,8 @@ export default function CartPage() {
                   const key = cartItemKey(item);
                   const lineDiscount = computeLineDiscount(item.price, item.qty, item.item_discount ?? 0, isAuthenticated ? customerPct : 0, item.unit_type, item.top_tier ?? item.unit_type);
                   const lineTotal = Math.round((item.price * item.qty - lineDiscount) * 100) / 100;
+                  const unitDiscount = item.qty > 0 ? lineDiscount / item.qty : 0;
+                  const unitDisplay = Math.round((item.price - unitDiscount) * 100) / 100;
                   return (
                   <div key={key} className="grid grid-cols-1 md:grid-cols-12 gap-4 py-6 border-b border-gray-100 items-center group">
                     {/* Product Details */}
@@ -139,7 +141,10 @@ export default function CartPage() {
 
                     {/* Price */}
                     <div className="col-span-1 md:col-span-2 text-center hidden md:block">
-                      <span className="text-base font-bold text-[#374151]">Rs. {item.price.toFixed(2)}</span>
+                      {lineDiscount > 0 && (
+                        <span className="block text-xs text-gray-400 line-through">Rs. {item.price.toFixed(2)}</span>
+                      )}
+                      <span className="text-base font-bold text-[#374151]">Rs. {unitDisplay.toFixed(2)}</span>
                     </div>
 
                     {/* Item Total */}

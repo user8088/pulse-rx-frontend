@@ -5,10 +5,25 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { useCart, cartItemKey } from '@/lib/context/CartContext';
+import { useAuth } from '@/lib/context/AuthContext';
+import { computeLineDiscount } from '@/utils/pricing';
 
 export default function CartSidebar() {
   const { cartItems, isCartOpen, closeCart, updateQty, removeItem, cartTotal, cartCount } = useCart();
+  const { customerProfile, isAuthenticated } = useAuth();
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const customerPct = Number(customerProfile?.discount_percentage) || 0;
+  const estimatedDiscount = cartItems.reduce((sum, item) => sum + computeLineDiscount(
+    item.price,
+    item.qty,
+    item.item_discount ?? 0,
+    isAuthenticated ? customerPct : 0,
+    item.unit_type,
+    item.top_tier ?? item.unit_type,
+    item.offer_percent
+  ), 0);
+  const subtotalBeforeDiscount = cartTotal;
+  const subtotalAfterDiscount = Math.round((subtotalBeforeDiscount - estimatedDiscount) * 100) / 100;
 
   // Close on escape key
   useEffect(() => {
@@ -73,6 +88,17 @@ export default function CartSidebar() {
           {cartItems.length > 0 ? (
             cartItems.map((item) => {
               const key = cartItemKey(item);
+              const lineDiscount = computeLineDiscount(
+                item.price,
+                item.qty,
+                item.item_discount ?? 0,
+                isAuthenticated ? customerPct : 0,
+                item.unit_type,
+                item.top_tier ?? item.unit_type,
+                item.offer_percent
+              );
+              const lineBase = item.price * item.qty;
+              const lineTotal = Math.round((lineBase - lineDiscount) * 100) / 100;
               return (
               <div key={key} className="flex gap-4 group">
                 {/* Image */}
@@ -147,7 +173,12 @@ export default function CartSidebar() {
                         <Plus className="w-3 h-3" />
                       </button>
                     </div>
-                    <span className="text-sm font-bold text-[#01AC28]">Rs. {(item.price * item.qty).toFixed(2)}</span>
+                    <div className="text-right">
+                      {lineDiscount > 0 && (
+                        <span className="block text-[10px] text-gray-400 line-through">Rs. {lineBase.toFixed(2)}</span>
+                      )}
+                      <span className="text-sm font-bold text-[#01AC28]">Rs. {lineTotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -168,7 +199,17 @@ export default function CartSidebar() {
         <div className="p-6 md:p-8 bg-gray-50 border-t border-gray-100 space-y-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Subtotal</span>
-            <span className="text-xl font-black text-[#374151]">Rs. {cartTotal.toFixed(2)}</span>
+            <span className="text-xl font-black text-[#374151]">Rs. {subtotalBeforeDiscount.toFixed(2)}</span>
+          </div>
+          {estimatedDiscount > 0 && (
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Discount</span>
+              <span className="text-sm font-bold text-[#01AC28]">-Rs. {estimatedDiscount.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total</span>
+            <span className="text-xl font-black text-[#374151]">Rs. {subtotalAfterDiscount.toFixed(2)}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

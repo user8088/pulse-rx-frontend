@@ -11,7 +11,11 @@ export default function AppProviders({ children }: { children: React.ReactNode }
 
   // Keep the storefront and dashboard fully separate: the dashboard should not
   // mount storefront-only UX (cart, magic cursor, smooth scroll, etc).
-  if (pathname?.startsWith("/dashboard")) {
+  // Coming soon is a minimal shell without storefront providers.
+  if (
+    pathname?.startsWith("/dashboard") ||
+    pathname === "/coming-soon"
+  ) {
     return <>{children}</>;
   }
 

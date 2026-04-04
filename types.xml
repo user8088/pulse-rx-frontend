@@ -1,0 +1,565 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+auth.ts
+category.ts
+customer.ts
+index.ts
+offer.ts
+order.ts
+prescription.ts
+product.ts
+productImportLog.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="auth.ts">
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: 'admin' | 'staff' | 'customer';
+  tenant_id: number;
+  email_verified_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Tenant {
+  id: number;
+  name: string;
+  slug: string;
+  status: 'active' | 'suspended';
+  schema_name: string;
+  trial_ends_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+  tenant: Tenant;
+}
+
+export interface UserResponse {
+  user: User;
+  tenant: Tenant;
+}
+</file>
+
+<file path="category.ts">
+export interface Category {
+  id: number;
+  category_name: string;
+  alias: string;
+  serial_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Subcategory {
+  id: number;
+  category_id: number;
+  subcategory_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedCategories {
+  data: Category[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number;
+  to: number;
+}
+
+export interface PaginatedSubcategories {
+  data: Subcategory[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number;
+  to: number;
+}
+</file>
+
+<file path="customer.ts">
+export interface Customer {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  external_id: string | null;
+  gender: string | null;
+  address: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  discount_percentage: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedCustomers {
+  data: Customer[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+
+export interface CustomerImportResult {
+  import_uuid: string;
+  log_saved: boolean;
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  errors: Array<{
+    row: number;
+    reason: string;
+    message: string;
+    data?: Record<string, unknown>;
+  }>;
+}
+
+export interface CustomerImportLog {
+  import_uuid: string;
+  total_rows?: number;
+  created_count?: number;
+  updated_count?: number;
+  skipped_count?: number;
+  errors?: Array<{
+    row: number;
+    reason: string;
+    message: string;
+    data?: Record<string, unknown>;
+  }>;
+  created_at?: string;
+}
+
+export interface PaginatedCustomerImportLogs {
+  data: CustomerImportLog[];
+  total?: number;
+  per_page?: number;
+  current_page?: number;
+  last_page?: number;
+  from?: number | null;
+  to?: number | null;
+}
+
+export interface MedicalProfile {
+  id: number;
+  customer_id: number;
+  name: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  products?: ProfileProduct[];
+  prescriptions?: ProfilePrescription[];
+}
+
+export interface ProfileProduct {
+  id?: number;
+  product_id: number;
+  quantity: number;
+  product?: { id: number; item_id: string; item_name: string };
+}
+
+export interface ProfilePrescription {
+  id: number;
+  profile_id: number;
+  name?: string | null;
+  file_name?: string;
+  object_key?: string;
+  created_at?: string;
+}
+
+export interface CreateCustomerBody {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  external_id?: string | null;
+  gender?: string | null;
+  address?: string | null;
+  city?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  discount_percentage?: number;
+}
+</file>
+
+<file path="index.ts">
+export * from './auth';
+export * from './category';
+export * from "./customer";
+export * from "./order";
+export * from "./prescription";
+export * from "./product";
+export * from "./productImportLog";
+</file>
+
+<file path="offer.ts">
+import type { Category } from "./category";
+import type { Subcategory } from "./category";
+
+export interface Offer {
+  id: number;
+  name: string;
+  description: string | null;
+  discount_percentage: number;
+  start_date: string;
+  end_date: string;
+  category_id: number | null;
+  subcategory_id: number | null;
+  banner_image: string | null;
+  banner_url?: string | null;
+  category?: Category | null;
+  subcategory?: Subcategory | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PaginatedOffers {
+  data: Offer[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+
+/** Body for POST /dashboard/offers. Use FormData when including banner file. */
+export interface CreateOfferBody {
+  name: string;
+  description?: string | null;
+  discount_percentage: number;
+  start_date: string;
+  end_date: string;
+  category_id?: number | null;
+  subcategory_id?: number | null;
+}
+</file>
+
+<file path="order.ts">
+export type OrderStatus =
+  | "pending"
+  | "confirmed"
+  | "processing"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled";
+
+export type PaymentMethod = "cod" | "card";
+
+export interface OrderAddress {
+  phone: string;
+  house_apt: string;
+  street: string;
+  block_locality: string;
+  city: string;
+}
+
+export interface OrderItemPrescription {
+  id: number;
+  file_name?: string | null;
+  object_key?: string | null;
+}
+
+export interface OrderItem {
+  id: number;
+  product_id: number;
+  product_name?: string;
+  item_name: string;
+  item_id: string;
+  unit_type?: "item" | "secondary" | "box";
+  unit_label?: string;
+  tier: "box" | "secondary" | "item";
+  tier_label: string;
+  unit_price: string;
+  quantity: number;
+  line_total: string;
+  /** Discount applied to this line only (e.g. "5.00"). */
+  discount_amount?: string | null;
+  image_url?: string | null;
+  requires_prescription?: boolean;
+  prescriptions?: OrderItemPrescription[];
+}
+
+export interface Order {
+  id: number;
+  order_number: string;
+  status: OrderStatus;
+  payment_method: PaymentMethod;
+  customer_id?: number | null;
+  customer_name: string;
+  customer_email?: string | null;
+  customer_phone: string;
+  delivery_name: string;
+  delivery_phone: string;
+  delivery_address: string;
+  delivery_city?: string | null;
+  delivery_gender?: string | null;
+  delivery_latitude?: number | null;
+  delivery_longitude?: number | null;
+  /** @deprecated kept for mock/legacy compat; prefer delivery_* fields */
+  address?: OrderAddress;
+  subtotal: string;
+  tax: string;
+  shipping: string;
+  /** Total discount applied (sum of line discounts). Prefer over discount when present. */
+  discount_amount?: string | null;
+  /** Customer's discount % at time of order (display only). */
+  discount_percentage?: number | null;
+  /** @deprecated use discount_amount when available */
+  discount?: string | null;
+  /** Delivery fee (may be sent instead of shipping). */
+  delivery_fee?: string | null;
+  total: string;
+  notes?: string | null;
+  items: OrderItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedOrders {
+  data: Order[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+
+/** Payload sent to POST /orders to place an order. */
+export interface CreateOrderRequest {
+  delivery_name: string;
+  delivery_phone: string;
+  delivery_address: string;
+  delivery_city?: string;
+  delivery_gender?: string;
+  delivery_latitude?: number;
+  delivery_longitude?: number;
+  notes?: string;
+  items: CreateOrderItemRequest[];
+}
+
+export interface CreateOrderItemRequest {
+  product_id: number;
+  unit_type: "item" | "secondary" | "box";
+  quantity: number;
+}
+</file>
+
+<file path="prescription.ts">
+export type PrescriptionStatus = "pending" | "approved" | "rejected";
+
+export interface Prescription {
+  id: number;
+  product_id: number;
+  order_id: number;
+  order_item_id: number;
+  customer_id?: number | null;
+  guest_phone?: string | null;
+  guest_name?: string | null;
+  file_key: string;
+  status: PrescriptionStatus;
+  notes?: string | null;
+  reviewed_by_user_id?: number | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  product?: { id: number; item_name: string; requires_prescription: boolean };
+  order?: { id: number; order_number: string };
+  order_item?: { id: number; product_id: number };
+  customer?: { id: number; name: string; email: string } | null;
+  reviewer?: { id: number; name: string } | null;
+}
+
+export interface PaginatedPrescriptions {
+  data: Prescription[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+</file>
+
+<file path="product.ts">
+import type { Category, Subcategory } from "./category";
+
+export interface ProductImage {
+  id: number;
+  product_id: number;
+  object_key: string;
+  sort_order: number;
+  is_primary: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Product {
+  id: number;
+  item_id: string;
+  item_name: string;
+  product_group_id: string | null;
+  variation_type: string | null;
+  variation_value: string | null;
+  generic_name: string | null;
+  is_narcotic: boolean;
+  requires_prescription?: boolean;
+  category_id: number | null;
+  brand: string | null;
+  retail_price_unit: string;
+  retail_price_item?: string;
+  retail_price_secondary: string;
+  retail_price_box: string;
+  pack_qty: number | null;
+  strip_qty: number | null;
+  description?: string | null;
+  usage_instructions?: string | null;
+  detail_sections?: Array<{
+    key: string;
+    label: string;
+    content: string;
+    sort_order?: number | null;
+  }> | null;
+  details_synced_at?: string | null;
+  can_sell_item?: boolean;
+  can_sell_secondary?: boolean;
+  can_sell_box?: boolean;
+  secondary_unit_label?: string;
+  box_unit_label?: string;
+  base_unit_label?: string | null;
+  packaging_display?: {
+    base_unit: string;
+    options: Array<{
+      tier: "box" | "secondary" | "item";
+      label: string;
+      description: string;
+      price: string;
+    }>;
+  };
+  availability: "yes" | "no" | "short";
+  cold_chain_needed: boolean;
+  item_discount: string;
+  created_at: string;
+  updated_at: string;
+  category?: Category | null;
+  subcategories?: Subcategory[];
+  images?: ProductImage[];
+}
+
+export interface PaginatedProducts {
+  data: Product[];
+  total: number;
+  per_page: number;
+  current_page: number;
+  last_page: number;
+  from: number | null;
+  to: number | null;
+}
+
+export type ProductImportError = {
+  row: number;
+  item_id?: string | null;
+  reason: string;
+  message: string;
+  data?: Record<string, unknown>;
+};
+
+export interface ProductImportResult {
+  import_uuid?: string;
+  log_saved?: boolean;
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  skipped_count: number;
+  errors?: ProductImportError[];
+}
+</file>
+
+<file path="productImportLog.ts">
+export type ProductImportLogError = {
+  row: number;
+  item_id?: string | null;
+  reason: string;
+  message: string;
+  data?: Record<string, unknown>;
+};
+
+export interface ProductImportLog {
+  id?: number;
+  import_uuid: string;
+  total_rows?: number;
+  created_count?: number;
+  updated_count?: number;
+  skipped_count?: number;
+  errors?: ProductImportLogError[];
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PaginatedProductImportLogs {
+  data: ProductImportLog[];
+  total?: number;
+  per_page?: number;
+  current_page?: number;
+  last_page?: number;
+  from?: number | null;
+  to?: number | null;
+}
+</file>
+
+</files>

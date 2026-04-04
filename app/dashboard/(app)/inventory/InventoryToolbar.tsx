@@ -135,11 +135,15 @@ export function InventoryToolbar({
   products,
   createProductAction,
   importProductsAction,
+  showCreateProduct = true,
+  showImportProducts = true,
 }: {
   categories: Category[];
   products: Product[];
   createProductAction: (formData: FormData) => Promise<void>;
   importProductsAction: (formData: FormData) => Promise<void>;
+  showCreateProduct?: boolean;
+  showImportProducts?: boolean;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -175,43 +179,47 @@ export function InventoryToolbar({
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-2">
-        <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
-          Create product
-        </Button>
-
-        <div className="inline-flex items-center gap-1">
-          <form
-            action={importProductsAction}
-            className="inline-flex"
-            onSubmit={() => {
-              fileInputRef.current?.blur();
-            }}
-          >
-            <input
-              ref={fileInputRef}
-              name="file"
-              type="file"
-              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-              className="hidden"
-              onChange={() => {
-                if (fileInputRef.current?.files?.length) hiddenSubmitRef.current?.click();
-              }}
-            />
-            <button ref={hiddenSubmitRef} type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
-            <ImportInner onPick={() => fileInputRef.current?.click()} />
-          </form>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-gray-400 hover:text-gray-600 px-1.5"
-            onClick={() => setImportHelpOpen(true)}
-            title="Excel column reference"
-          >
-            ?
+      <div className="flex flex-wrap items-center gap-2">
+        {showCreateProduct ? (
+          <Button type="button" size="sm" onClick={() => setCreateOpen(true)}>
+            Create product
           </Button>
-        </div>
+        ) : null}
+
+        {showImportProducts ? (
+          <div className="inline-flex items-center gap-1">
+            <form
+              action={importProductsAction}
+              className="inline-flex"
+              onSubmit={() => {
+                fileInputRef.current?.blur();
+              }}
+            >
+              <input
+                ref={fileInputRef}
+                name="file"
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                className="hidden"
+                onChange={() => {
+                  if (fileInputRef.current?.files?.length) hiddenSubmitRef.current?.click();
+                }}
+              />
+              <button ref={hiddenSubmitRef} type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
+              <ImportInner onPick={() => fileInputRef.current?.click()} />
+            </form>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-gray-400 hover:text-gray-600 px-1.5"
+              onClick={() => setImportHelpOpen(true)}
+              title="Excel column reference"
+            >
+              ?
+            </Button>
+          </div>
+        ) : null}
 
         <Button type="button" variant="secondary" size="sm" onClick={() => setExportOpen(true)}>
           Export

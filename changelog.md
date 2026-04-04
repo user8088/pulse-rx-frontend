@@ -1,173 +1,99 @@
-# Dynamic Product Details (Excel/CSV from S3)
+# Frontend integration notes
 
-This feature lets each product page render a dynamic details tab panel from a file stored in object storage, instead of hardcoded tabs.
+## Catalog approval workflow (product manager + pharmacist)
 
-## What is now supported
+### Roles (`user.role`)
 
-- Per-product details file path:
-  - `tenants/{tenant_id}/products/{item_id}/descriptions/product_details.xlsx`
-  - `tenants/{tenant_id}/products/{item_id}/descriptions/product_details.xls`
-  - `tenants/{tenant_id}/products/{item_id}/descriptions/product_details.csv`
-- File priority when multiple formats exist for the same product:
-  1. `product_details.xlsx`
-  2. `product_details.xls`
-  3. `product_details.csv`
-- Dynamic columns:
-  - Row 1 = tab headers
-  - Row 2 = tab content
-  - Any number of columns is supported.
-  - Example:
-    - Product A can have `Description`, `Usage`, `Ingredients`
-    - Product B can have only `Description`, `Usage`
+| Value | Dashboard login | Typical UI |
+|-------|-----------------|------------|
+| `admin` | Yes | Full access |
+| `staff` | Yes | Operations (imports, orders, categories, customers, offers, …) |
+| `product_manager` | Yes | Create/edit **draft** or **rejected** products only; upload **staging** images; edit **draft** detail tabs; submit for review |
+| `pharmacist` | Yes | **Read** catalog (all statuses); **approve** / **reject** pending items; **no** product create/update/delete, **no** image uploads |
+| `customer` | Store login | Unchanged |
 
-## Backend behavior
+`POST /api/dashboard/login` accepts all dashboard roles above (not only admin/staff).
 
-### Sync sources
+### Product lifecycle (`catalog_status`)
 
-Product details are synced from S3 by:
+| Status | Storefront (`GET /api/products*`) | Meaning |
+|--------|-----------------------------------|---------|
+| `published` | Visible | Live catalog |
+| `draft` | Hidden | PM work in progress |
+| `pending_review` | Hidden | Awaiting pharmacist/admin/staff approval |
+| `rejected` | Hidden | Sent back; PM edits and resubmits |
 
-1. Automatic sync after product import (`POST /api/products/import` and dashboard equivalent).
-2. Manual command:
-   - `php artisan products:sync-details`
-   - `php artisan products:sync-details {tenant_id}`
+Existing/imported products default to `published` so current stores stay live.
 
-### Parsing rules
+### Detail tabs: live vs draft
 
-- Reads active sheet (or CSV equivalent).
-- Uses row 1 as headers, row 2 as values.
-- Trims header and value text.
-- Skips blank header columns.
-- Skips columns where row-2 content is blank.
-- Generates stable `key` from header (`slug`), with collision handling:
-  - `Description`, `Description` => `description`, `description-2`
-- Maintains tab order by original column index (`sort_order`).
+- **`detail_sections`** — **published** copy shown on the public product page (after approval).
+- **`detail_sections_draft`** — PM (or admin) edits **before** approval; pharmacist should compare draft vs live when reviewing.
 
-### Storage in DB (tenant schema)
+**Who writes where (same request field `detail_sections`):**
 
-`products` table now stores:
+- **Product manager** on **draft** or **rejected** → saved to **`detail_sections_draft`**.
+- **Admin / staff** → saved to **`detail_sections`** (live), subject to workflow rules.
 
-- `detail_sections` (json, nullable)
-- `details_object_key` (string, nullable)
-- `details_synced_at` (timestamp, nullable)
+### Images (`product_images`)
 
-If a product previously had detail data but the file no longer exists in S3, backend clears stale detail fields for that product on sync.
+- **`is_staging: false`** — live images used on the storefront (`tenants/.../products/{item_id}/images/...`).
+- **`is_staging: true`** — staging uploads (`tenants/.../products/{item_id}/staging/images/...`) until **approve** copies them to live and clears staging rows.
 
-## API contract for frontend
+Upload routing:
 
-## 1) Product detail endpoint (used by product page)
+- **Product manager** → always staging.
+- **Admin/staff** → staging if product is **not** `published`; if **published**, uploads go to **live** paths (quick fix path).
 
-- `GET /api/products/{product}`
-- Tenant context is the same as existing product APIs (`X-Tenant-Id` for guest flows or authenticated tenant user).
+Public `GET /api/products` and `GET /api/products/{id}` only return **published** products and **non-staging** images.
 
-### Response fields added/available
+### List filters (dashboard only)
 
-- `detail_sections`: array of dynamic tab sections
-- `details_synced_at`: timestamp when this product detail file was last parsed
+```
+GET /api/dashboard/products?catalog_status=draft
+GET /api/dashboard/products?catalog_status=pending_review,rejected
+```
 
-Example shape:
+Comma-separated or single value; must be valid status names.
+
+### Workflow endpoints (authenticated)
+
+| Method | Path | Roles |
+|--------|------|--------|
+| `POST` | `/api/products/{id}/submit-for-review` | admin, staff, product_manager |
+| `POST` | `/api/products/{id}/approve` | admin, staff, pharmacist |
+| `POST` | `/api/products/{id}/reject` | admin, staff, pharmacist |
+
+Dashboard prefix equivalents:
+
+- `/api/dashboard/products/{id}/submit-for-review`
+- `/api/dashboard/products/{id}/approve`
+- `/api/dashboard/products/{id}/reject`
+
+**Reject body (optional):**
 
 ```json
-{
-  "id": 101,
-  "item_id": "2112486",
-  "item_name": "Example Product",
-  "detail_sections": [
-    {
-      "key": "description",
-      "label": "Description",
-      "content": "This is a sample description.",
-      "sort_order": 0
-    },
-    {
-      "key": "usage",
-      "label": "Usage",
-      "content": "Take once daily after meal.",
-      "sort_order": 1
-    },
-    {
-      "key": "ingredients",
-      "label": "Ingredients",
-      "content": "Vitamin C, Zinc",
-      "sort_order": 2
-    }
-  ],
-  "details_synced_at": "2026-03-31T12:00:00.000000Z"
-}
+{ "catalog_rejection_note": "Reason for rejection" }
 ```
 
-## 2) Product list endpoint (card/list pages)
+**Approve** promotes `detail_sections_draft` → `detail_sections` (if present), replaces live images with promoted staging copies when staging images exist, then sets `catalog_status` to `published`.
 
-- `GET /api/products`
-- For payload efficiency, list response does not include:
-  - `detail_sections`
-  - `details_synced_at`
-- Fetch product details page data from `GET /api/products/{id}`.
+### Routes split summary
 
-## Frontend implementation instructions (important)
+- **Admin/staff only:** `POST /products/import`, categories/customers/orders CRUD (as before), dashboard imports, etc.
+- **Admin/staff/product_manager:** `POST|PATCH|DELETE /api/products*`, image uploads, submit-for-review.
+- **Admin/staff/pharmacist:** approve/reject.
 
-The product details panel in your screenshot must be fully dynamic.
+### UI suggestions
 
-Do not hardcode `Description`, `Usage`, `Ingredients`, `Reviews`. Render tabs from API data.
+- **Product manager:** show products filtered to `draft` + `rejected`; editor reads/writes `detail_sections` in API body (mapped server-side to draft); show staging image previews via `object_key` + `NEXT_PUBLIC_BUCKET_URL` (see `FRONTEND_OBJECT_STORAGE.md`).
+- **Pharmacist:** default list filter `catalog_status=pending_review`; review screen shows `detail_sections` (current live) vs `detail_sections_draft` + staging vs live images.
+- **Admin:** unrestricted catalog edits; can use import.
 
-### Rendering rules
+### Migrations
 
-1. Read `detail_sections` from `GET /api/products/{id}`.
-2. If array exists, sort by `sort_order` ascending.
-3. Render each tab:
-   - tab id/key = `section.key`
-   - tab label = `section.label`
-   - tab body = `section.content`
-4. Preserve line breaks in content:
-   - Use CSS `white-space: pre-wrap`.
-5. If `detail_sections` is missing, null, or empty:
-   - Show current empty placeholder (e.g. `No description added yet`) OR hide the panel.
+Tenant migration adds `catalog_*` columns, `detail_sections_draft`, and `product_images.is_staging`. Run:
 
-### React-style pseudocode
-
-```tsx
-const sections = [...(product.detail_sections ?? [])]
-  .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
-
-if (!sections.length) {
-  return <EmptyState text="No description added yet" />;
-}
-
-return (
-  <Tabs defaultValue={sections[0].key}>
-    <TabsList>
-      {sections.map((s) => (
-        <TabsTrigger key={s.key} value={s.key}>
-          {s.label}
-        </TabsTrigger>
-      ))}
-    </TabsList>
-
-    {sections.map((s) => (
-      <TabsContent key={s.key} value={s.key}>
-        <div style={{ whiteSpace: 'pre-wrap' }}>{s.content}</div>
-      </TabsContent>
-    ))}
-  </Tabs>
-);
+```bash
+php artisan tenants:migrate
 ```
-
-## Content authoring guide (Ops/Admin)
-
-For each tenant product:
-
-1. Prepare a file with:
-   - Row 1 headers (tab names), e.g. `Description | Usage | Ingredients`
-   - Row 2 values (tab content)
-2. Upload to:
-   - `tenants/{tenant_id}/products/{item_id}/descriptions/product_details.xlsx` (recommended)
-3. Trigger sync:
-   - by running product import, or
-   - by command `php artisan products:sync-details {tenant_id}`
-4. Verify from API:
-   - `GET /api/products/{id}` returns `detail_sections`
-
-## Notes
-
-- `details_object_key` is internal and not exposed in product JSON.
-- If duplicate headers are used, backend auto-deduplicates keys with suffixes (`-2`, `-3`, ...).
-- Keep row-2 content plain text unless and until rich text support is explicitly added.

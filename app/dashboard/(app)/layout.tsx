@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { DASHBOARD_AUTH_COOKIE } from "@/lib/dashboardAuth";
 import { getApiBaseURL } from "@/lib/api/baseUrl";
+import { getDashboardUser } from "@/lib/dashboardUser";
 
 async function validateDashboardSession() {
   const jar = await cookies();
@@ -45,14 +46,16 @@ async function validateDashboardSession() {
 export default async function DashboardAppLayout({ children }: { children: React.ReactNode }) {
   // Make dashboard access fully API-dependent: validate the token against `/auth/me`.
   await validateDashboardSession();
+  const session = await getDashboardUser();
+  const userRole = session?.user.role;
 
   return (
     <div className="min-h-screen">
       <div className="mx-auto flex min-h-screen w-full max-w-[1800px]">
-        <SidebarNav />
+        <SidebarNav userRole={userRole} />
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <DashboardHeader />
+          <DashboardHeader userRole={userRole} />
 
           <main className="flex-1 min-h-0 min-w-0 overflow-x-auto px-4 py-6 sm:px-6 lg:px-8">{children}</main>
         </div>

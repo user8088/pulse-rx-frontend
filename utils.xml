@@ -1,0 +1,222 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+cn.ts
+errors.ts
+offers.ts
+pricing.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="cn.ts">
+export function cn(...classes: Array<string | false | null | undefined>) {
+  return classes.filter(Boolean).join(" ");
+}
+</file>
+
+<file path="errors.ts">
+import axios from 'axios';
+
+export function handleApiError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    if (error.response?.status === 401) {
+      return 'Authentication required. Please log in.';
+    }
+    if (error.response?.status === 403) {
+      return 'Access denied. You do not have permission.';
+    }
+    if (error.response?.status === 404) {
+      return 'Resource not found.';
+    }
+    if (error.response?.status === 422) {
+      // Laravel validation errors
+      const firstError = Object.values(error.response.data.errors || {})[0];
+      return Array.isArray(firstError) ? firstError[0] : (error.response.data.message || 'Validation error');
+    }
+    return error.response?.data?.message || 'An error occurred';
+  }
+  
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  return 'An unexpected error occurred';
+}
+</file>
+
+<file path="offers.ts">
+import type { Offer } from "@/types/offer";
+
+/** Product shape needed to compute best offer % (category_id + subcategory ids). */
+export interface ProductOfferInput {
+  category_id: number | null;
+  subcategories?: Array<{ id: number }> | null;
+}
+
+/**
+ * Best offer % for a product: max of offer.discount_percentage where the offer
+ * applies to the product's category or any of its subcategories.
+ * Offer applies if offer.category_id === product.category_id OR
+ * offer.subcategory_id is in product.subcategories.
+ */
+export function getBestOfferPercentForProduct(
+  offers: Offer[],
+  product: ProductOfferInput
+): number {
+  if (!product.category_id && !product.subcategories?.length) return 0;
+  const subIds = new Set((product.subcategories ?? []).map((s) => s.id));
+  let best = 0;
+  for (const o of offers) {
+    const pct = Number(o.discount_percentage);
+    if (!Number.isFinite(pct) || pct <= 0) continue;
+    const applies =
+      (o.category_id != null && o.category_id === product.category_id) ||
+      (o.subcategory_id != null && subIds.has(o.subcategory_id));
+    if (applies && pct > best) best = pct;
+  }
+  return Math.min(100, Math.max(0, best));
+}
+
+/**
+ * Offer to show on a category page: when viewing a subcategory, return offer for that subcategory;
+ * when viewing a category only, return offer for that category. Returns first matching offer.
+ */
+export function getOfferForCategoryPage(
+  offers: Offer[],
+  categoryId: number,
+  subcategoryId?: number | null
+): Offer | null {
+  for (const o of offers) {
+    if (subcategoryId != null) {
+      if (o.subcategory_id === subcategoryId) return o;
+    } else {
+      if (o.category_id === categoryId) return o;
+    }
+  }
+  return null;
+}
+</file>
+
+<file path="pricing.ts">
+/**
+ * Apply a percentage discount to a price.
+ * Used for customer-level discount (e.g. discount_percentage from customer profile).
+ */
+export function applyCustomerDiscount(
+  price: number,
+  discountPercent: number
+): { discountedPrice: number; originalPrice: number } {
+  if (!Number.isFinite(price) || price < 0) {
+    return { discountedPrice: 0, originalPrice: 0 };
+  }
+  if (!Number.isFinite(discountPercent) || discountPercent <= 0) {
+    return { discountedPrice: price, originalPrice: price };
+  }
+  const pct = Math.min(100, Math.max(0, discountPercent));
+  const discountedPrice = Math.round(price * (1 - pct / 100) * 100) / 100;
+  return { discountedPrice, originalPrice: price };
+}
+
+export type UnitTier = "item" | "secondary" | "box";
+
+/**
+ * Compute line discount: the greatest of product, customer, and offer discount.
+ * All apply only when unit_type is the product's top tier.
+ * For items inside a box/pack (non–top tier), line discount = 0.
+ * Used for cart preview and checkout estimation.
+ */
+export function computeLineDiscount(
+  unitPrice: number,
+  quantity: number,
+  itemDiscountPercent: number,
+  customerDiscountPercent: number,
+  unitType: UnitTier,
+  topTier: UnitTier,
+  offerDiscountPercent?: number
+): number {
+  if (!Number.isFinite(unitPrice) || !Number.isFinite(quantity) || quantity < 1) return 0;
+  const isTopTier = unitType === topTier;
+  if (!isTopTier) return 0;
+  const lineTotalBeforeDiscount = unitPrice * quantity;
+  const productPct = Number.isFinite(itemDiscountPercent) ? Math.min(100, Math.max(0, itemDiscountPercent)) : 0;
+  const productDiscount = productPct > 0 ? Math.round(lineTotalBeforeDiscount * (productPct / 100) * 100) / 100 : 0;
+  const customerPct = Number.isFinite(customerDiscountPercent) ? Math.min(100, Math.max(0, customerDiscountPercent)) : 0;
+  const customerDiscount = customerPct > 0 ? Math.round(lineTotalBeforeDiscount * (customerPct / 100) * 100) / 100 : 0;
+  const offerPct = Number.isFinite(offerDiscountPercent ?? 0) ? Math.min(100, Math.max(0, offerDiscountPercent ?? 0)) : 0;
+  const offerDiscount = offerPct > 0 ? Math.round(lineTotalBeforeDiscount * (offerPct / 100) * 100) / 100 : 0;
+  const discount = Math.max(productDiscount, customerDiscount, offerDiscount);
+  return Math.round(discount * 100) / 100;
+}
+
+export type DiscountSource = "product" | "customer" | "offer";
+
+/**
+ * Effective discount per unit to show on product listing/detail.
+ * Product, customer, and offer discounts apply only for the product's top tier.
+ * For top tier: show the greatest of (product %, customer %, offer %). For other tiers: no discount.
+ */
+export function effectiveDiscountPerUnit(
+  unitPrice: number,
+  itemDiscountPercent: number,
+  customerDiscountPercent: number,
+  isTopTier: boolean,
+  offerDiscountPercent?: number
+): { amount: number; isCustomerDiscount: boolean; source: DiscountSource; effectivePercent: number } {
+  if (!isTopTier) return { amount: 0, isCustomerDiscount: false, source: "product", effectivePercent: 0 };
+  const productPct = Number.isFinite(itemDiscountPercent) ? Math.min(100, Math.max(0, itemDiscountPercent)) : 0;
+  const productAmount = productPct > 0 ? Math.round(unitPrice * (productPct / 100) * 100) / 100 : 0;
+  const customerPct = Number.isFinite(customerDiscountPercent) ? Math.min(100, Math.max(0, customerDiscountPercent)) : 0;
+  const customerAmount = customerPct > 0 ? Math.round(unitPrice * (customerPct / 100) * 100) / 100 : 0;
+  const offerPct = Number.isFinite(offerDiscountPercent ?? 0) ? Math.min(100, Math.max(0, offerDiscountPercent ?? 0)) : 0;
+  const offerAmount = offerPct > 0 ? Math.round(unitPrice * (offerPct / 100) * 100) / 100 : 0;
+  const best = Math.max(productAmount, customerAmount, offerAmount);
+  const effectivePercent = unitPrice > 0 ? Math.round((best / unitPrice) * 100) : 0;
+  if (best <= 0) return { amount: 0, isCustomerDiscount: false, source: "product", effectivePercent: 0 };
+  if (customerAmount >= best) return { amount: best, isCustomerDiscount: true, source: "customer", effectivePercent };
+  if (offerAmount >= best) return { amount: best, isCustomerDiscount: false, source: "offer", effectivePercent };
+  return { amount: best, isCustomerDiscount: false, source: "product", effectivePercent };
+}
+</file>
+
+</files>

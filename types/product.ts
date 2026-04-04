@@ -1,14 +1,27 @@
 import type { Category, Subcategory } from "./category";
 
+/** One storefront detail tab: `label` = header, `content` = body (HTML/plain/markdown per app). */
+export type ProductDetailSection = {
+  key: string;
+  label: string;
+  content: string;
+  sort_order?: number | null;
+};
+
 export interface ProductImage {
   id: number;
   product_id: number;
   object_key: string;
   sort_order: number;
   is_primary: boolean;
+  /** When true, image is staging until approval (dashboard uploads for non-published products). */
+  is_staging?: boolean;
   created_at: string;
   updated_at: string;
 }
+
+/** Catalog approval workflow (dashboard). */
+export type CatalogStatus = "published" | "draft" | "pending_review" | "rejected";
 
 export interface Product {
   id: number;
@@ -30,13 +43,15 @@ export interface Product {
   strip_qty: number | null;
   description?: string | null;
   usage_instructions?: string | null;
-  detail_sections?: Array<{
-    key: string;
-    label: string;
-    content: string;
-    sort_order?: number | null;
-  }> | null;
+  detail_sections?: ProductDetailSection[] | null;
+  /** PM/admin draft copy; promoted to `detail_sections` on approve when present. */
+  detail_sections_draft?: ProductDetailSection[] | null;
+  /** When true, object-storage detail file sync will not overwrite `detail_sections`. */
+  detail_sections_locked?: boolean;
   details_synced_at?: string | null;
+  catalog_status?: CatalogStatus;
+  /** Shown after reject; PM sees reason when editing a rejected product. */
+  catalog_rejection_note?: string | null;
   can_sell_item?: boolean;
   can_sell_secondary?: boolean;
   can_sell_box?: boolean;

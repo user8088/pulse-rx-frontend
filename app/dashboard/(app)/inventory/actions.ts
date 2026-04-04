@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { dashboardFetch } from "@/lib/dashboardApi";
 import { readErrorMessage } from "@/lib/api/readErrorMessage";
-import type { ProductImportResult } from "@/types";
+import type { Product, ProductDetailSection, ProductImportResult } from "@/types";
 
 const LAST_IMPORT_COOKIE = "prx_products_last_import";
 
@@ -32,6 +32,47 @@ function toFloatOrUndefined(value: FormDataEntryValue | null): number | undefine
   const n = Number.parseFloat(s);
   if (!Number.isFinite(n) || Number.isNaN(n)) return undefined;
   return n;
+}
+
+function parseDetailSectionsJson(raw: string): ProductDetailSection[] | null {
+  const s = raw.trim();
+  if (!s) return [];
+  try {
+    const parsed = JSON.parse(s) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    const out: ProductDetailSection[] = [];
+    const seenKeys = new Set<string>();
+    for (let i = 0; i < parsed.length; i++) {
+      const row = parsed[i];
+      if (!row || typeof row !== "object") return null;
+      const key = String((row as Record<string, unknown>).key ?? "").trim();
+      const label = String((row as Record<string, unknown>).label ?? "").trim();
+      const content = String((row as Record<string, unknown>).content ?? "");
+      if (!key || !label) return null;
+      if (seenKeys.has(key)) return null;
+      seenKeys.add(key);
+      const sortRaw = (row as Record<string, unknown>).sort_order;
+      const sort_order =
+        typeof sortRaw === "number" && Number.isFinite(sortRaw) ? sortRaw : i;
+      out.push({ key, label, content, sort_order });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** Full product row for editing tabs (list responses may omit `detail_sections` bodies). */
+export async function getDashboardProduct(id: string): Promise<Product | null> {
+  const trimmed = id.trim();
+  if (!trimmed) return null;
+  try {
+    const res = await dashboardFetch(`/dashboard/products/${trimmed}`);
+    if (!res.ok) return null;
+    return res.json() as Promise<Product>;
+  } catch {
+    return null;
+  }
 }
 
 export async function createProduct(formData: FormData) {
@@ -192,6 +233,28 @@ export async function updateProduct(formData: FormData) {
     .filter((n) => Number.isFinite(n));
   body.subcategory_ids = subcategory_ids;
 
+  const detailReady = String(formData.get("detail_sections_ready") ?? "") === "1";
+  if (detailReady) {
+    const rawJson = String(formData.get("detail_sections_json") ?? "");
+    const sections = parseDetailSectionsJson(rawJson);
+    if (sections === null) {
+      return redirect(
+        "/dashboard/inventory?error=failed&message=" +
+          encodeURIComponent(
+            "Invalid detail tabs. Each tab needs a header, and tabs must not conflict. Try again or reload the page."
+          )
+      );
+    }
+    body.detail_sections = sections.map((s, index) => ({
+      key: s.key,
+      label: s.label,
+      content: s.content,
+      sort_order: s.sort_order ?? index,
+    }));
+    const lockStr = String(formData.get("detail_sections_locked") ?? "true").trim().toLowerCase();
+    body.detail_sections_locked = lockStr !== "false" && lockStr !== "0";
+  }
+
   let res: Response;
   try {
     res = await dashboardFetch(`/products/${id}`, {
@@ -233,6 +296,33 @@ export async function deleteProduct(formData: FormData) {
 
   revalidatePath("/dashboard/inventory");
   return redirect("/dashboard/inventory?message=Product deleted successfully.");
+}
+
+/** Clears all detail tabs and allows object-storage / Excel detail sync to repopulate. */
+export async function clearProductDetailSections(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/products/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ detail_sections: null }),
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
+  }
+
+  revalidatePath("/dashboard/inventory");
+  return redirect("/dashboard/inventory?message=Detail tabs cleared. File sync can update this product again.");
 }
 
 export async function importProductsExcel(formData: FormData) {
@@ -387,5 +477,69 @@ export async function deleteProductImage(formData: FormData) {
 
   revalidatePath("/dashboard/inventory");
   return redirect("/dashboard/inventory?message=Image deleted successfully.");
+}
+
+export async function submitProductForReview(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
+  }
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/products/${id}/submit-for-review`, { method: "POST" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
+  }
+  revalidatePath("/dashboard/inventory");
+  return redirect("/dashboard/inventory?message=" + encodeURIComponent("Submitted for review."));
+}
+
+export async function approveProduct(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  if (!id) {
+    return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
+  }
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/products/${id}/approve`, { method: "POST" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
+  }
+  revalidatePath("/dashboard/inventory");
+  return redirect("/dashboard/inventory?message=" + encodeURIComponent("Product approved and published."));
+}
+
+export async function rejectProduct(formData: FormData) {
+  const id = String(formData.get("id") ?? "").trim();
+  const note = String(formData.get("catalog_rejection_note") ?? "").trim();
+  if (!id) {
+    return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
+  }
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/products/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify(note ? { catalog_rejection_note: note } : {}),
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
+  }
+  revalidatePath("/dashboard/inventory");
+  return redirect("/dashboard/inventory?message=" + encodeURIComponent("Product rejected."));
 }
 

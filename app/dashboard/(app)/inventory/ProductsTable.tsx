@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import type { Category, Product } from "@/types";
+import type { Category, Product, User } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -14,11 +14,13 @@ export function ProductsTable({
   categories,
   query,
   total,
+  viewerRole,
 }: {
   products: Product[];
   categories: Category[];
   query?: string;
   total?: number;
+  viewerRole: User["role"];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -146,7 +148,12 @@ export function ProductsTable({
                 </tr>
               ) : (
                 products.map((product) => (
-                  <ProductTableRow key={product.id} product={product} categories={categories} />
+                  <ProductTableRow
+                    key={product.id}
+                    product={product}
+                    categories={categories}
+                    viewerRole={viewerRole}
+                  />
                 ))
               )}
             </tbody>

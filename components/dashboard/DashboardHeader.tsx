@@ -4,8 +4,9 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { LogOut } from "lucide-react";
 import { dashboardSignOut } from "@/app/dashboard/sign-in/actions";
+import type { User } from "@/types";
 
-export function DashboardHeader() {
+export function DashboardHeader({ userRole }: { userRole?: User["role"] }) {
   const pathname = usePathname();
   const isOrders = pathname?.startsWith("/dashboard/orders");
   const title = isOrders ? "Order Management" : "Inventory Management";
@@ -20,6 +21,11 @@ export function DashboardHeader() {
           <div className="text-base font-semibold text-gray-900 leading-tight">
             {title}
           </div>
+          {userRole ? (
+            <div className="mt-0.5 text-[10px] font-medium text-gray-400 capitalize">
+              {userRole.replace(/_/g, " ")}
+            </div>
+          ) : null}
         </div>
 
         <form action={dashboardSignOut}>

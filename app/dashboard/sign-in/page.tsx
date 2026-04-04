@@ -32,7 +32,7 @@ export default async function DashboardSignInPage({
             </div>
             <h1 className="mt-2 text-2xl font-black text-[#374151]">Sign in</h1>
             <p className="mt-2 text-sm text-gray-600">
-              Sign in with an admin/staff account to access the dashboard.
+              Sign in with admin, staff, product manager, or pharmacist credentials to access the dashboard.
             </p>
           </div>
 

@@ -2,28 +2,49 @@ import React from "react";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { dashboardFetch } from "@/lib/dashboardApi";
+import { getDashboardUser } from "@/lib/dashboardUser";
+import { defaultCatalogStatusQuery } from "@/lib/dashboardRoles";
 import type { PaginatedCategories, PaginatedProducts } from "@/types";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
 import { createProduct, importProductsExcel } from "./actions";
 import { ProductsTable } from "./ProductsTable";
 import { InventoryToolbar } from "./InventoryToolbar";
+import { InventoryFiltersBar } from "./InventoryFiltersBar";
+import { isProductManager } from "@/lib/dashboardRoles";
 
 async function getProducts({
   page,
   q,
+  catalogStatus,
+  categoryId,
+  availability,
+  perPage,
 }: {
   page?: number;
   q?: string;
+  catalogStatus?: string;
+  categoryId?: string;
+  availability?: string;
+  perPage?: number;
 }): Promise<PaginatedProducts | null> {
   try {
     const sp = new URLSearchParams();
     if (page && Number.isFinite(page)) sp.set("page", String(page));
     const query = (q ?? "").trim();
     if (query) sp.set("q", query);
+    const cs = (catalogStatus ?? "").trim();
+    if (cs) sp.set("catalog_status", cs);
+    const cat = (categoryId ?? "").trim();
+    if (cat && /^\d+$/.test(cat)) sp.set("category_id", cat);
+    const av = (availability ?? "").trim().toLowerCase();
+    if (av && ["yes", "no", "short"].includes(av)) sp.set("availability", av);
+    if (typeof perPage === "number" && perPage >= 1 && perPage <= 100) sp.set("per_page", String(perPage));
 
     const qs = sp.toString();
-    const res = await dashboardFetch(qs ? `/products?${qs}` : "/products");
+    // Catalog workflow filters (catalog_status, etc.) are implemented on the dashboard route only.
+    // Storefront GET /products ignores them and can hide non-published rows.
+    const res = await dashboardFetch(qs ? `/dashboard/products?${qs}` : "/dashboard/products");
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -44,7 +65,16 @@ async function getCategories(): Promise<PaginatedCategories | null> {
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ message?: string; error?: string; page?: string; q?: string }>;
+  searchParams?: Promise<{
+    message?: string;
+    error?: string;
+    page?: string;
+    q?: string;
+    catalog_status?: string;
+    category_id?: string;
+    availability?: string;
+    per_page?: string;
+  }>;
 }) {
   const sp = (await searchParams) ?? {};
   const message = sp.message;
@@ -52,8 +82,29 @@ export default async function InventoryPage({
   const page = sp.page ? Number.parseInt(sp.page, 10) : undefined;
   const q = (sp.q ?? "").trim();
 
+  const session = await getDashboardUser();
+  const viewerRole = session?.user.role ?? "staff";
+
+  const catalogExplicit = sp.catalog_status !== undefined && sp.catalog_status !== null;
+  const catalogStatus = catalogExplicit
+    ? String(sp.catalog_status ?? "").trim()
+    : (defaultCatalogStatusQuery(viewerRole) ?? "");
+
+  const categoryId = String(sp.category_id ?? "").trim();
+  const availability = String(sp.availability ?? "").trim().toLowerCase();
+  const perPageRaw = sp.per_page ? Number.parseInt(String(sp.per_page), 10) : NaN;
+  const perPage =
+    Number.isFinite(perPageRaw) && perPageRaw >= 1 && perPageRaw <= 100 ? perPageRaw : undefined;
+
   const [productsData, categoriesData] = await Promise.all([
-    getProducts({ page, q }),
+    getProducts({
+      page,
+      q,
+      catalogStatus: catalogStatus || undefined,
+      categoryId: categoryId || undefined,
+      availability: availability || undefined,
+      perPage,
+    }),
     getCategories(),
   ]);
 
@@ -91,19 +142,45 @@ export default async function InventoryPage({
           </div>
           <h2 className="mt-0.5 text-2xl font-bold text-gray-900">Products</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Manage products, upload images, and import from Excel.
+            Filter the catalog, search, and manage workflow from one place.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/inventory/categories"
-            className="text-xs font-semibold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-wider"
-          >
-            Manage categories →
-          </Link>
+          {viewerRole === "admin" || viewerRole === "staff" ? (
+            <Link
+              href="/dashboard/inventory/categories"
+              className="text-xs font-semibold text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-wider"
+            >
+              Manage categories →
+            </Link>
+          ) : null}
         </div>
       </div>
+
+      {isProductManager(viewerRole) ? (
+        <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm text-blue-900">
+          <p className="font-semibold text-blue-950">How you’ll see pharmacist feedback</p>
+          <p className="mt-1 text-xs text-blue-900/90 leading-relaxed">
+            If a pharmacist <strong>rejects</strong> a submission, their note is stored on the product and shown on the
+            row (Rejected) and at the top when you edit. After you fix and resubmit, it goes back to{" "}
+            <strong>Pending review</strong>. If they <strong>approve</strong>, the product becomes{" "}
+            <strong>Published</strong> and leaves your draft/rejected filters—check the published list or search by
+            name/SKU. There is no separate inbox yet; use filters + rejection notes on each item.
+          </p>
+        </div>
+      ) : null}
+
+      {!productsData && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-semibold">Products could not be loaded</p>
+          <p className="mt-1 text-xs text-red-800/90 leading-relaxed">
+            The inventory list uses the dashboard catalog API. If this persists, confirm you are signed in,{" "}
+            <code className="rounded bg-red-100/80 px-1">NEXT_PUBLIC_API_URL</code> points at the API, and your role can
+            access <code className="rounded bg-red-100/80 px-1">GET /dashboard/products</code>.
+          </p>
+        </div>
+      )}
 
       {(message || error) && (
         <div
@@ -146,12 +223,23 @@ export default async function InventoryPage({
         </Card>
       </div>
 
+      <InventoryFiltersBar
+        categories={categories}
+        role={viewerRole}
+        catalogStatus={catalogStatus}
+        categoryId={categoryId}
+        availability={availability && ["yes", "no", "short"].includes(availability) ? availability : ""}
+        perPage={perPage ? String(perPage) : "15"}
+      />
+
       {/* Actions */}
       <InventoryToolbar
         categories={categories}
         products={products}
         createProductAction={createProduct}
         importProductsAction={importProductsExcel}
+        showCreateProduct={viewerRole !== "pharmacist"}
+        showImportProducts={viewerRole === "admin" || viewerRole === "staff"}
       />
 
       {/* Table (below) */}
@@ -161,6 +249,7 @@ export default async function InventoryPage({
           categories={categories}
           query={q}
           total={productsData?.total}
+          viewerRole={viewerRole}
         />
       </div>
 
@@ -172,7 +261,13 @@ export default async function InventoryPage({
           total={productsData.total}
           from={productsData.from}
           to={productsData.to}
-          params={q ? { q } : undefined}
+          params={{
+            ...(q ? { q } : {}),
+            ...(catalogStatus ? { catalog_status: catalogStatus } : {}),
+            ...(categoryId ? { category_id: categoryId } : {}),
+            ...(availability && ["yes", "no", "short"].includes(availability) ? { availability } : {}),
+            ...(perPage && perPage !== 15 ? { per_page: String(perPage) } : {}),
+          }}
         />
       ) : null}
 

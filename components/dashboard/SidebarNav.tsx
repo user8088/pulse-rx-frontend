@@ -2,21 +2,34 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/utils/cn";
+import type { User } from "@/types";
 import { Boxes, LayoutGrid, ShoppingCart, Users, Tag, ChevronLeft, ChevronRight } from "lucide-react";
 
 const SIDEBAR_COLLAPSED_KEY = "pulse-rx-sidebar-collapsed";
 
 const navItems = [
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
-  { href: "/dashboard/inventory", label: "Inventory", icon: Boxes },
+  { href: "/dashboard/inventory", label: "Products", icon: Boxes },
   { href: "/dashboard/offers", label: "Offers", icon: Tag },
   { href: "/dashboard/customers", label: "Customers", icon: Users },
 ];
 
-export default function SidebarNav() {
+export default function SidebarNav({ userRole }: { userRole?: User["role"] }) {
   const pathname = usePathname();
+
+  const visibleNav = useMemo(() => {
+    if (userRole === "pharmacist") {
+      return navItems.filter(
+        (i) => i.href === "/dashboard/orders" || i.href === "/dashboard/inventory"
+      );
+    }
+    if (userRole === "product_manager") {
+      return navItems.filter((i) => i.href === "/dashboard/inventory");
+    }
+    return navItems;
+  }, [userRole]);
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -80,7 +93,7 @@ export default function SidebarNav() {
       {/* Nav - when collapsed, toggle sits just below the links */}
       <nav className={cn("flex-1 overflow-hidden flex flex-col", collapsed ? "px-3 py-4 pt-5" : "px-3 pb-6 pt-4")}>
         <div className="space-y-1">
-          {navItems.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || pathname?.startsWith(item.href + "/");
             return (

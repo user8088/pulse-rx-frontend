@@ -1,7 +1,18 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import type { Category, Product, ProductImage } from "@/types";
+import type { Category, Product, ProductImage, User } from "@/types";
+import {
+  canApproveOrReject,
+  canDeleteProducts,
+  canProductManagerEditRow,
+  canSubmitForReview,
+  canUploadProductImages,
+  canWriteProducts,
+  isAdminOrStaff,
+  isPharmacist,
+  isProductManager,
+} from "@/lib/dashboardRoles";
 import { tryBucketUrl } from "@/lib/bucketUrl";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -9,8 +20,11 @@ import { Input } from "@/components/ui/Input";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { ConfirmingSubmitButton } from "@/components/ui/ConfirmingSubmitButton";
 import {
+  approveProduct,
   deleteProduct,
   deleteProductImage,
+  rejectProduct,
+  submitProductForReview,
   updateProduct,
   updateProductImageMetadata,
   uploadProductImage,
@@ -18,13 +32,34 @@ import {
 import { ChevronDown, Edit2, ImagePlus, Star, Trash2, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { SubcategorySelect } from "./SubcategorySelect";
+import { ProductDetailSectionsEditor } from "./ProductDetailSectionsEditor";
 
 function pickPrimaryImage(images: ProductImage[] | undefined) {
   const list = Array.isArray(images) ? images : [];
   if (list.length === 0) return null;
-  const primary = list.find((i) => i.is_primary);
+  const live = list.filter((i) => !i.is_staging);
+  const pool = live.length ? live : list;
+  const primary = pool.find((i) => i.is_primary);
   if (primary) return primary;
-  return [...list].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0] ?? null;
+  return [...pool].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0] ?? null;
+}
+
+function catalogStatusMeta(status: string | undefined): { label: string; className: string } | null {
+  if (status === undefined || status === null || status === "") {
+    return { label: "Unset", className: "bg-slate-50 text-slate-600 border-slate-200" };
+  }
+  switch (status) {
+    case "draft":
+      return { label: "Draft", className: "bg-gray-100 text-gray-700 border-gray-200" };
+    case "pending_review":
+      return { label: "Pending review", className: "bg-amber-50 text-amber-900 border-amber-200" };
+    case "rejected":
+      return { label: "Rejected", className: "bg-red-50 text-red-800 border-red-100" };
+    case "published":
+      return { label: "Published", className: "bg-emerald-50 text-emerald-800 border-emerald-100" };
+    default:
+      return null;
+  }
 }
 
 function availabilityBadge(availability: string): { label: string; variant: "success" | "warning" | "danger" } {
@@ -92,9 +127,11 @@ function PriceField({
 export function ProductTableRow({
   product,
   categories,
+  viewerRole,
 }: {
   product: Product;
   categories: Category[];
+  viewerRole: User["role"];
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editCategoryId, setEditCategoryId] = useState<string>(
@@ -107,6 +144,47 @@ export function ProductTableRow({
   const [boxUnitLabel, setBoxUnitLabel] = useState(product.box_unit_label ?? "Box");
   const [baseUnitLabel, setBaseUnitLabel] = useState(product.base_unit_label ?? "");
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [detailBlockReady, setDetailBlockReady] = useState(true);
+
+  /** Use raw API value for permissions — do not default to published (that blocked PM edits when the field was missing). */
+  const catalogStatusRaw = product.catalog_status;
+  const catalogMeta = catalogStatusMeta(catalogStatusRaw);
+  const readOnly =
+    isPharmacist(viewerRole) ||
+    (isProductManager(viewerRole) && !canProductManagerEditRow(catalogStatusRaw));
+
+  const canOpenEditor =
+    (canWriteProducts(viewerRole) &&
+      (isAdminOrStaff(viewerRole) ||
+        (isProductManager(viewerRole) && canProductManagerEditRow(catalogStatusRaw)))) ||
+    (isPharmacist(viewerRole) && catalogStatusRaw === "pending_review");
+
+  const toggleEditing = () => {
+    if (!canOpenEditor) return;
+    setIsEditing((v) => {
+      const next = !v;
+      setDetailBlockReady(!next);
+      return next;
+    });
+  };
+
+  const closeEditing = () => {
+    setIsEditing(false);
+    setDetailBlockReady(true);
+  };
+
+  const showDelete = canDeleteProducts(viewerRole);
+  const showImageUpload = canUploadProductImages(viewerRole) && !readOnly;
+  const detailVariant = isPharmacist(viewerRole) && catalogStatusRaw === "pending_review" ? "review" : "edit";
+  const detailEditSource: "live" | "draft" =
+    isProductManager(viewerRole) && canProductManagerEditRow(catalogStatusRaw) ? "draft" : "live";
+
+  const showSubmitReview =
+    canSubmitForReview(viewerRole) &&
+    (catalogStatusRaw === "draft" || catalogStatusRaw === "rejected") &&
+    !readOnly;
+
+  const showApproveReject = canApproveOrReject(viewerRole) && catalogStatusRaw === "pending_review";
 
   const categoryName = product.category?.category_name ?? "";
   const status = availabilityBadge(product.availability);
@@ -124,6 +202,9 @@ export function ProductTableRow({
       return (a.sort_order ?? 0) - (b.sort_order ?? 0);
     });
   }, [product.images]);
+
+  const liveImages = useMemo(() => sortedImages.filter((i) => !i.is_staging), [sortedImages]);
+  const stagingImages = useMemo(() => sortedImages.filter((i) => i.is_staging), [sortedImages]);
 
   const itemPriceDefault =
     product.retail_price_item && String(product.retail_price_item).trim() !== ""
@@ -146,6 +227,8 @@ export function ProductTableRow({
       ? Number.parseFloat(product.item_discount)
       : "";
 
+  const editFormId = `dashboard-edit-product-${product.id}`;
+
   return (
     <>
       {/* ── Table row (read-only) ── */}
@@ -162,6 +245,15 @@ export function ProductTableRow({
             </div>
             <div>
               <div className="font-semibold text-gray-900">{product.item_name}</div>
+              {product.catalog_status === "rejected" && product.catalog_rejection_note ? (
+                <p
+                  className="mt-1.5 text-[11px] text-red-800 line-clamp-2 leading-snug"
+                  title={product.catalog_rejection_note}
+                >
+                  <span className="font-bold uppercase tracking-wide text-red-700">Pharmacist note · </span>
+                  {product.catalog_rejection_note}
+                </p>
+              ) : null}
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                 <span className="lg:hidden text-[10px] font-mono text-gray-400">{product.item_id}</span>
                 {product.brand ? <span className="font-medium">{product.brand}</span> : "No brand"}
@@ -170,6 +262,18 @@ export function ProductTableRow({
                 <span className="sm:hidden">
                   <Badge variant={status.variant}>{status.label}</Badge>
                 </span>
+                {product.detail_sections_locked ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-700 border border-emerald-100">
+                    Manual tabs
+                  </span>
+                ) : null}
+                {catalogMeta ? (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide border ${catalogMeta.className}`}
+                  >
+                    {catalogMeta.label}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -200,26 +304,29 @@ export function ProductTableRow({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-8 w-8 p-0 text-gray-500 hover:text-[#01AC28] sm:h-9 sm:w-9"
-              onClick={() => setIsEditing((v) => !v)}
-              title="Edit"
+              className="h-8 w-8 p-0 text-gray-500 hover:text-[#01AC28] sm:h-9 sm:w-9 disabled:opacity-40"
+              disabled={!canOpenEditor}
+              onClick={toggleEditing}
+              title={isPharmacist(viewerRole) ? "Review" : "Edit"}
             >
               {isEditing ? <X className="h-4 w-4" /> : <Edit2 className="h-4 w-4" />}
             </Button>
 
-            <form action={deleteProduct}>
-              <input type="hidden" name="id" value={product.id} />
-              <ConfirmingSubmitButton
-                variant="ghost"
-                size="sm"
-                className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 hover:bg-red-50 sm:h-9 sm:w-9"
-                confirmMessage={`Delete "${product.item_name}"? This cannot be undone.`}
-                pendingText=""
-                showSpinner={true}
-              >
-                <Trash2 className="h-4 w-4" />
-              </ConfirmingSubmitButton>
-            </form>
+            {showDelete ? (
+              <form action={deleteProduct}>
+                <input type="hidden" name="id" value={product.id} />
+                <ConfirmingSubmitButton
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 text-gray-500 hover:text-red-600 hover:bg-red-50 sm:h-9 sm:w-9"
+                  confirmMessage={`Delete "${product.item_name}"? This cannot be undone.`}
+                  pendingText=""
+                  showSpinner={true}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </ConfirmingSubmitButton>
+              </form>
+            ) : null}
           </div>
         </td>
       </tr>
@@ -230,29 +337,88 @@ export function ProductTableRow({
           <td colSpan={6} className="px-3 sm:px-5 pb-8">
             <div className="mt-2 rounded-xl border border-gray-200 bg-[#f8f9fa] p-5 sm:p-6">
               {/* Header */}
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h4 className="text-base font-bold text-gray-900">Edit Product</h4>
-                  <p className="text-xs text-gray-500 mt-0.5">Update item details and manage images.</p>
+                  <h4 className="text-base font-bold text-gray-900">
+                    {isPharmacist(viewerRole) ? "Review product" : "Edit product"}
+                  </h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {readOnly
+                      ? "Compare catalog data and approve or reject pending items."
+                      : "Update item details, images, and description tabs."}
+                  </p>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setIsEditing(false)}
+                  onClick={closeEditing}
                   className="h-8 w-8 p-0 text-gray-400 hover:text-gray-600"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                {/* ─── LEFT COLUMN ─── */}
+              {product.catalog_rejection_note ? (
+                <div className="mb-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs text-red-800">
+                  <span className="font-semibold">Rejection note: </span>
+                  {product.catalog_rejection_note}
+                </div>
+              ) : null}
+
+              {(showSubmitReview || showApproveReject) && (
+                <div className="mb-4 flex flex-wrap items-end gap-2">
+                  {showSubmitReview ? (
+                    <form action={submitProductForReview}>
+                      <input type="hidden" name="id" value={product.id} />
+                      <PendingSubmitButton
+                        pendingText="Submitting…"
+                        className="h-9 px-4 text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg"
+                      >
+                        Submit for review
+                      </PendingSubmitButton>
+                    </form>
+                  ) : null}
+                  {showApproveReject ? (
+                    <>
+                      <form action={approveProduct}>
+                        <input type="hidden" name="id" value={product.id} />
+                        <PendingSubmitButton
+                          pendingText="Publishing…"
+                          className="h-9 px-4 text-xs font-semibold bg-emerald-700 text-white hover:bg-emerald-800 rounded-lg"
+                        >
+                          Approve &amp; publish
+                        </PendingSubmitButton>
+                      </form>
+                      <form action={rejectProduct} className="flex flex-wrap items-end gap-2">
+                        <input type="hidden" name="id" value={product.id} />
+                        <textarea
+                          name="catalog_rejection_note"
+                          placeholder="Rejection note (optional)"
+                          rows={2}
+                          className="min-w-[200px] max-w-md rounded-lg border border-gray-200 px-2 py-1.5 text-xs text-gray-800"
+                        />
+                        <PendingSubmitButton
+                          pendingText="Rejecting…"
+                          variant="danger"
+                          className="h-9 px-4 text-xs font-semibold"
+                        >
+                          Reject
+                        </PendingSubmitButton>
+                      </form>
+                    </>
+                  ) : null}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+                {/* ─── LEFT COLUMN: Basic + Pricing + Advanced + save ─── */}
                 <form
+                  id={editFormId}
                   action={async (fd) => {
                     await updateProduct(fd);
-                    setIsEditing(false);
+                    closeEditing();
                   }}
-                  className="space-y-5 lg:col-span-7"
+                  className="space-y-5 min-w-0"
                 >
                   <input type="hidden" name="id" value={product.id} />
                   <input type="hidden" name="can_sell_item" value={canSellItem ? "true" : "false"} />
@@ -262,6 +428,10 @@ export function ProductTableRow({
                   <input type="hidden" name="box_unit_label" value={boxUnitLabel} />
                   <input type="hidden" name="base_unit_label" value={baseUnitLabel} />
 
+                  <fieldset
+                    disabled={readOnly}
+                    className="min-w-0 space-y-5 border-0 p-0 m-0 disabled:opacity-[0.65]"
+                  >
                   {/* ── SECTION 1 : Basic Information ── */}
                   <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
                     <div className="flex items-center gap-2.5">
@@ -519,20 +689,11 @@ export function ProductTableRow({
                       </div>
                     )}
                   </div>
-
-                  {/* ── Bottom actions ── */}
-                  <div className="flex items-center justify-end gap-3 pt-2">
-                    <Button type="button" variant="secondary" onClick={() => setIsEditing(false)} className="h-10 px-6 rounded-lg text-sm font-medium">
-                      Cancel
-                    </Button>
-                    <PendingSubmitButton pendingText="Saving…" className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-semibold">
-                      Save Product
-                    </PendingSubmitButton>
-                  </div>
+                  </fieldset>
                 </form>
 
-                {/* ─── RIGHT COLUMN : Product Images ─── */}
-                <div className="space-y-5 lg:col-span-5">
+                {/* ─── RIGHT COLUMN: Images (top) + Product descriptions (bottom) — 2×2 with left column ─── */}
+                <div className="space-y-5 min-w-0">
                   <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
                     <div className="flex items-center gap-2.5">
                       <SectionBadge n={3} />
@@ -540,40 +701,47 @@ export function ProductTableRow({
                     </div>
 
                     {/* Upload area */}
-                    <form action={uploadProductImage} className="relative group">
-                      <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/30 p-6 transition-all group-hover:bg-gray-50 group-hover:border-gray-300">
-                        <input type="hidden" name="product_id" value={product.id} />
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm text-gray-400 group-hover:text-emerald-500 transition-colors">
-                          <ImagePlus className="h-5 w-5" />
-                        </div>
-                        <div className="text-center">
-                          <input
-                            name="file"
-                            type="file"
-                            accept="image/png,image/jpeg,image/jpg,image/webp"
-                            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                            required
-                          />
-                          <p className="text-xs font-semibold text-gray-700">Click to upload image</p>
-                          <p className="mt-1 text-[10px] text-gray-400">PNG, JPG or WebP up to 5MB</p>
-                        </div>
+                    {showImageUpload ? (
+                      <form action={uploadProductImage} className="relative group">
+                        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-gray-200 bg-gray-50/30 p-6 transition-all group-hover:bg-gray-50 group-hover:border-gray-300">
+                          <input type="hidden" name="product_id" value={product.id} />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm text-gray-400 group-hover:text-emerald-500 transition-colors">
+                            <ImagePlus className="h-5 w-5" />
+                          </div>
+                          <div className="text-center">
+                            <input
+                              name="file"
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/webp"
+                              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                              required
+                            />
+                            <p className="text-xs font-semibold text-gray-700">Click to upload image</p>
+                            <p className="mt-1 text-[10px] text-gray-400">PNG, JPG or WebP up to 5MB</p>
+                          </div>
 
-                        <label className="relative z-20 mt-2 flex items-center gap-2 text-sm font-medium text-gray-600 cursor-pointer select-none">
-                          <input name="is_primary" type="checkbox" value="true" defaultChecked className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                          Set as primary image
-                        </label>
+                          <label className="relative z-20 mt-2 flex items-center gap-2 text-sm font-medium text-gray-600 cursor-pointer select-none">
+                            <input name="is_primary" type="checkbox" value="true" defaultChecked className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                            Set as primary image
+                          </label>
 
-                        <PendingSubmitButton pendingText="Uploading…" className="relative z-20 mt-1 h-8 px-4 text-xs font-semibold bg-gray-900 text-white hover:bg-black rounded-lg">
-                          Upload Now
-                        </PendingSubmitButton>
-                      </div>
-                    </form>
+                          <PendingSubmitButton pendingText="Uploading…" className="relative z-20 mt-1 h-8 px-4 text-xs font-semibold bg-gray-900 text-white hover:bg-black rounded-lg">
+                            Upload Now
+                          </PendingSubmitButton>
+                        </div>
+                      </form>
+                    ) : (
+                      <p className="text-xs text-gray-500 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+                        Image uploads are not available for your role on this screen.
+                      </p>
+                    )}
 
                     {/* Image gallery */}
                     <div className="space-y-3">
-                      <span className="text-xs font-medium text-gray-500">
-                        Manage Images ({sortedImages.length})
-                      </span>
+                      <div className="text-xs font-medium text-gray-500 space-y-1">
+                        <div>Live ({liveImages.length})</div>
+                        {stagingImages.length > 0 ? <div>Staging ({stagingImages.length})</div> : null}
+                      </div>
 
                       {sortedImages.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 rounded-xl bg-gray-50/50 border border-gray-100">
@@ -607,10 +775,15 @@ export function ProductTableRow({
                                     Primary
                                   </span>
                                 )}
+                                {img.is_staging ? (
+                                  <span className="absolute top-1 right-1 bg-amber-500 text-white text-[8px] font-bold uppercase px-1.5 py-0.5 rounded">
+                                    Staging
+                                  </span>
+                                ) : null}
 
                                 {/* Hover overlay with actions */}
                                 <div className="absolute inset-0 bg-black/0 group-hover/item:bg-black/40 transition-colors flex items-end justify-center gap-1 pb-2 opacity-0 group-hover/item:opacity-100">
-                                  {!img.is_primary && (
+                                  {showImageUpload && !img.is_primary ? (
                                     <form action={updateProductImageMetadata}>
                                       <input type="hidden" name="product_id" value={product.id} />
                                       <input type="hidden" name="image_id" value={img.id} />
@@ -626,7 +799,8 @@ export function ProductTableRow({
                                         Primary
                                       </PendingSubmitButton>
                                     </form>
-                                  )}
+                                  ) : null}
+                                  {showImageUpload ? (
                                   <form action={deleteProductImage}>
                                     <input type="hidden" name="product_id" value={product.id} />
                                     <input type="hidden" name="image_id" value={img.id} />
@@ -641,6 +815,7 @@ export function ProductTableRow({
                                       <Trash2 className="h-3 w-3" />
                                     </ConfirmingSubmitButton>
                                   </form>
+                                  ) : null}
                                 </div>
                               </div>
                             );
@@ -649,7 +824,39 @@ export function ProductTableRow({
                       )}
                     </div>
                   </div>
+
+                  <ProductDetailSectionsEditor
+                    active={isEditing}
+                    productId={product.id}
+                    formId={editFormId}
+                    variant={detailVariant}
+                    detailEditSource={detailEditSource}
+                    onReadyChange={setDetailBlockReady}
+                  />
                 </div>
+
+                {/* Full-width actions below the 2×2 grid (mobile: save after images + descriptions) */}
+                {!readOnly ? (
+                  <div className="col-span-1 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-end lg:col-span-2">
+                    <Button type="button" variant="secondary" onClick={closeEditing} className="h-10 px-6 rounded-lg text-sm font-medium">
+                      Cancel
+                    </Button>
+                    <PendingSubmitButton
+                      form={editFormId}
+                      pendingText="Saving…"
+                      disabled={!detailBlockReady}
+                      className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-semibold"
+                    >
+                      Save Product
+                    </PendingSubmitButton>
+                  </div>
+                ) : (
+                  <div className="col-span-1 flex justify-end border-t border-gray-200 pt-4 lg:col-span-2">
+                    <Button type="button" variant="secondary" onClick={closeEditing} className="h-10 px-6 rounded-lg text-sm font-medium">
+                      Close
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </td>

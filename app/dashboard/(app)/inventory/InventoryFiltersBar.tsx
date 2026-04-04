@@ -3,12 +3,9 @@
 import React, { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { Category } from "@/types";
-import type { ViewerRole } from "@/lib/dashboardRoles";
-import { isPharmacist } from "@/lib/dashboardRoles";
 import { Button } from "@/components/ui/Button";
 import { SlidersHorizontal } from "lucide-react";
 
-/** Single-value API filters only (comma lists removed — backend expects known status names). */
 const CATALOG_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "All products" },
   { value: "published", label: "Published" },
@@ -17,26 +14,26 @@ const CATALOG_OPTIONS: { value: string; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ];
 
-const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100] as const;
+const REVISION_OPTIONS: { value: string; label: string }[] = [
+  { value: "", label: "Any revision state" },
+  { value: "none", label: "No staged revision" },
+  { value: "pending", label: "Revision queue (pending)" },
+  { value: "rejected", label: "Revision rejected" },
+];
 
-function catalogOptionsForRole(role: ViewerRole) {
-  if (isPharmacist(role)) {
-    return CATALOG_OPTIONS.filter((o) => ["", "published", "pending_review", "rejected"].includes(o.value));
-  }
-  return CATALOG_OPTIONS;
-}
+const PER_PAGE_OPTIONS = [10, 15, 25, 50, 100] as const;
 
 export function InventoryFiltersBar({
   categories,
-  role,
   catalogStatus,
+  revisionReviewStatus,
   categoryId,
   availability,
   perPage,
 }: {
   categories: Category[];
-  role: ViewerRole;
   catalogStatus: string;
+  revisionReviewStatus: string;
   categoryId: string;
   availability: string;
   perPage: string;
@@ -44,8 +41,6 @@ export function InventoryFiltersBar({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-
-  const catalogOptions = useMemo(() => catalogOptionsForRole(role), [role]);
 
   const apply = useCallback(
     (patch: Record<string, string>) => {
@@ -63,18 +58,21 @@ export function InventoryFiltersBar({
 
   const clearFilters = useCallback(() => {
     const sp = new URLSearchParams(searchParams?.toString());
-    ["catalog_status", "category_id", "availability", "per_page", "page"].forEach((k) => sp.delete(k));
+    ["catalog_status", "revision_review_status", "category_id", "availability", "per_page", "page"].forEach((k) =>
+      sp.delete(k)
+    );
     const qs = sp.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   }, [pathname, router, searchParams]);
 
   const hasActiveFilters = useMemo(() => {
     if (catalogStatus) return true;
+    if (revisionReviewStatus) return true;
     if (categoryId) return true;
     if (availability) return true;
     if (perPage && perPage !== "15") return true;
     return false;
-  }, [availability, categoryId, catalogStatus, perPage]);
+  }, [availability, catalogStatus, categoryId, perPage, revisionReviewStatus]);
 
   const perPageValue = perPage || "15";
 
@@ -99,16 +97,31 @@ export function InventoryFiltersBar({
           ) : null}
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <label className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-gray-600">Workflow status</span>
+            <span className="text-xs font-medium text-gray-600">Catalog status</span>
             <select
               value={catalogStatus}
               onChange={(e) => apply({ catalog_status: e.target.value })}
               className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01AC28]/25 focus:border-[#01AC28]"
             >
-              {catalogOptions.map((o) => (
+              {CATALOG_OPTIONS.map((o) => (
                 <option key={o.value || "all"} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-gray-600">Published revisions</span>
+            <select
+              value={revisionReviewStatus}
+              onChange={(e) => apply({ revision_review_status: e.target.value })}
+              className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#01AC28]/25 focus:border-[#01AC28]"
+            >
+              {REVISION_OPTIONS.map((o) => (
+                <option key={o.value || "any"} value={o.value}>
                   {o.label}
                 </option>
               ))}
@@ -165,9 +178,10 @@ export function InventoryFiltersBar({
         </div>
 
         <p className="text-[12px] leading-relaxed text-gray-500">
-          Filters apply on the server and work with the search box in the table. Tip: choose{" "}
-          <strong className="font-medium text-gray-700">Draft</strong> to see work-in-progress items, or{" "}
-          <strong className="font-medium text-gray-700">Pending review</strong> for the pharmacist queue.
+          Filters call <code className="rounded bg-gray-100 px-1 text-[11px]">GET /dashboard/products</code>. Use{" "}
+          <strong className="font-medium text-gray-700">Revision queue (pending)</strong> for PM edits waiting on a
+          pharmacist; <strong className="font-medium text-gray-700">Pending review</strong> for first-time publication
+          requests.
         </p>
       </div>
     </div>

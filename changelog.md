@@ -8,8 +8,8 @@
 |-------|-----------------|------------|
 | `admin` | Yes | Full access |
 | `staff` | Yes | Operations (imports, orders, categories, customers, offers, …) |
-| `product_manager` | Yes | Create/edit **draft** or **rejected** products only; upload **staging** images; edit **draft** detail tabs; submit for review |
-| `pharmacist` | Yes | **Read** catalog (all statuses); **approve** / **reject** pending items; **no** product create/update/delete, **no** image uploads |
+| `product_manager` | Yes | Create products; edit **all** statuses; on **published** products, detail tabs and images go to **draft/staging** until submitted and approved; submit for review |
+| `pharmacist` | Yes | Edit **all** products (live detail tabs and live images on published items); **draft** or **reject** published items; **approve** / **reject** first-publish and revision queues; **no** product **create** (403), **no** **delete** |
 | `customer` | Store login | Unchanged |
 
 `POST /api/dashboard/login` accepts all dashboard roles above (not only admin/staff).
@@ -25,15 +25,27 @@
 
 Existing/imported products default to `published` so current stores stay live.
 
+### Published revisions (`revision_review_status`)
+
+After first publish, PM edits to **published** products are held in **`detail_sections_draft`** and **staging** images until the PM calls **`submit-for-review`**. The listing stays **`catalog_status: published`**; **`revision_review_status`** becomes **`pending`** until a pharmacist approves (promotes draft → live) or rejects (keeps site on current live content; draft/staging remain for edits).
+
+| `revision_review_status` | Meaning |
+|--------------------------|---------|
+| `none` | No revision in queue (or cleared after approve) |
+| `pending` | Pharmacist should review staged draft + staging images |
+| `rejected` | Pharmacist rejected this revision; PM can change draft and resubmit |
+
+**List filter (dashboard):** `GET /api/dashboard/products?revision_review_status=pending`
+
 ### Detail tabs: live vs draft
 
 - **`detail_sections`** — **published** copy shown on the public product page (after approval).
-- **`detail_sections_draft`** — PM (or admin) edits **before** approval; pharmacist should compare draft vs live when reviewing.
+- **`detail_sections_draft`** — Staging copy for PM (and for **published** PM edits until approved); compare to live when reviewing.
 
 **Who writes where (same request field `detail_sections`):**
 
-- **Product manager** on **draft** or **rejected** → saved to **`detail_sections_draft`**.
-- **Admin / staff** → saved to **`detail_sections`** (live), subject to workflow rules.
+- **Product manager** on **draft**, **rejected**, or **published** → saved to **`detail_sections_draft`** (published stays live until approve).
+- **Admin / staff / pharmacist** → saved to **`detail_sections`** (live).
 
 ### Images (`product_images`)
 
@@ -52,6 +64,7 @@ Public `GET /api/products` and `GET /api/products/{id}` only return **published*
 ```
 GET /api/dashboard/products?catalog_status=draft
 GET /api/dashboard/products?catalog_status=pending_review,rejected
+GET /api/dashboard/products?revision_review_status=pending
 ```
 
 Comma-separated or single value; must be valid status names.
@@ -76,7 +89,11 @@ Dashboard prefix equivalents:
 { "catalog_rejection_note": "Reason for rejection" }
 ```
 
-**Approve** promotes `detail_sections_draft` → `detail_sections` (if present), replaces live images with promoted staging copies when staging images exist, then sets `catalog_status` to `published`.
+**Approve** — If **`catalog_status` is `pending_review`** (first publication): promotes `detail_sections_draft` → `detail_sections` (if present), promotes staging images to live, sets **`catalog_status`** to **`published`**, clears **`revision_review_status`**.
+
+If **`catalog_status` is already `published`** and **`revision_review_status` is `pending`**: promotes draft + staging to live only; product stays published; **`revision_review_status`** → **`none`**.
+
+**Reject** — First-publish queue: **`catalog_status`** → **`rejected`**. Published revision queue: **`revision_review_status`** → **`rejected`**; live storefront unchanged.
 
 ### Routes split summary
 

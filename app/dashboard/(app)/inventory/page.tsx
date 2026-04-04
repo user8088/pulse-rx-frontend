@@ -17,6 +17,7 @@ async function getProducts({
   page,
   q,
   catalogStatus,
+  revisionReviewStatus,
   categoryId,
   availability,
   perPage,
@@ -24,6 +25,7 @@ async function getProducts({
   page?: number;
   q?: string;
   catalogStatus?: string;
+  revisionReviewStatus?: string;
   categoryId?: string;
   availability?: string;
   perPage?: number;
@@ -35,6 +37,8 @@ async function getProducts({
     if (query) sp.set("q", query);
     const cs = (catalogStatus ?? "").trim();
     if (cs) sp.set("catalog_status", cs);
+    const rev = (revisionReviewStatus ?? "").trim().toLowerCase();
+    if (rev && ["none", "pending", "rejected"].includes(rev)) sp.set("revision_review_status", rev);
     const cat = (categoryId ?? "").trim();
     if (cat && /^\d+$/.test(cat)) sp.set("category_id", cat);
     const av = (availability ?? "").trim().toLowerCase();
@@ -71,6 +75,7 @@ export default async function InventoryPage({
     page?: string;
     q?: string;
     catalog_status?: string;
+    revision_review_status?: string;
     category_id?: string;
     availability?: string;
     per_page?: string;
@@ -90,6 +95,11 @@ export default async function InventoryPage({
     ? String(sp.catalog_status ?? "").trim()
     : (defaultCatalogStatusQuery(viewerRole) ?? "");
 
+  const revisionExplicit = sp.revision_review_status !== undefined && sp.revision_review_status !== null;
+  const revisionReviewStatus = revisionExplicit
+    ? String(sp.revision_review_status ?? "").trim().toLowerCase()
+    : "";
+
   const categoryId = String(sp.category_id ?? "").trim();
   const availability = String(sp.availability ?? "").trim().toLowerCase();
   const perPageRaw = sp.per_page ? Number.parseInt(String(sp.per_page), 10) : NaN;
@@ -101,6 +111,7 @@ export default async function InventoryPage({
       page,
       q,
       catalogStatus: catalogStatus || undefined,
+      revisionReviewStatus: revisionReviewStatus || undefined,
       categoryId: categoryId || undefined,
       availability: availability || undefined,
       perPage,
@@ -160,13 +171,12 @@ export default async function InventoryPage({
 
       {isProductManager(viewerRole) ? (
         <div className="rounded-xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-sm text-blue-900">
-          <p className="font-semibold text-blue-950">How you’ll see pharmacist feedback</p>
+          <p className="font-semibold text-blue-950">Draft vs live (published products)</p>
           <p className="mt-1 text-xs text-blue-900/90 leading-relaxed">
-            If a pharmacist <strong>rejects</strong> a submission, their note is stored on the product and shown on the
-            row (Rejected) and at the top when you edit. After you fix and resubmit, it goes back to{" "}
-            <strong>Pending review</strong>. If they <strong>approve</strong>, the product becomes{" "}
-            <strong>Published</strong> and leaves your draft/rejected filters—check the published list or search by
-            name/SKU. There is no separate inbox yet; use filters + rejection notes on each item.
+            On <strong>published</strong> items, your tab and image changes stay in <strong>draft / staging</strong> until
+            you <strong>Submit for review</strong>. The storefront stays on the current live version until a pharmacist
+            approves. Use the <strong>Revision queue</strong> filter to see items with a pending revision. Rejection notes
+            apply to the queue you submitted (first publish vs revision).
           </p>
         </div>
       ) : null}
@@ -225,8 +235,12 @@ export default async function InventoryPage({
 
       <InventoryFiltersBar
         categories={categories}
-        role={viewerRole}
         catalogStatus={catalogStatus}
+        revisionReviewStatus={
+          revisionReviewStatus && ["none", "pending", "rejected"].includes(revisionReviewStatus)
+            ? revisionReviewStatus
+            : ""
+        }
         categoryId={categoryId}
         availability={availability && ["yes", "no", "short"].includes(availability) ? availability : ""}
         perPage={perPage ? String(perPage) : "15"}
@@ -264,6 +278,9 @@ export default async function InventoryPage({
           params={{
             ...(q ? { q } : {}),
             ...(catalogStatus ? { catalog_status: catalogStatus } : {}),
+            ...(revisionReviewStatus && ["none", "pending", "rejected"].includes(revisionReviewStatus)
+              ? { revision_review_status: revisionReviewStatus }
+              : {}),
             ...(categoryId ? { category_id: categoryId } : {}),
             ...(availability && ["yes", "no", "short"].includes(availability) ? { availability } : {}),
             ...(perPage && perPage !== 15 ? { per_page: String(perPage) } : {}),

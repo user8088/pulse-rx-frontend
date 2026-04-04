@@ -162,7 +162,7 @@ export function ProductDetailSectionsEditor({
               {variant === "review"
                 ? "Compare live catalog copy with the pending draft submitted for approval."
                 : detailEditSource === "draft"
-                  ? "Edits are saved as draft until a pharmacist approves (same fields as live; server routes by role)."
+                  ? "Product manager: tab content is staged as draft until you submit for review and a pharmacist approves; the live product page stays unchanged until then."
                   : "Each block is one storefront tab: header + body. Order matches the product page."}
             </p>
           </div>

@@ -5,11 +5,9 @@ import type { Category, Product, ProductImage, User } from "@/types";
 import {
   canApproveOrReject,
   canDeleteProducts,
-  canProductManagerEditRow,
+  canEditProductCatalog,
   canSubmitForReview,
   canUploadProductImages,
-  canWriteProducts,
-  isAdminOrStaff,
   isPharmacist,
   isProductManager,
 } from "@/lib/dashboardRoles";
@@ -42,6 +40,27 @@ function pickPrimaryImage(images: ProductImage[] | undefined) {
   const primary = pool.find((i) => i.is_primary);
   if (primary) return primary;
   return [...pool].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))[0] ?? null;
+}
+
+function revisionReviewMeta(
+  rev: string | undefined
+): { label: string; className: string } | null {
+  switch (rev) {
+    case "pending":
+      return {
+        label: "Revision pending",
+        className: "bg-violet-50 text-violet-900 border-violet-200",
+      };
+    case "rejected":
+      return {
+        label: "Revision rejected",
+        className: "bg-orange-50 text-orange-900 border-orange-200",
+      };
+    case "none":
+      return null;
+    default:
+      return null;
+  }
 }
 
 function catalogStatusMeta(status: string | undefined): { label: string; className: string } | null {
@@ -148,16 +167,11 @@ export function ProductTableRow({
 
   /** Use raw API value for permissions — do not default to published (that blocked PM edits when the field was missing). */
   const catalogStatusRaw = product.catalog_status;
+  const revisionRaw = product.revision_review_status;
   const catalogMeta = catalogStatusMeta(catalogStatusRaw);
-  const readOnly =
-    isPharmacist(viewerRole) ||
-    (isProductManager(viewerRole) && !canProductManagerEditRow(catalogStatusRaw));
+  const revisionMeta = revisionReviewMeta(revisionRaw);
 
-  const canOpenEditor =
-    (canWriteProducts(viewerRole) &&
-      (isAdminOrStaff(viewerRole) ||
-        (isProductManager(viewerRole) && canProductManagerEditRow(catalogStatusRaw)))) ||
-    (isPharmacist(viewerRole) && catalogStatusRaw === "pending_review");
+  const canOpenEditor = canEditProductCatalog(viewerRole);
 
   const toggleEditing = () => {
     if (!canOpenEditor) return;
@@ -174,17 +188,26 @@ export function ProductTableRow({
   };
 
   const showDelete = canDeleteProducts(viewerRole);
-  const showImageUpload = canUploadProductImages(viewerRole) && !readOnly;
-  const detailVariant = isPharmacist(viewerRole) && catalogStatusRaw === "pending_review" ? "review" : "edit";
-  const detailEditSource: "live" | "draft" =
-    isProductManager(viewerRole) && canProductManagerEditRow(catalogStatusRaw) ? "draft" : "live";
+  const showImageUpload = canUploadProductImages(viewerRole);
+  const pharmacistReviewMode =
+    isPharmacist(viewerRole) &&
+    (catalogStatusRaw === "pending_review" ||
+      (catalogStatusRaw === "published" && revisionRaw === "pending"));
+  const detailVariant = pharmacistReviewMode ? "review" : "edit";
+  /** PM: always stage tab edits in draft; admin/staff/pharmacist write live per API. */
+  const detailEditSource: "live" | "draft" = isProductManager(viewerRole) ? "draft" : "live";
 
+  const rev = revisionRaw ?? "none";
   const showSubmitReview =
     canSubmitForReview(viewerRole) &&
-    (catalogStatusRaw === "draft" || catalogStatusRaw === "rejected") &&
-    !readOnly;
+    (catalogStatusRaw === "draft" ||
+      catalogStatusRaw === "rejected" ||
+      (catalogStatusRaw === "published" && rev !== "pending"));
 
-  const showApproveReject = canApproveOrReject(viewerRole) && catalogStatusRaw === "pending_review";
+  const showApproveReject =
+    canApproveOrReject(viewerRole) &&
+    (catalogStatusRaw === "pending_review" ||
+      (catalogStatusRaw === "published" && revisionRaw === "pending"));
 
   const categoryName = product.category?.category_name ?? "";
   const status = availabilityBadge(product.availability);
@@ -274,6 +297,13 @@ export function ProductTableRow({
                     {catalogMeta.label}
                   </span>
                 ) : null}
+                {revisionMeta && catalogStatusRaw === "published" ? (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide border ${revisionMeta.className}`}
+                  >
+                    {revisionMeta.label}
+                  </span>
+                ) : null}
               </div>
             </div>
           </div>
@@ -340,12 +370,14 @@ export function ProductTableRow({
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-base font-bold text-gray-900">
-                    {isPharmacist(viewerRole) ? "Review product" : "Edit product"}
+                    {pharmacistReviewMode ? "Review product" : "Edit product"}
                   </h4>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    {readOnly
-                      ? "Compare catalog data and approve or reject pending items."
-                      : "Update item details, images, and description tabs."}
+                    {pharmacistReviewMode
+                      ? "Compare live vs staged draft where applicable, approve or reject, or edit live fields directly."
+                      : isProductManager(viewerRole) && catalogStatusRaw === "published"
+                        ? "Tab and image changes are staged until you submit for review; the storefront stays on the current live version."
+                        : "Update item details, images, and description tabs."}
                   </p>
                 </div>
                 <Button
@@ -386,7 +418,9 @@ export function ProductTableRow({
                           pendingText="Publishing…"
                           className="h-9 px-4 text-xs font-semibold bg-emerald-700 text-white hover:bg-emerald-800 rounded-lg"
                         >
-                          Approve &amp; publish
+                          {catalogStatusRaw === "published" && revisionRaw === "pending"
+                            ? "Approve revision"
+                            : "Approve & publish"}
                         </PendingSubmitButton>
                       </form>
                       <form action={rejectProduct} className="flex flex-wrap items-end gap-2">
@@ -428,10 +462,7 @@ export function ProductTableRow({
                   <input type="hidden" name="box_unit_label" value={boxUnitLabel} />
                   <input type="hidden" name="base_unit_label" value={baseUnitLabel} />
 
-                  <fieldset
-                    disabled={readOnly}
-                    className="min-w-0 space-y-5 border-0 p-0 m-0 disabled:opacity-[0.65]"
-                  >
+                  <fieldset className="min-w-0 space-y-5 border-0 p-0 m-0">
                   {/* ── SECTION 1 : Basic Information ── */}
                   <div className="rounded-xl bg-white border border-gray-200 p-5 space-y-4">
                     <div className="flex items-center gap-2.5">
@@ -836,27 +867,19 @@ export function ProductTableRow({
                 </div>
 
                 {/* Full-width actions below the 2×2 grid (mobile: save after images + descriptions) */}
-                {!readOnly ? (
-                  <div className="col-span-1 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-end lg:col-span-2">
-                    <Button type="button" variant="secondary" onClick={closeEditing} className="h-10 px-6 rounded-lg text-sm font-medium">
-                      Cancel
-                    </Button>
-                    <PendingSubmitButton
-                      form={editFormId}
-                      pendingText="Saving…"
-                      disabled={!detailBlockReady}
-                      className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-semibold"
-                    >
-                      Save Product
-                    </PendingSubmitButton>
-                  </div>
-                ) : (
-                  <div className="col-span-1 flex justify-end border-t border-gray-200 pt-4 lg:col-span-2">
-                    <Button type="button" variant="secondary" onClick={closeEditing} className="h-10 px-6 rounded-lg text-sm font-medium">
-                      Close
-                    </Button>
-                  </div>
-                )}
+                <div className="col-span-1 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-end lg:col-span-2">
+                  <Button type="button" variant="secondary" onClick={closeEditing} className="h-10 px-6 rounded-lg text-sm font-medium">
+                    Cancel
+                  </Button>
+                  <PendingSubmitButton
+                    form={editFormId}
+                    pendingText="Saving…"
+                    disabled={!detailBlockReady}
+                    className="h-10 px-6 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-sm font-semibold"
+                  >
+                    Save Product
+                  </PendingSubmitButton>
+                </div>
               </div>
             </div>
           </td>

@@ -23,6 +23,9 @@ export interface ProductImage {
 /** Catalog approval workflow (dashboard). */
 export type CatalogStatus = "published" | "draft" | "pending_review" | "rejected";
 
+/** Staged PM edits on published products awaiting pharmacist review (dashboard). */
+export type RevisionReviewStatus = "none" | "pending" | "rejected";
+
 export interface Product {
   id: number;
   item_id: string;
@@ -50,6 +53,8 @@ export interface Product {
   detail_sections_locked?: boolean;
   details_synced_at?: string | null;
   catalog_status?: CatalogStatus;
+  /** When `catalog_status` is published: staged draft/staging revision queue (not storefront visibility). */
+  revision_review_status?: RevisionReviewStatus;
   /** Shown after reject; PM sees reason when editing a rejected product. */
   catalog_rejection_note?: string | null;
   can_sell_item?: boolean;

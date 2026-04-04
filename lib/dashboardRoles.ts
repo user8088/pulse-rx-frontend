@@ -1,4 +1,3 @@
-import type { CatalogStatus } from "@/types/product";
 import type { User } from "@/types/auth";
 
 export type ViewerRole = User["role"];
@@ -20,13 +19,18 @@ export function canImportProducts(role: ViewerRole): boolean {
   return isAdminOrStaff(role);
 }
 
-/** Can create/update/delete products via API (not pharmacist). */
+/** Can create/update/delete products via API (not pharmacist — use `canEditProductCatalog` for edits). */
 export function canWriteProducts(role: ViewerRole): boolean {
   return role === "admin" || role === "staff" || role === "product_manager";
 }
 
+/** Open product editor: admin, staff, PM, pharmacist (pharmacist edits live fields per API; no create). */
+export function canEditProductCatalog(role: ViewerRole): boolean {
+  return role === "admin" || role === "staff" || role === "product_manager" || role === "pharmacist";
+}
+
 export function canUploadProductImages(role: ViewerRole): boolean {
-  return role === "admin" || role === "staff" || role === "product_manager";
+  return role === "admin" || role === "staff" || role === "product_manager" || role === "pharmacist";
 }
 
 export function canDeleteProducts(role: ViewerRole): boolean {
@@ -42,17 +46,10 @@ export function canApproveOrReject(role: ViewerRole): boolean {
 }
 
 /**
- * PM may edit only draft/rejected rows. Admin/staff always (when they can open editor).
+ * Default `catalog_status` when the URL omits `catalog_status`.
  */
-export function canProductManagerEditRow(status: CatalogStatus | undefined | null): boolean {
-  // Missing status on older rows: allow edit so PMs are not locked out of the UI.
-  return status == null || status === "draft" || status === "rejected";
-}
-
-/**
- * Default `catalog_status` when the URL omits `catalog_status` (show everything on the dashboard list).
- * Narrow with the status dropdown (e.g. pharmacists → “Pending review”).
- */
-export function defaultCatalogStatusQuery(_role: ViewerRole): string | undefined {
+export function defaultCatalogStatusQuery(role: ViewerRole): string | undefined {
+  if (role === "pharmacist") return "pending_review";
   return undefined;
 }
+

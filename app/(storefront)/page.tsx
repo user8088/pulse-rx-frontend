@@ -11,54 +11,40 @@ import Testimonials from "@/components/Testimonials";
 import FAQ from "@/components/FAQ";
 import Footer from "@/components/Footer";
 import CategoryProductSection from "@/components/CategoryProductSection";
-import { getCategories } from "@/lib/api/categories";
+import { getCachedCategories } from "@/lib/api/categories";
 import { getProducts } from "@/lib/api/products";
 import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import type { Category } from "@/types/category";
+import type { CustomerCity } from "@/lib/context/CityContext";
 
 export default async function Home() {
-  let categories: Category[] = [];
-  try {
-    const data = await getCategories({ per_page: 10 });
-    categories = data.data;
-  } catch (error) {
-    console.error("Failed to fetch categories for home page:", error);
-  }
+  const cookieStore = await cookies();
+  const cityRaw = cookieStore.get("prx_customer_city")?.value;
+  const customerCity: CustomerCity | undefined =
+    cityRaw === "islamabad" || cityRaw === "other" ? cityRaw : undefined;
 
-  const customerCity = (await cookies()).get("prx_customer_city")?.value;
-  const cityParam =
-    customerCity === "islamabad" || customerCity === "other"
-      ? { customer_city: customerCity }
-      : {};
+  // Reuses the same in-flight promise as the layout — zero extra API calls.
+  const categoriesData = await getCachedCategories().catch(() => null);
+  const categories = categoriesData?.data ?? [];
 
   const queryClient = new QueryClient();
-  const productsPerCategory = await Promise.all(
+
+  // Prefetch products for every category in parallel.
+  await Promise.all(
     categories.map(async (c) => {
+      const params: Record<string, any> = { q: c.category_name, per_page: 30 };
+      if (customerCity) params.customer_city = customerCity;
       try {
-        return await getProducts({
-          q: c.category_name,
-          per_page: 30,
-          ...cityParam,
-        });
-      } catch (error) {
-        console.error(
-          "Failed to fetch products for category on home page:",
-          c.category_name,
-          error
+        const data = await getProducts(params);
+        queryClient.setQueryData(
+          ["products", { category: c.category_name, per_page: 30, customer_city: customerCity ?? undefined }],
+          data
         );
-        return null;
+      } catch (error) {
+        console.error("Failed to fetch products for category on home page:", c.category_name, error);
       }
     })
   );
-  productsPerCategory.forEach((paginated, i) => {
-    const categoryName = categories[i]?.category_name;
-    if (categoryName && paginated) {
-      queryClient.setQueryData(
-        ["products", { category: categoryName, per_page: 30, customer_city: customerCity ?? undefined }],
-        paginated
-      );
-    }
-  });
+
   const dehydratedState = dehydrate(queryClient);
 
   return (

@@ -2,9 +2,10 @@
 
 import React, { useCallback, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import type { Category } from "@/types";
+import type { Category, User } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { SlidersHorizontal } from "lucide-react";
+import { isPharmacist } from "@/lib/dashboardRoles";
 
 const CATALOG_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "All products" },
@@ -30,6 +31,7 @@ export function InventoryFiltersBar({
   categoryId,
   availability,
   perPage,
+  viewerRole,
 }: {
   categories: Category[];
   catalogStatus: string;
@@ -37,6 +39,7 @@ export function InventoryFiltersBar({
   categoryId: string;
   availability: string;
   perPage: string;
+  viewerRole?: User["role"];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -181,8 +184,15 @@ export function InventoryFiltersBar({
           Filters call <code className="rounded bg-gray-100 px-1 text-[11px]">GET /dashboard/products</code>. Use{" "}
           <strong className="font-medium text-gray-700">Revision queue (pending)</strong> for PM edits waiting on a
           pharmacist; <strong className="font-medium text-gray-700">Pending review</strong> for first-time publication
-          requests.
+          requests; <strong className="font-medium text-gray-700">Draft</strong> for items not yet live.
         </p>
+        {viewerRole && isPharmacist(viewerRole) ? (
+          <p className="text-[12px] leading-relaxed text-emerald-900/90 rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2">
+            <strong className="font-semibold">Pharmacist:</strong> Use <strong>Draft</strong> or{" "}
+            <strong>Pending review</strong> to find work. Each row has <strong>Publish</strong> (or select many →{" "}
+            <strong>Publish selected</strong>). Open <strong>Review</strong> for full detail before publishing.
+          </p>
+        ) : null}
       </div>
     </div>
   );

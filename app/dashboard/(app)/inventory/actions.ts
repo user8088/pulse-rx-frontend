@@ -34,6 +34,27 @@ function toFloatOrUndefined(value: FormDataEntryValue | null): number | undefine
   return n;
 }
 
+/**
+ * Catalog publish / review actions.
+ * Mutations elsewhere use `/products/...` (PUT, DELETE, import). Approve/reject must use the same routes
+ * so Laravel policies match (dashboard-prefixed routes may be admin-only and return 403 "unauthorized").
+ * Try `/products/{id}/{action}` first; on 403/404/405 try `/dashboard/products/{id}/{action}`.
+ */
+async function postCatalogWorkflow(
+  productId: string,
+  action: "approve" | "reject" | "submit-for-review",
+  init?: RequestInit
+): Promise<Response> {
+  const opts: RequestInit = { method: "POST", ...init };
+  const primary = await dashboardFetch(`/products/${productId}/${action}`, opts);
+  if (primary.ok) return primary;
+  if (primary.status === 403 || primary.status === 404 || primary.status === 405) {
+    const fallback = await dashboardFetch(`/dashboard/products/${productId}/${action}`, opts);
+    if (fallback.ok) return fallback;
+  }
+  return primary;
+}
+
 function parseDetailSectionsJson(raw: string): ProductDetailSection[] | null {
   const s = raw.trim();
   if (!s) return [];
@@ -160,7 +181,7 @@ export async function createProduct(formData: FormData) {
   return redirect("/dashboard/inventory?message=Product created successfully.");
 }
 
-export async function updateProduct(formData: FormData) {
+function buildUpdateBody(formData: FormData): { id: string; body: Record<string, unknown> } | { error: string } {
   const id = String(formData.get("id") ?? "").trim();
   const item_id = String(formData.get("item_id") ?? "").trim();
   const item_name = String(formData.get("item_name") ?? "").trim();
@@ -187,15 +208,12 @@ export async function updateProduct(formData: FormData) {
   const cold_chain_needed = toBool(formData.get("cold_chain_needed"));
   const item_discount = toFloatOrUndefined(formData.get("item_discount"));
 
-  if (!id) {
-    return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
-  }
+  if (!id) return { error: "Product ID is required." };
 
   const body: Record<string, unknown> = {};
   if (item_id) body.item_id = item_id;
   if (item_name) body.item_name = item_name;
 
-  // Allow clearing brand/category/generic_name by sending null (only if fields were submitted).
   if (hasBrand) {
     const brandTrimmed = String(brandRaw ?? "").trim();
     body.brand = brandTrimmed ? brandTrimmed : null;
@@ -238,12 +256,7 @@ export async function updateProduct(formData: FormData) {
     const rawJson = String(formData.get("detail_sections_json") ?? "");
     const sections = parseDetailSectionsJson(rawJson);
     if (sections === null) {
-      return redirect(
-        "/dashboard/inventory?error=failed&message=" +
-          encodeURIComponent(
-            "Invalid detail tabs. Each tab needs a header, and tabs must not conflict. Try again or reload the page."
-          )
-      );
+      return { error: "Invalid detail tabs. Each tab needs a header, and tabs must not conflict. Try again or reload the page." };
     }
     body.detail_sections = sections.map((s, index) => ({
       key: s.key,
@@ -255,6 +268,10 @@ export async function updateProduct(formData: FormData) {
     body.detail_sections_locked = lockStr !== "false" && lockStr !== "0";
   }
 
+  return { id, body };
+}
+
+async function sendProductUpdate(id: string, body: Record<string, unknown>): Promise<string | null> {
   let res: Response;
   try {
     res = await dashboardFetch(`/products/${id}`, {
@@ -262,13 +279,21 @@ export async function updateProduct(formData: FormData) {
       body: JSON.stringify(body),
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Network error";
-    return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
+    return err instanceof Error ? err.message : "Network error";
+  }
+  if (!res.ok) return await readErrorMessage(res);
+  return null;
+}
+
+export async function updateProduct(formData: FormData) {
+  const parsed = buildUpdateBody(formData);
+  if ("error" in parsed) {
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(parsed.error)}`);
   }
 
-  if (!res.ok) {
-    const message = await readErrorMessage(res);
-    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
+  const err = await sendProductUpdate(parsed.id, parsed.body);
+  if (err) {
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(err)}`);
   }
 
   revalidatePath("/dashboard/inventory");
@@ -344,6 +369,13 @@ export async function importProductsExcel(formData: FormData) {
   }
 
   if (!res.ok) {
+    if (res.status === 403) {
+      return redirect(
+        `/dashboard/inventory?error=failed&message=${encodeURIComponent(
+          "Import denied (403). Backend must allow product_manager on POST /products/import; new rows should default to draft until a pharmacist approves. See changelog.md."
+        )}`
+      );
+    }
     const message = await readErrorMessage(res);
     return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
   }
@@ -479,6 +511,63 @@ export async function deleteProductImage(formData: FormData) {
   return redirect("/dashboard/inventory?message=Image deleted successfully.");
 }
 
+export async function updateProductAndSubmit(formData: FormData) {
+  const parsed = buildUpdateBody(formData);
+  if ("error" in parsed) {
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(parsed.error)}`);
+  }
+
+  const updateErr = await sendProductUpdate(parsed.id, parsed.body);
+  if (updateErr) {
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(updateErr)}`);
+  }
+
+  let res: Response;
+  try {
+    res = await postCatalogWorkflow(parsed.id, "submit-for-review");
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Network error";
+    return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
+  }
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(message)}`);
+  }
+
+  revalidatePath("/dashboard/inventory");
+  return redirect("/dashboard/inventory?message=" + encodeURIComponent("Changes saved and submitted for review."));
+}
+
+/**
+ * Inline variant that returns a result object instead of redirecting.
+ * Used from the client via useTransition so the edit panel stays open.
+ */
+export async function stageImageDeletionInline(
+  productId: number,
+  imageId: number
+): Promise<{ ok: boolean; error?: string }> {
+  if (!productId || !imageId) {
+    return { ok: false, error: "Product ID and Image ID are required." };
+  }
+
+  let res: Response;
+  try {
+    res = await dashboardFetch(`/products/${productId}/images/${imageId}/stage-deletion`, {
+      method: "POST",
+    });
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : "Network error" };
+  }
+
+  if (!res.ok) {
+    const message = await readErrorMessage(res);
+    return { ok: false, error: message };
+  }
+
+  revalidatePath("/dashboard/inventory");
+  return { ok: true };
+}
+
 export async function submitProductForReview(formData: FormData) {
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
@@ -486,7 +575,7 @@ export async function submitProductForReview(formData: FormData) {
   }
   let res: Response;
   try {
-    res = await dashboardFetch(`/products/${id}/submit-for-review`, { method: "POST" });
+    res = await postCatalogWorkflow(id, "submit-for-review");
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Network error";
     return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
@@ -506,7 +595,7 @@ export async function approveProduct(formData: FormData) {
   }
   let res: Response;
   try {
-    res = await dashboardFetch(`/products/${id}/approve`, { method: "POST" });
+    res = await postCatalogWorkflow(id, "approve");
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Network error";
     return redirect(`/dashboard/inventory?error=network&message=${encodeURIComponent(message)}`);
@@ -525,11 +614,12 @@ export async function rejectProduct(formData: FormData) {
   if (!id) {
     return redirect("/dashboard/inventory?error=missing&message=Product ID is required.");
   }
+  const body = JSON.stringify(note ? { catalog_rejection_note: note } : {});
   let res: Response;
   try {
-    res = await dashboardFetch(`/products/${id}/reject`, {
-      method: "POST",
-      body: JSON.stringify(note ? { catalog_rejection_note: note } : {}),
+    res = await postCatalogWorkflow(id, "reject", {
+      headers: { "Content-Type": "application/json" },
+      body,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Network error";
@@ -541,5 +631,104 @@ export async function rejectProduct(formData: FormData) {
   }
   revalidatePath("/dashboard/inventory");
   return redirect("/dashboard/inventory?message=" + encodeURIComponent("Product rejected."));
+}
+
+function parseIdListJson(raw: string): number[] | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    const out: number[] = [];
+    for (const x of parsed) {
+      if (typeof x === "number" && Number.isFinite(x) && x > 0) {
+        out.push(x);
+        continue;
+      }
+      if (typeof x === "string" && /^\d+$/.test(x.trim())) {
+        const n = Number.parseInt(x.trim(), 10);
+        if (Number.isFinite(n) && n > 0) out.push(n);
+      }
+    }
+    return out.length ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Approve/publish many products (same workflow as single approve). */
+export async function bulkApproveProducts(formData: FormData) {
+  const ids = parseIdListJson(String(formData.get("ids") ?? ""));
+  if (!ids || ids.length === 0) {
+    return redirect("/dashboard/inventory?error=missing&message=No products selected to publish.");
+  }
+  let ok = 0;
+  const failed: number[] = [];
+  let firstError: string | null = null;
+  for (const id of ids) {
+    let res: Response;
+    try {
+      res = await postCatalogWorkflow(String(id), "approve");
+    } catch {
+      failed.push(id);
+      if (!firstError) firstError = "Network error";
+      continue;
+    }
+    if (res.ok) ok++;
+    else {
+      failed.push(id);
+      if (!firstError) {
+        try {
+          firstError = await readErrorMessage(res);
+        } catch {
+          firstError = `HTTP ${res.status}`;
+        }
+      }
+    }
+  }
+  revalidatePath("/dashboard/inventory");
+  if (failed.length === 0) {
+    return redirect(
+      `/dashboard/inventory?message=${encodeURIComponent(`Published ${ok} product(s).`)}`
+    );
+  }
+  const detail = firstError ? ` Example: ${firstError}` : "";
+  const unauthorized =
+    (firstError ?? "").toLowerCase().includes("unauthorized") ||
+    (firstError ?? "").toLowerCase().includes("forbidden");
+  const backendNote =
+    unauthorized || ok === 0
+      ? " Backend: allow the approver role on POST /products/{id}/approve (see changelog.md — Approve / publish authorization)."
+      : "";
+  const msg = `Published ${ok} of ${ids.length}. Failed: ${failed.length}.${detail}${backendNote}`.trim();
+  if (ok === 0) {
+    return redirect(`/dashboard/inventory?error=failed&message=${encodeURIComponent(msg)}`);
+  }
+  return redirect(`/dashboard/inventory?message=${encodeURIComponent(msg)}`);
+}
+
+/** Hard-delete many products (admin/staff). */
+export async function bulkDeleteProducts(formData: FormData) {
+  const ids = parseIdListJson(String(formData.get("ids") ?? ""));
+  if (!ids || ids.length === 0) {
+    return redirect("/dashboard/inventory?error=missing&message=No products selected to delete.");
+  }
+  let ok = 0;
+  const failed: number[] = [];
+  for (const id of ids) {
+    let res: Response;
+    try {
+      res = await dashboardFetch(`/products/${id}`, { method: "DELETE" });
+    } catch {
+      failed.push(id);
+      continue;
+    }
+    if (res.ok || res.status === 204) ok++;
+    else failed.push(id);
+  }
+  revalidatePath("/dashboard/inventory");
+  const msg =
+    failed.length === 0
+      ? `Deleted ${ok} product(s).`
+      : `Deleted ${ok} of ${ids.length}. Failed IDs: ${failed.join(", ")}.`;
+  return redirect(`/dashboard/inventory?message=${encodeURIComponent(msg)}`);
 }
 

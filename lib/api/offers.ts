@@ -1,3 +1,4 @@
+import { cache } from "react";
 import apiClient from "./client";
 import type { Offer } from "@/types/offer";
 
@@ -26,3 +27,6 @@ function filterActiveOffers(offers: Offer[]): Offer[] {
     return start && end && now >= start && now <= end;
   });
 }
+
+/** Server-side deduped within a single RSC render pass. */
+export const getCachedOffers = cache(() => getOffers());

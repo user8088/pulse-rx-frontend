@@ -1,116 +1,205 @@
-# Frontend integration notes
+# Changelog
 
-## Catalog approval workflow (product manager + pharmacist)
+## 2026-04-12 — Approve / publish authorization (“This action is unauthorized”)
 
-### Roles (`user.role`)
+### Symptom
 
-| Value | Dashboard login | Typical UI |
-|-------|-----------------|------------|
-| `admin` | Yes | Full access |
-| `staff` | Yes | Operations (imports, orders, categories, customers, offers, …) |
-| `product_manager` | Yes | Create products; edit **all** statuses; on **published** products, detail tabs and images go to **draft/staging** until submitted and approved; submit for review |
-| `pharmacist` | Yes | Edit **all** products (live detail tabs and live images on published items); **draft** or **reject** published items; **approve** / **reject** first-publish and revision queues; **no** product **create** (403), **no** **delete** |
-| `customer` | Store login | Unchanged |
+Bulk or single **Publish** / **Approve** returns **Published 0 of N** with **Example: This action is unauthorized.** (or Laravel’s **403** with the same text). The Next.js app calls the API with the same **Bearer** token as other dashboard actions; **this is not a frontend routing bug** if both `POST /products/{id}/approve` and the optional `POST /dashboard/products/{id}/approve` fallback return 403.
 
-`POST /api/dashboard/login` accepts all dashboard roles above (not only admin/staff).
+### Frontend behavior
 
-### Product lifecycle (`catalog_status`)
+- Server actions use **`postCatalogWorkflow`** in `app/dashboard/(app)/inventory/actions.ts`: tries **`POST /products/{id}/approve`** first, then **`POST /dashboard/products/{id}/approve`** only on 403/404/405 from the first call.
+- **Bulk approve** runs the same approve request once per selected id. Each call must be authorized by the backend.
 
-| Status | Storefront (`GET /api/products*`) | Meaning |
-|--------|-----------------------------------|---------|
-| `published` | Visible | Live catalog |
-| `draft` | Hidden | PM work in progress |
-| `pending_review` | Hidden | Awaiting pharmacist/admin/staff approval |
-| `rejected` | Hidden | Sent back; PM edits and resubmits |
+### Backend changes required (Laravel / API)
 
-Existing/imported products default to `published` so current stores stay live.
+1. **`ProductPolicy` (or gate) for `approve` / `update` / `review`**
 
-### Published revisions (`revision_review_status`)
+   - Ensure **`pharmacist`** (and **`admin`** / **`staff`** if they should publish) is **explicitly allowed** to run the action that handles **`POST /products/{id}/approve`**.
+   - Laravel often uses `$this->authorize('approve', $product)` or `Gate::authorize('approve', $product)`. If **`approve`** is missing from the policy or defaults to `false`, the API returns **403** with *This action is unauthorized.*
 
-After first publish, PM edits to **published** products are held in **`detail_sections_draft`** and **staging** images until the PM calls **`submit-for-review`**. The listing stays **`catalog_status: published`**; **`revision_review_status`** becomes **`pending`** until a pharmacist approves (promotes draft → live) or rejects (keeps site on current live content; draft/staging remain for edits).
+2. **Route middleware**
 
-| `revision_review_status` | Meaning |
-|--------------------------|---------|
-| `none` | No revision in queue (or cleared after approve) |
-| `pending` | Pharmacist should review staged draft + staging images |
-| `rejected` | Pharmacist rejected this revision; PM can change draft and resubmit |
+   - Confirm the route group for **`/api/.../products/{product}/approve`** (or your prefix) uses middleware that attaches the authenticated user and **does not** restrict roles to `admin` only.
 
-**List filter (dashboard):** `GET /api/dashboard/products?revision_review_status=pending`
+3. **Same user as list**
 
-### Detail tabs: live vs draft
+   - If **`GET /dashboard/products`** works but **approve** returns 403, the policy for **read** vs **approve** is inconsistent — grant **`approve`** to the same roles that should publish catalog items.
 
-- **`detail_sections`** — **published** copy shown on the public product page (after approval).
-- **`detail_sections_draft`** — Staging copy for PM (and for **published** PM edits until approved); compare to live when reviewing.
+4. **`reject` and `submit-for-review`**
 
-**Who writes where (same request field `detail_sections`):**
+   - Apply the same role checks for **`POST /products/{id}/reject`** and **`POST /products/{id}/submit-for-review`** so PM/pharmacist flows match product rules.
 
-- **Product manager** on **draft**, **rejected**, or **published** → saved to **`detail_sections_draft`** (published stays live until approve).
-- **Admin / staff / pharmacist** → saved to **`detail_sections`** (live).
+5. **Bulk / sequential calls**
 
-### Images (`product_images`)
+   - No special “bulk” endpoint is required; the frontend sends **N separate approve requests**. Each must pass authorization.
 
-- **`is_staging: false`** — live images used on the storefront (`tenants/.../products/{item_id}/images/...`).
-- **`is_staging: true`** — staging uploads (`tenants/.../products/{item_id}/staging/images/...`) until **approve** copies them to live and clears staging rows.
+### Quick policy sketch (illustrative only)
 
-Upload routing:
-
-- **Product manager** → always staging.
-- **Admin/staff** → staging if product is **not** `published`; if **published**, uploads go to **live** paths (quick fix path).
-
-Public `GET /api/products` and `GET /api/products/{id}` only return **published** products and **non-staging** images.
-
-### List filters (dashboard only)
-
-```
-GET /api/dashboard/products?catalog_status=draft
-GET /api/dashboard/products?catalog_status=pending_review,rejected
-GET /api/dashboard/products?revision_review_status=pending
+```php
+// In ProductPolicy
+public function approve(User $user, Product $product): bool
+{
+    return in_array($user->role, ['pharmacist', 'admin', 'staff'], true);
+}
 ```
 
-Comma-separated or single value; must be valid status names.
+Register the policy and ensure the controller calls `authorize('approve', $product)` (or equivalent) and that **`pharmacist`** is included in your role enum / checks.
 
-### Workflow endpoints (authenticated)
+---
 
-| Method | Path | Roles |
-|--------|------|--------|
-| `POST` | `/api/products/{id}/submit-for-review` | admin, staff, product_manager |
-| `POST` | `/api/products/{id}/approve` | admin, staff, pharmacist |
-| `POST` | `/api/products/{id}/reject` | admin, staff, pharmacist |
+## 2026-04-12 — Product Manager: inventory API & Excel import (fixes 403 Forbidden)
 
-Dashboard prefix equivalents:
+### What was wrong
 
-- `/api/dashboard/products/{id}/submit-for-review`
-- `/api/dashboard/products/{id}/approve`
-- `/api/dashboard/products/{id}/reject`
+The inventory page loads data with **`GET /dashboard/products`** (see `app/dashboard/(app)/inventory/page.tsx`). Excel import uses **`POST /products/import`**. If the backend only allows **admin** / **staff** (or **pharmacist**) on those routes, **`product_manager` gets HTTP 403**. The UI then shows an empty list (0 products) and/or a red banner such as **Forbidden** (from the API JSON `message` or from a failed import redirect).
 
-**Reject body (optional):**
+The frontend already allows PMs to use the import button (`canImportProducts`); listing and importing must succeed on the API side.
 
+### Frontend changes
+
+| Change | File |
+|--------|------|
+| `getProducts` distinguishes **403** from other failures; dedicated banner explains PM needs API access to `GET /dashboard/products` | `app/dashboard/(app)/inventory/page.tsx` |
+| Import action: on **403**, redirect with a clear message pointing to this changelog | `app/dashboard/(app)/inventory/actions.ts` |
+
+### Backend changes required
+
+#### 1. `GET /dashboard/products` — allow `product_manager`
+
+- Authorize **`product_manager`** the same way as other roles that may view the dashboard catalog (e.g. **admin**, **staff**), or define a scoped policy that still returns every row the PM is allowed to see (drafts, pending review, published, etc.).
+- **Do not** return 403 for this role if they are expected to manage the catalog; otherwise the inventory screen stays empty.
+
+#### 2. `POST /products/import` — allow `product_manager`
+
+- Authorize **`product_manager`** to upload the Excel file.
+- **Default new/updated rows to draft workflow**, consistent with manual PM creates:
+  - Set **`catalog_status`** to **`draft`** (or **`pending_review`** if your workflow treats bulk upload as “submit for review” in one step — align with product rules).
+  - Products must **not** appear on the public storefront until a **pharmacist** approves (same as manually created PM products).
+
+#### 3. Optional: related read endpoints
+
+- If **`GET /categories`** (or any endpoint the inventory page calls for filters) returns **403** for PM, allow read access for building filters and forms.
+
+#### 4. Policy summary
+
+| Endpoint | Role `product_manager` |
+|----------|------------------------|
+| `GET /dashboard/products` | Allowed (list + filters) |
+| `POST /products/import` | Allowed; rows draft / pending per workflow |
+| `POST /products` (create) | Already expected for PM — keep `draft` until approval |
+
+---
+
+## 2026-04-12 — PM Staging UX + Pharmacist Diff Review Panel
+
+### Frontend Changes
+
+| Change | File |
+|--------|------|
+| PM image deletion no longer closes the edit panel — uses `useTransition` + inline result | `ProductTableRow.tsx` |
+| Images staged for deletion show red dashed border, grayscale, diagonal strikethrough, "Pending deletion" badge | `ProductTableRow.tsx` |
+| New `RevisionDiffPanel` component — shows pharmacist a table of field changes (live vs proposed), staged deletions, new staging images, and draft tabs | `ProductTableRow.tsx` |
+| PM edit panel shows violet "Staging mode" banner explaining all edits are staged | `ProductTableRow.tsx` |
+| Inline success/error toast inside edit panel (no page-level redirect) | `ProductTableRow.tsx` |
+| `stageImageDeletionInline` action returns `{ ok, error }` instead of redirecting | `actions.ts` |
+| `ProductImage` type now includes `is_staging_deletion` boolean | `types/product.ts` |
+| `Product` type now includes `revision_data` for field-level diff | `types/product.ts` |
+
+### Backend Changes Required
+
+#### 1. `revision_data` field on product response
+
+When the backend stages PM edits (via `PUT /products/{id}`), store the changed fields in a `revision_data` JSON column. Return this column in the product API response so the frontend can display a diff.
+
+**Example response:**
 ```json
-{ "catalog_rejection_note": "Reason for rejection" }
+{
+  "id": 42,
+  "item_name": "Paracetamol 500mg",
+  "retail_price_secondary": "120.00",
+  "revision_data": {
+    "retail_price_secondary": "135.00",
+    "brand": "New Brand Name"
+  }
+}
 ```
 
-**Approve** — If **`catalog_status` is `pending_review`** (first publication): promotes `detail_sections_draft` → `detail_sections` (if present), promotes staging images to live, sets **`catalog_status`** to **`published`**, clears **`revision_review_status`**.
+#### 2. `is_staging_deletion` on product images
 
-If **`catalog_status` is already `published`** and **`revision_review_status` is `pending`**: promotes draft + staging to live only; product stays published; **`revision_review_status`** → **`none`**.
+Add `is_staging_deletion` boolean to the `product_images` table/response. When a PM calls `POST /products/{id}/images/{imageId}/stage-deletion`, set `is_staging_deletion = true`. On approve, hard-delete the image. On reject, clear the flag.
 
-**Reject** — First-publish queue: **`catalog_status`** → **`rejected`**. Published revision queue: **`revision_review_status`** → **`rejected`**; live storefront unchanged.
+---
 
-### Routes split summary
+## 2026-04-12 — Product Manager Workflow Fixes
 
-- **Admin/staff only:** `POST /products/import`, categories/customers/orders CRUD (as before), dashboard imports, etc.
-- **Admin/staff/product_manager:** `POST|PATCH|DELETE /api/products*`, image uploads, submit-for-review.
-- **Admin/staff/pharmacist:** approve/reject.
+### Frontend Changes
 
-### UI suggestions
+| Change | File |
+|--------|------|
+| PM sees **Save & Submit for Review** instead of Save Product | `ProductTableRow.tsx` |
+| PM image delete calls `stage-deletion` endpoint instead of hard DELETE | `ProductTableRow.tsx` |
+| PM can keep editing after submitting (removed `rev !== "pending"` guard) | `ProductTableRow.tsx` |
+| New `updateProductAndSubmit` action (PUT + submit-for-review in sequence) | `actions.ts` |
+| New `stageImageDeletion` action (POST to stage-deletion endpoint) | `actions.ts` |
+| Extracted `buildUpdateBody` + `sendProductUpdate` helpers for reuse | `actions.ts` |
 
-- **Product manager:** show products filtered to `draft` + `rejected`; editor reads/writes `detail_sections` in API body (mapped server-side to draft); show staging image previews via `object_key` + `NEXT_PUBLIC_BUCKET_URL` (see `FRONTEND_OBJECT_STORAGE.md`).
-- **Pharmacist:** default list filter `catalog_status=pending_review`; review screen shows `detail_sections` (current live) vs `detail_sections_draft` + staging vs live images.
-- **Admin:** unrestricted catalog edits; can use import.
+### Backend Changes Required
 
-### Migrations
+#### 1. New endpoint: `POST /products/{id}/images/{imageId}/stage-deletion`
 
-Tenant migration adds `catalog_*` columns, `detail_sections_draft`, and `product_images.is_staging`. Run:
+When a Product Manager "deletes" an image it should NOT be hard-deleted. Instead it should be staged for pharmacist review (same pattern as tab/detail draft edits).
 
-```bash
-php artisan tenants:migrate
-```
+**Expected behavior:**
+- Mark the image with `staged_for_deletion = true` (or add it to a `revision_images_to_delete` JSON column on the product).
+- The image stays visible in the gallery with a "Pending deletion" indicator.
+- When a pharmacist approves the revision (`POST /products/{id}/approve`), the image is actually deleted from storage.
+- When a pharmacist rejects, the deletion flag is cleared.
+
+**Request:** `POST /api/dashboard/products/{productId}/images/{imageId}/stage-deletion`
+**Auth:** `product_manager`, `admin`, or `staff`.
+**Response:** `200 OK` with the updated image object.
+
+**Alternative (simpler) approach:**
+- Add `is_staging_deletion` boolean to the `product_images` table.
+- The existing `DELETE /products/{id}/images/{imageId}` can check the caller's role:
+  - pharmacist/admin/staff → hard delete immediately.
+  - product_manager → set `is_staging_deletion = true`.
+- The approve endpoint then also processes any images flagged for staged deletion.
+
+#### 2. `POST /products/{id}/submit-for-review` — allow re-submission
+
+**Current behavior (broken):** once `revision_review_status = "pending"`, the PM cannot submit again. The endpoint rejects with "Already pending review".
+
+**Required behavior:** a PM should be able to make further edits and re-submit even while a pending review exists. Each re-submission overwrites the staged draft with the latest changes.
+
+**Changes needed:**
+- Remove or relax the guard that prevents submission when `revision_review_status = "pending"`.
+- Allow `PUT /products/{id}` followed by `POST /products/{id}/submit-for-review` to succeed even with an existing pending revision.
+- The latest draft simply replaces the previous pending draft.
+
+#### 3. `PUT /products/{id}` — verify PM edits always stage when pending
+
+When a PM calls `PUT /products/{id}` on a published product, the backend already stages changes as a draft revision. Verify this works correctly when `revision_review_status` is already `"pending"` — the PUT should update the draft, not fail.
+
+---
+
+## 2026-04-12 — Storefront Data-Fetching Optimization
+
+### Changes
+
+| Change | File |
+|--------|------|
+| Added `getCachedCategories` using React `cache()` for server-side dedup | `lib/api/categories.ts` |
+| Added `getCachedOffers` using React `cache()` for server-side dedup | `lib/api/offers.ts` |
+| Layout prefetches categories + offers + subcategories in parallel | `app/(storefront)/layout.tsx` |
+| Page reuses cached categories (zero extra API call) | `app/(storefront)/page.tsx` |
+| CityProvider accepts `initialCity` prop from server cookie | `lib/context/CityContext.tsx` |
+| Boosted staleTime to 5 min, gcTime to 10 min, disabled refetchOnWindowFocus | `components/StoreProviders.tsx` |
+
+### Result
+
+- Eliminated duplicate `/api/categories` call (layout + page used different `per_page`).
+- Offers prefetched server-side — no client-side fetch on first paint.
+- City query key mismatch fixed — hydrated product data no longer triggers refetch.
+- Total API calls on home page first load reduced from ~29 to ~10.

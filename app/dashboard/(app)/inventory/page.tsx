@@ -3,7 +3,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { dashboardFetch } from "@/lib/dashboardApi";
 import { getDashboardUser } from "@/lib/dashboardUser";
-import { defaultCatalogStatusQuery } from "@/lib/dashboardRoles";
+import { canImportProducts, defaultCatalogStatusQuery, isProductManager } from "@/lib/dashboardRoles";
 import type { PaginatedCategories, PaginatedProducts } from "@/types";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";
@@ -11,8 +11,6 @@ import { createProduct, importProductsExcel } from "./actions";
 import { ProductsTable } from "./ProductsTable";
 import { InventoryToolbar } from "./InventoryToolbar";
 import { InventoryFiltersBar } from "./InventoryFiltersBar";
-import { isProductManager } from "@/lib/dashboardRoles";
-
 async function getProducts({
   page,
   q,
@@ -29,7 +27,7 @@ async function getProducts({
   categoryId?: string;
   availability?: string;
   perPage?: number;
-}): Promise<PaginatedProducts | null> {
+}): Promise<{ data: PaginatedProducts | null; forbidden: boolean }> {
   try {
     const sp = new URLSearchParams();
     if (page && Number.isFinite(page)) sp.set("page", String(page));
@@ -49,10 +47,14 @@ async function getProducts({
     // Catalog workflow filters (catalog_status, etc.) are implemented on the dashboard route only.
     // Storefront GET /products ignores them and can hide non-published rows.
     const res = await dashboardFetch(qs ? `/dashboard/products?${qs}` : "/dashboard/products");
-    if (!res.ok) return null;
-    return res.json();
+    if (!res.ok) {
+      if (res.status === 403) return { data: null, forbidden: true };
+      return { data: null, forbidden: false };
+    }
+    const data = (await res.json()) as PaginatedProducts;
+    return { data, forbidden: false };
   } catch {
-    return null;
+    return { data: null, forbidden: false };
   }
 }
 
@@ -106,7 +108,7 @@ export default async function InventoryPage({
   const perPage =
     Number.isFinite(perPageRaw) && perPageRaw >= 1 && perPageRaw <= 100 ? perPageRaw : undefined;
 
-  const [productsData, categoriesData] = await Promise.all([
+  const [productsLoad, categoriesData] = await Promise.all([
     getProducts({
       page,
       q,
@@ -118,6 +120,9 @@ export default async function InventoryPage({
     }),
     getCategories(),
   ]);
+
+  const productsData = productsLoad.data;
+  const productsForbidden = productsLoad.forbidden;
 
   const categories = categoriesData?.data ?? [];
   const products = productsData?.data ?? [];
@@ -181,7 +186,17 @@ export default async function InventoryPage({
         </div>
       ) : null}
 
-      {!productsData && (
+      {!productsData && productsForbidden ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          <p className="font-semibold">Access denied (403) — inventory API</p>
+          <p className="mt-1 text-xs text-red-800/90 leading-relaxed">
+            The backend returned <strong>Forbidden</strong> for{" "}
+            <code className="rounded bg-red-100/80 px-1">GET /dashboard/products</code>. Product managers must be allowed
+            to list products the same way as other dashboard roles (see <code className="rounded bg-red-100/80 px-1">changelog.md</code>{" "}
+            — PM catalog &amp; import API). After the API is updated, refresh this page.
+          </p>
+        </div>
+      ) : !productsData ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
           <p className="font-semibold">Products could not be loaded</p>
           <p className="mt-1 text-xs text-red-800/90 leading-relaxed">
@@ -190,7 +205,7 @@ export default async function InventoryPage({
             access <code className="rounded bg-red-100/80 px-1">GET /dashboard/products</code>.
           </p>
         </div>
-      )}
+      ) : null}
 
       {(message || error) && (
         <div
@@ -244,6 +259,7 @@ export default async function InventoryPage({
         categoryId={categoryId}
         availability={availability && ["yes", "no", "short"].includes(availability) ? availability : ""}
         perPage={perPage ? String(perPage) : "15"}
+        viewerRole={viewerRole}
       />
 
       {/* Actions */}
@@ -253,7 +269,7 @@ export default async function InventoryPage({
         createProductAction={createProduct}
         importProductsAction={importProductsExcel}
         showCreateProduct={viewerRole !== "pharmacist"}
-        showImportProducts={viewerRole === "admin" || viewerRole === "staff"}
+        showImportProducts={canImportProducts(viewerRole)}
       />
 
       {/* Table (below) */}

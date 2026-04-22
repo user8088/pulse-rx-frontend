@@ -27,17 +27,24 @@ interface CityContextType {
 
 const CityContext = createContext<CityContextType | undefined>(undefined);
 
-export function CityProvider({ children }: { children: React.ReactNode }) {
-  const [customerCity, setCustomerCityState] = useState<CustomerCity | null>(null);
-  const [showCityModal, setShowCityModal] = useState(false);
+export function CityProvider({
+  children,
+  initialCity,
+}: {
+  children: React.ReactNode;
+  initialCity?: CustomerCity | null;
+}) {
+  const [customerCity, setCustomerCityState] = useState<CustomerCity | null>(initialCity ?? null);
+  const [showCityModal, setShowCityModal] = useState(!initialCity);
 
   const refreshCity = useCallback(() => {
     setCustomerCityState(getCustomerCityFromCookie());
   }, []);
 
   useEffect(() => {
-    setCustomerCityState(getCustomerCityFromCookie());
-    setShowCityModal(!getCustomerCityFromCookie());
+    const fromCookie = getCustomerCityFromCookie();
+    if (fromCookie !== customerCity) setCustomerCityState(fromCookie);
+    setShowCityModal(!fromCookie);
   }, []);
 
   const setCustomerCity = useCallback((city: CustomerCity | null) => {

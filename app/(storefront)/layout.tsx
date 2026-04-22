@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { QueryClient, dehydrate, HydrationBoundary } from "@tanstack/react-query";
-import { getCategories, getSubcategories } from "@/lib/api/categories";
-import { CityProvider } from "@/lib/context/CityContext";
+import { getCachedCategories, getSubcategories } from "@/lib/api/categories";
+import { getCachedOffers } from "@/lib/api/offers";
+import { CityProvider, type CustomerCity } from "@/lib/context/CityContext";
 import { CityModal } from "@/components/CityModal";
 
 export default async function StorefrontLayout({
@@ -8,16 +10,21 @@ export default async function StorefrontLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const cityRaw = cookieStore.get("prx_customer_city")?.value;
+  const initialCity: CustomerCity | null =
+    cityRaw === "islamabad" || cityRaw === "other" ? cityRaw : null;
+
   const queryClient = new QueryClient();
 
-  // Best-effort prefetch: if the API is down or slow during build,
-  // we don't want the whole build to fail. Navbar and other clients
-  // will still load categories via React Query on the client.
   try {
-    const categoriesData = await queryClient.fetchQuery({
-      queryKey: ["categories"],
-      queryFn: () => getCategories({ per_page: 20 }),
-    });
+    const [categoriesData, offersData] = await Promise.all([
+      getCachedCategories(),
+      getCachedOffers(),
+    ]);
+
+    queryClient.setQueryData(["categories"], categoriesData);
+    queryClient.setQueryData(["offers"], offersData);
 
     await Promise.all(
       (categoriesData?.data ?? []).map((cat) =>
@@ -29,7 +36,7 @@ export default async function StorefrontLayout({
     );
   } catch (error) {
     console.error(
-      "StorefrontLayout prefetch failed; continuing without cached categories:",
+      "StorefrontLayout prefetch failed; continuing without cached data:",
       error
     );
   }
@@ -37,7 +44,7 @@ export default async function StorefrontLayout({
   const dehydratedState = dehydrate(queryClient);
 
   return (
-    <CityProvider>
+    <CityProvider initialCity={initialCity}>
       <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
       <CityModal />
     </CityProvider>

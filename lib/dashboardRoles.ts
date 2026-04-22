@@ -14,9 +14,9 @@ export function isAdminOrStaff(role: ViewerRole): boolean {
   return role === "admin" || role === "staff";
 }
 
-/** Excel / bulk import — admin & staff only per catalog workflow. */
+/** Excel / bulk import — admin, staff, and product managers. */
 export function canImportProducts(role: ViewerRole): boolean {
-  return isAdminOrStaff(role);
+  return isAdminOrStaff(role) || isProductManager(role);
 }
 
 /** Can create/update/delete products via API (not pharmacist — use `canEditProductCatalog` for edits). */
@@ -46,10 +46,24 @@ export function canApproveOrReject(role: ViewerRole): boolean {
 }
 
 /**
+ * Product is in a state where Approve/Publish applies (draft, queue, rejected resubmit, or published with pending revision).
+ */
+export function isProductAwaitingPublication(product: {
+  catalog_status?: string | null;
+  revision_review_status?: string | null;
+}): boolean {
+  const s = product.catalog_status;
+  const r = product.revision_review_status ?? "none";
+  if (s === "draft" || s === "pending_review" || s === "rejected") return true;
+  if (s === "published" && r === "pending") return true;
+  return false;
+}
+
+/**
  * Default `catalog_status` when the URL omits `catalog_status`.
+ * Pharmacists see **all** products by default so drafts and the approval queue are both reachable; they can filter to Pending review or Draft.
  */
 export function defaultCatalogStatusQuery(role: ViewerRole): string | undefined {
-  if (role === "pharmacist") return "pending_review";
   return undefined;
 }
 

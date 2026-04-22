@@ -16,6 +16,8 @@ export interface ProductImage {
   is_primary: boolean;
   /** When true, image is staging until approval (dashboard uploads for non-published products). */
   is_staging?: boolean;
+  /** When true, a PM has staged this image for deletion; pharmacist must approve. */
+  is_staging_deletion?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -57,6 +59,8 @@ export interface Product {
   revision_review_status?: RevisionReviewStatus;
   /** Shown after reject; PM sees reason when editing a rejected product. */
   catalog_rejection_note?: string | null;
+  /** Staged revision data submitted by PM; contains only changed fields. */
+  revision_data?: Record<string, unknown> | null;
   can_sell_item?: boolean;
   can_sell_secondary?: boolean;
   can_sell_box?: boolean;

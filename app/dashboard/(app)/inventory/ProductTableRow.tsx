@@ -22,6 +22,7 @@ import {
   approveProduct,
   deleteProduct,
   deleteProductImage,
+  getDashboardProduct,
   rejectProduct,
   stageImageDeletionInline,
   submitProductForReview,
@@ -30,7 +31,7 @@ import {
   updateProductImageMetadata,
   uploadProductImage,
 } from "./actions";
-import { AlertTriangle, ChevronDown, Edit2, ImagePlus, Star, Trash2, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, Edit2, ImagePlus, Info, Star, Trash2, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { SubcategorySelect } from "./SubcategorySelect";
 import { ProductDetailSectionsEditor } from "./ProductDetailSectionsEditor";
@@ -119,12 +120,14 @@ function PriceField({
   defaultValue,
   disabled,
   className: extraClass,
+  changed,
 }: {
   label: React.ReactNode;
   name: string;
   defaultValue: string | number | "";
   disabled?: boolean;
   className?: string;
+  changed?: boolean;
 }) {
   return (
     <div className={cn("space-y-1", disabled && "opacity-60 pointer-events-none", extraClass)}>
@@ -135,7 +138,10 @@ function PriceField({
           type="number"
           min={0}
           step="0.01"
-          className="pr-10"
+          className={cn(
+            "pr-10",
+            changed && "border-red-400 ring-2 ring-red-100 bg-red-50/30 focus:border-red-500 focus:ring-red-200"
+          )}
           defaultValue={defaultValue}
           placeholder="0.00"
           disabled={disabled}
@@ -156,8 +162,38 @@ function fmtRevVal(key: string, val: unknown): string {
 }
 
 /**
- * Small inline tooltip icon placed next to a field label.
- * Shows "Was: X → Proposed: Y" on hover.
+ * Friendly label for revision_data keys.
+ */
+function friendlyFieldLabel(key: string): string {
+  const map: Record<string, string> = {
+    item_name: "Product Name",
+    item_id: "Item ID",
+    brand: "Brand",
+    category_id: "Category",
+    generic_name: "Generic Name",
+    availability: "Availability",
+    retail_price_unit: "Supplier Price",
+    retail_price_item: "Price per item",
+    retail_price_secondary: "Price per secondary",
+    retail_price_box: "Price per box",
+    can_sell_item: "Sell per item",
+    can_sell_secondary: "Sell per secondary unit",
+    can_sell_box: "Sell per box",
+    secondary_unit_label: "Secondary tier label",
+    box_unit_label: "Box tier label",
+    base_unit_label: "Base unit label",
+    pack_qty: "Units per box",
+    strip_qty: "Strip Qty",
+    item_discount: "Discount",
+    is_narcotic: "Narcotic",
+    cold_chain_needed: "Cold chain needed",
+  };
+  return map[key] ?? key.replace(/_/g, " ");
+}
+
+/**
+ * Inline tooltip icon next to a field label.
+ * Hover shows a rich before → after diff card.
  */
 function RevisionTooltip({
   fieldKey,
@@ -171,20 +207,35 @@ function RevisionTooltip({
   if (!revisionData || !(fieldKey in revisionData)) return null;
   const proposed = revisionData[fieldKey];
   return (
-    <span className="group/tip relative ml-1.5 inline-flex align-middle">
-      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white cursor-help shadow-sm">
-        <AlertTriangle className="h-2.5 w-2.5" />
+    <span className="group/tip relative ml-1 inline-flex align-middle">
+      <span
+        className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-red-100 border border-red-300 text-red-600 cursor-help"
+        title="Field was changed — hover for details"
+      >
+        <Info className="h-3 w-3" />
       </span>
-      <span className="pointer-events-none invisible group-hover/tip:visible absolute left-full top-1/2 -translate-y-1/2 ml-2 z-50 w-56 rounded-lg border border-red-100 bg-white p-3 text-[11px] leading-relaxed shadow-xl">
-        <span className="block font-bold text-red-600 mb-1">Changed by PM</span>
-        <span className="flex justify-between border-b border-gray-100 pb-1 mb-1">
-          <span className="text-gray-400">Was</span>
-          <span className="text-gray-700 font-medium">{fmtRevVal(fieldKey, currentValue)}</span>
-        </span>
-        <span className="flex justify-between">
-          <span className="text-red-500">Proposed</span>
-          <span className="text-red-700 font-semibold">{fmtRevVal(fieldKey, proposed)}</span>
-        </span>
+      <span className="pointer-events-none invisible group-hover/tip:visible absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-64 rounded-xl border border-red-200 bg-white p-3.5 text-[11px] leading-relaxed shadow-2xl">
+        {/* Arrow */}
+        <span className="absolute left-1/2 -translate-x-1/2 top-full -mt-[6px] w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-white" />
+        <span className="absolute left-1/2 -translate-x-1/2 top-full -mt-[7px] w-0 h-0 border-l-[7px] border-r-[7px] border-t-[7px] border-l-transparent border-r-transparent border-t-red-200" />
+        {/* Content */}
+        <div className="font-bold text-red-700 mb-2 flex items-center gap-1.5">
+          <AlertTriangle className="h-3 w-3 text-red-500" />
+          {friendlyFieldLabel(fieldKey)} changed
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex items-start gap-2 rounded-md bg-gray-50 px-2.5 py-1.5">
+            <span className="text-gray-400 shrink-0 text-[10px] uppercase tracking-wider font-semibold mt-px">Before</span>
+            <span className="text-gray-700 font-medium break-all">{fmtRevVal(fieldKey, currentValue)}</span>
+          </div>
+          <div className="flex items-center justify-center text-red-300">
+            ↓
+          </div>
+          <div className="flex items-start gap-2 rounded-md bg-red-50 border border-red-100 px-2.5 py-1.5">
+            <span className="text-red-400 shrink-0 text-[10px] uppercase tracking-wider font-semibold mt-px">After</span>
+            <span className="text-red-800 font-semibold break-all">{fmtRevVal(fieldKey, proposed)}</span>
+          </div>
+        </div>
       </span>
     </span>
   );
@@ -202,6 +253,9 @@ export function ProductTableRow({
   bulkSelect?: { enabled: boolean; selected: boolean; onToggle: () => void };
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [fetchedRevisionData, setFetchedRevisionData] = useState<Record<string, unknown> | null>(null);
+  const [fetchedRevisionStatus, setFetchedRevisionStatus] = useState<string | null | undefined>(null);
+  const [, startLoadingDetail] = useTransition();
   const [editCategoryId, setEditCategoryId] = useState<string>(
     product.category_id != null ? String(product.category_id) : ""
   );
@@ -232,16 +286,26 @@ export function ProductTableRow({
 
   const toggleEditing = () => {
     if (!canOpenEditor) return;
-    setIsEditing((v) => {
-      const next = !v;
-      setDetailBlockReady(!next);
-      return next;
-    });
+    const opening = !isEditing;
+    setIsEditing(!isEditing);
+    setDetailBlockReady(isEditing);
+    if (opening) {
+      startLoadingDetail(async () => {
+        const full = await getDashboardProduct(String(product.id));
+        if (full) {
+          const rd = full.revision_data as Record<string, unknown> | null | undefined;
+          setFetchedRevisionData(rd && Object.keys(rd).length > 0 ? rd : null);
+          setFetchedRevisionStatus(full.revision_review_status ?? null);
+        }
+      });
+    }
   };
 
   const closeEditing = () => {
     setIsEditing(false);
     setDetailBlockReady(true);
+    setFetchedRevisionData(null);
+    setFetchedRevisionStatus(null);
   };
 
   const showDelete = canDeleteProducts(viewerRole);
@@ -314,16 +378,45 @@ export function ProductTableRow({
   const editFormId = `dashboard-edit-product-${product.id}`;
 
   /* ── Revision helpers for inline field highlighting ── */
-  const revData = pharmacistReviewMode
-    ? (product.revision_data as Record<string, unknown> | null) ?? null
-    : null;
+  /** Use fetched revision_data (from detail endpoint) when available, else fall back to list-level data. */
+  const rawRevisionData = fetchedRevisionData ?? ((product.revision_data as Record<string, unknown> | null) ?? null);
+  const hasRevision = !!rawRevisionData && typeof rawRevisionData === "object" && Object.keys(rawRevisionData).length > 0;
+  const revData = hasRevision ? rawRevisionData : null;
+  /** Use fetched revision status when available (detail endpoint returns the live value). */
+  const effectiveRevisionRaw = fetchedRevisionStatus ?? revisionRaw;
   const isChanged = (key: string) => !!(revData && key in revData);
-  const fieldRing = (key: string) =>
-    isChanged(key) ? "rounded-lg ring-2 ring-red-200 bg-red-50/40 p-2 -m-1" : "";
+
+  /** Red border wrapper for text/select fields that changed. */
+  const fieldChangedWrap = (key: string) =>
+    isChanged(key) ? "space-y-1 rounded-lg border-2 border-red-300 bg-red-50/40 p-2.5" : "space-y-1";
+
+  /** Red-highlight class for a checkbox label when the boolean was toggled. */
+  const checkboxChangedCls = (key: string) =>
+    isChanged(key)
+      ? "flex items-center gap-2 text-sm font-medium cursor-pointer select-none rounded-lg border-2 border-red-300 bg-red-50 px-3 py-1.5"
+      : "flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none";
+
+  /** Checkbox input class — red tint when changed. */
+  const checkboxChangedInputCls = (key: string) =>
+    isChanged(key)
+      ? "h-4 w-4 rounded border-red-400 text-red-600 focus:ring-red-300 bg-red-50"
+      : "h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500";
+
   const productRecord = product as unknown as Record<string, unknown>;
   const tip = (k: string) => (
     <RevisionTooltip fieldKey={k} revisionData={revData} currentValue={productRecord[k]} />
   );
+
+  /** Build a change summary list for the pharmacist banner. */
+  const changeSummary = useMemo(() => {
+    if (!revData) return [];
+    return Object.entries(revData).map(([key, proposed]) => ({
+      key,
+      label: friendlyFieldLabel(key),
+      before: fmtRevVal(key, productRecord[key]),
+      after: fmtRevVal(key, proposed),
+    }));
+  }, [revData, productRecord]);
 
   return (
     <>
@@ -479,9 +572,9 @@ export function ProductTableRow({
                   </h4>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {pharmacistReviewMode
-                      ? catalogStatusRaw === "draft" || catalogStatusRaw === "pending_review" || catalogStatusRaw === "rejected"
-                        ? "Check details, then Publish to make this product live on the store, or Reject with a note."
-                        : "Review PM changes highlighted below. Approve to publish or reject with a note."
+                      ? hasRevision
+                        ? "PM edited this published product — changed fields are highlighted in red. Approve to apply or reject with a note."
+                        : "This product is awaiting your review. Check the details below, then Approve to publish or Reject with a note."
                       : pmRole
                         ? "All your changes are staged for pharmacist review — nothing goes live until approved."
                         : "Update item details, images, and description tabs."}
@@ -530,10 +623,63 @@ export function ProductTableRow({
                 </div>
               ) : null}
 
-              {/* ── Compact pharmacist summary banner ── */}
+              {/* ── Pharmacist review banner ── */}
               {pharmacistReviewMode && (() => {
-                const parts: string[] = [];
+                /* Case 1: Published product with PM revision — show red diff summary */
+                if (hasRevision) {
+                  const fc = Object.keys(revData!).length;
+                  const parts: string[] = [];
+                  if (fc) parts.push(`${fc} field edit${fc > 1 ? "s" : ""}`);
+                  if (stagedDeletionIds.size) parts.push(`${stagedDeletionIds.size} image deletion${stagedDeletionIds.size > 1 ? "s" : ""}`);
+                  const ni = product.images?.filter((i) => i.is_staging).length ?? 0;
+                  if (ni) parts.push(`${ni} new image${ni > 1 ? "s" : ""}`);
+                  const dt = product.detail_sections_draft?.length ?? 0;
+                  if (dt) parts.push(`${dt} tab change${dt > 1 ? "s" : ""}`);
+                  return (
+                    <div className="mb-4 rounded-xl border border-red-200 bg-gradient-to-b from-red-50/60 to-white overflow-hidden">
+                      <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-red-100 bg-red-50/50">
+                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                        <p className="text-xs text-red-900">
+                          <span className="font-bold">PM submitted changes: </span>
+                          {parts.join(", ")}
+                        </p>
+                      </div>
+                      {changeSummary.length > 0 && (
+                        <div className="px-4 py-3">
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {changeSummary.map(({ key, label, before, after }) => (
+                              <div key={key} className="flex items-center gap-2 text-[11px]">
+                                <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-semibold text-gray-700">
+                                  {label}
+                                </span>
+                                <span className="text-gray-400 truncate">{before}</span>
+                                <span className="text-red-400 shrink-0">→</span>
+                                <span className="text-red-700 font-semibold truncate">{after}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                /* Case 2: Draft / pending_review / rejected — new product awaiting review */
+                return (
+                  <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+                    <Info className="h-4 w-4 text-blue-500 shrink-0" />
+                    <p className="text-xs text-blue-900 leading-relaxed">
+                      <span className="font-bold">Awaiting your review.</span> This product is{" "}
+                      {catalogStatusRaw === "pending_review" ? "pending review" : catalogStatusRaw === "rejected" ? "previously rejected" : "a draft"}.
+                      Verify the details below and Approve to publish it to the storefront.
+                    </p>
+                  </div>
+                );
+              })()}
+
+              {/* PM viewing own staged revision */}
+              {pmRole && effectiveRevisionRaw === "pending" && (() => {
                 const fc = revData ? Object.keys(revData).length : 0;
+                const parts: string[] = [];
                 if (fc) parts.push(`${fc} field edit${fc > 1 ? "s" : ""}`);
                 if (stagedDeletionIds.size) parts.push(`${stagedDeletionIds.size} image deletion${stagedDeletionIds.size > 1 ? "s" : ""}`);
                 const ni = product.images?.filter((i) => i.is_staging).length ?? 0;
@@ -542,15 +688,30 @@ export function ProductTableRow({
                 if (dt) parts.push(`${dt} tab change${dt > 1 ? "s" : ""}`);
                 if (!parts.length) return null;
                 return (
-                  <div className="mb-4 flex items-center gap-2.5 rounded-lg border border-violet-200 bg-violet-50 px-4 py-2.5">
-                    <Edit2 className="h-4 w-4 text-violet-600 shrink-0" />
-                    <p className="text-xs text-violet-800">
-                      <span className="font-semibold">PM submitted: </span>
-                      {parts.join(", ")}.
-                      {fc > 0 && (
-                        <> Changed fields are highlighted in <span className="font-semibold text-red-600">red</span> — hover the <AlertTriangle className="inline h-3 w-3 text-red-500 -mt-0.5" /> icon to see the original value.</>
-                      )}
-                    </p>
+                  <div className="mb-4 rounded-xl border border-red-200 bg-gradient-to-b from-red-50/60 to-white overflow-hidden">
+                    <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-red-100 bg-red-50/50">
+                      <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />
+                      <p className="text-xs text-red-900">
+                        <span className="font-bold">Your staged changes: </span>
+                        {parts.join(", ")}
+                      </p>
+                    </div>
+                    {changeSummary.length > 0 && (
+                      <div className="px-4 py-3">
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {changeSummary.map(({ key, label, before, after }) => (
+                            <div key={key} className="flex items-center gap-2 text-[11px]">
+                              <span className="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-semibold text-gray-700">
+                                {label}
+                              </span>
+                              <span className="text-gray-400 truncate">{before}</span>
+                              <span className="text-red-400 shrink-0">→</span>
+                              <span className="text-red-700 font-semibold truncate">{after}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -634,28 +795,28 @@ export function ProductTableRow({
 
                     <div className="space-y-3">
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className={cn("space-y-1", fieldRing("item_name"))}>
+                        <div className={fieldChangedWrap("item_name")}>
                           <label className="text-xs font-medium text-gray-600">Product Name {tip("item_name")}</label>
-                          <Input name="item_name" defaultValue={product.item_name} required />
+                          <Input name="item_name" defaultValue={product.item_name} required className={isChanged("item_name") ? "border-red-400 focus:border-red-500" : ""} />
                         </div>
-                        <div className={cn("space-y-1", fieldRing("item_id"))}>
+                        <div className={fieldChangedWrap("item_id")}>
                           <label className="text-xs font-medium text-gray-600">Item ID {tip("item_id")}</label>
-                          <Input name="item_id" defaultValue={product.item_id} required />
+                          <Input name="item_id" defaultValue={product.item_id} required className={isChanged("item_id") ? "border-red-400 focus:border-red-500" : ""} />
                         </div>
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className={cn("space-y-1", fieldRing("brand"))}>
+                        <div className={fieldChangedWrap("brand")}>
                           <label className="text-xs font-medium text-gray-600">Brand {tip("brand")}</label>
-                          <Input name="brand" defaultValue={product.brand ?? ""} placeholder="e.g. HealthSafe" />
+                          <Input name="brand" defaultValue={product.brand ?? ""} placeholder="e.g. HealthSafe" className={isChanged("brand") ? "border-red-400 focus:border-red-500" : ""} />
                         </div>
-                        <div className={cn("space-y-1", fieldRing("category_id"))}>
+                        <div className={fieldChangedWrap("category_id")}>
                           <label className="text-xs font-medium text-gray-600">Category {tip("category_id")}</label>
                           <select
                             name="category_id"
                             value={editCategoryId}
                             onChange={(e) => setEditCategoryId(e.target.value)}
-                            className={selectClass}
+                            className={cn(selectClass, isChanged("category_id") && "border-red-400 ring-2 ring-red-100 bg-red-50/30 focus:border-red-500 focus:ring-red-200")}
                           >
                             <option value="">— None —</option>
                             {categories.map((c) => (
@@ -666,13 +827,13 @@ export function ProductTableRow({
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className={cn("space-y-1", fieldRing("generic_name"))}>
+                        <div className={fieldChangedWrap("generic_name")}>
                           <label className="text-xs font-medium text-gray-600">Generic Name {tip("generic_name")}</label>
-                          <Input name="generic_name" defaultValue={product.generic_name ?? ""} placeholder="e.g. Paracetamol" />
+                          <Input name="generic_name" defaultValue={product.generic_name ?? ""} placeholder="e.g. Paracetamol" className={isChanged("generic_name") ? "border-red-400 focus:border-red-500" : ""} />
                         </div>
-                        <div className={cn("space-y-1", fieldRing("availability"))}>
+                        <div className={fieldChangedWrap("availability")}>
                           <label className="text-xs font-medium text-gray-600">Availability {tip("availability")}</label>
-                          <select name="availability" defaultValue={product.availability ?? "yes"} className={selectClass}>
+                          <select name="availability" defaultValue={product.availability ?? "yes"} className={cn(selectClass, isChanged("availability") && "border-red-400 ring-2 ring-red-100 bg-red-50/30 focus:border-red-500 focus:ring-red-200")}>
                             <option value="yes">Available</option>
                             <option value="short">Short supply</option>
                             <option value="no">Unavailable</option>
@@ -697,36 +858,39 @@ export function ProductTableRow({
                       <span className="text-sm font-bold text-gray-900">Pricing Options</span>
                     </div>
 
-                    {/* Yellow highlight box */}
+                    {/* Selling method checkboxes */}
                     <div className="rounded-lg bg-amber-50/80 border border-amber-200/60 px-4 py-3 space-y-2.5">
                       <p className="text-sm font-semibold text-gray-800">How will you sell this?</p>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                        <label className={checkboxChangedCls("can_sell_item")}>
                           <input
                             type="checkbox"
                             checked={canSellItem}
                             onChange={(e) => setCanSellItem(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            className={checkboxChangedInputCls("can_sell_item")}
                           />
                           Sell per item (e.g. per tablet)
+                          {isChanged("can_sell_item") && tip("can_sell_item")}
                         </label>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                        <label className={checkboxChangedCls("can_sell_secondary")}>
                           <input
                             type="checkbox"
                             checked={canSellSecondary}
                             onChange={(e) => setCanSellSecondary(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            className={checkboxChangedInputCls("can_sell_secondary")}
                           />
                           Sell per secondary unit (strip, pack)
+                          {isChanged("can_sell_secondary") && tip("can_sell_secondary")}
                         </label>
-                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 cursor-pointer select-none">
+                        <label className={checkboxChangedCls("can_sell_box")}>
                           <input
                             type="checkbox"
                             checked={canSellBox}
                             onChange={(e) => setCanSellBox(e.target.checked)}
-                            className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                            className={checkboxChangedInputCls("can_sell_box")}
                           />
                           Sell per box
+                          {isChanged("can_sell_box") && tip("can_sell_box")}
                         </label>
                       </div>
                     </div>
@@ -741,7 +905,8 @@ export function ProductTableRow({
                               label={<>Price per item (e.g. per tablet) {tip("retail_price_item")}</>}
                               name="retail_price_item"
                               defaultValue={itemPriceDefault}
-                              className={fieldRing("retail_price_item")}
+                              className={isChanged("retail_price_item") ? fieldChangedWrap("retail_price_item") : undefined}
+                              changed={isChanged("retail_price_item")}
                             />
                           </div>
                         )}
@@ -749,19 +914,21 @@ export function ProductTableRow({
                         {/* Secondary tier */}
                         {canSellSecondary && (
                           <div className="space-y-3">
-                            <div className={cn("space-y-1", fieldRing("secondary_unit_label"))}>
+                            <div className={fieldChangedWrap("secondary_unit_label")}>
                               <label className="text-xs font-medium text-gray-600">Secondary tier label {tip("secondary_unit_label")}</label>
                               <Input
                                 value={secondaryLabel}
                                 onChange={(e) => setSecondaryLabel(e.target.value)}
                                 placeholder="e.g. Strip, Pack, Piece, Sachet"
+                                className={isChanged("secondary_unit_label") ? "border-red-400 focus:border-red-500" : ""}
                               />
                             </div>
                             <PriceField
                               label={<>Price per secondary unit {tip("retail_price_secondary")}</>}
                               name="retail_price_secondary"
                               defaultValue={secondaryPriceDefault}
-                              className={fieldRing("retail_price_secondary")}
+                              className={isChanged("retail_price_secondary") ? fieldChangedWrap("retail_price_secondary") : undefined}
+                              changed={isChanged("retail_price_secondary")}
                             />
                           </div>
                         )}
@@ -769,12 +936,13 @@ export function ProductTableRow({
                         {/* Box tier */}
                         {canSellBox && (
                           <div className="space-y-3">
-                            <div className={cn("space-y-1", fieldRing("box_unit_label"))}>
+                            <div className={fieldChangedWrap("box_unit_label")}>
                               <label className="text-xs font-medium text-gray-600">Box tier label {tip("box_unit_label")}</label>
                               <Input
                                 value={boxUnitLabel}
                                 onChange={(e) => setBoxUnitLabel(e.target.value)}
                                 placeholder="e.g. Box, Pack, Carton"
+                                className={isChanged("box_unit_label") ? "border-red-400 focus:border-red-500" : ""}
                               />
                             </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -782,9 +950,10 @@ export function ProductTableRow({
                                 label={<>Price per box {tip("retail_price_box")}</>}
                                 name="retail_price_box"
                                 defaultValue={boxPriceDefault}
-                                className={fieldRing("retail_price_box")}
+                                className={isChanged("retail_price_box") ? fieldChangedWrap("retail_price_box") : undefined}
+                                changed={isChanged("retail_price_box")}
                               />
-                              <div className={cn("space-y-1", fieldRing("pack_qty"))}>
+                              <div className={fieldChangedWrap("pack_qty")}>
                                 <label className="text-xs font-medium text-gray-600">Units per box (pack_qty) {tip("pack_qty")}</label>
                                 <Input
                                   name="pack_qty"
@@ -793,6 +962,7 @@ export function ProductTableRow({
                                   step={1}
                                   defaultValue={product.pack_qty ?? ""}
                                   placeholder="e.g. 24"
+                                  className={isChanged("pack_qty") ? "border-red-400 focus:border-red-500" : ""}
                                 />
                               </div>
                             </div>
@@ -800,12 +970,13 @@ export function ProductTableRow({
                         )}
 
                         {/* Base unit (optional) */}
-                        <div className={cn("space-y-1", fieldRing("base_unit_label"))}>
+                        <div className={fieldChangedWrap("base_unit_label")}>
                           <label className="text-xs font-medium text-gray-600">Base unit label (optional) {tip("base_unit_label")}</label>
                           <Input
                             value={baseUnitLabel}
                             onChange={(e) => setBaseUnitLabel(e.target.value)}
                             placeholder="e.g. Tablet, Capsule, Bottle"
+                            className={isChanged("base_unit_label") ? "border-red-400 focus:border-red-500" : ""}
                           />
                         </div>
                       </div>
@@ -834,7 +1005,7 @@ export function ProductTableRow({
 
                     {showAdvanced && (
                       <div className="border-t border-gray-100 p-5 space-y-4">
-                        <div className={cn("space-y-1", fieldRing("retail_price_unit"))}>
+                        <div className={fieldChangedWrap("retail_price_unit")}>
                           <label className="text-xs font-medium text-gray-600">Supplier Price (Internal) {tip("retail_price_unit")}</label>
                           <Input
                             name="retail_price_unit"
@@ -843,12 +1014,13 @@ export function ProductTableRow({
                             step="0.01"
                             defaultValue={unitPriceDefault}
                             placeholder="0.00"
+                            className={isChanged("retail_price_unit") ? "border-red-400 focus:border-red-500" : ""}
                           />
                           <p className="text-[11px] text-gray-400 mt-1">For margin calculations only. Not shown to customers.</p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className={cn("space-y-1", fieldRing("strip_qty"))}>
+                          <div className={fieldChangedWrap("strip_qty")}>
                             <label className="text-xs font-medium text-gray-600">Strip Qty {tip("strip_qty")}</label>
                             <Input
                               name="strip_qty"
@@ -857,9 +1029,10 @@ export function ProductTableRow({
                               step={1}
                               defaultValue={product.strip_qty ?? ""}
                               placeholder="—"
+                              className={isChanged("strip_qty") ? "border-red-400 focus:border-red-500" : ""}
                             />
                           </div>
-                          <div className={cn("space-y-1", fieldRing("item_discount"))}>
+                          <div className={fieldChangedWrap("item_discount")}>
                             <label className="text-xs font-medium text-gray-600">Discount {tip("item_discount")}</label>
                             <Input
                               name="item_discount"
@@ -868,17 +1041,18 @@ export function ProductTableRow({
                               step="0.01"
                               defaultValue={discountDefault}
                               placeholder="0.00"
+                              className={isChanged("item_discount") ? "border-red-400 focus:border-red-500" : ""}
                             />
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center gap-x-6 gap-y-3 pt-1">
-                          <label className={cn("flex items-center gap-2 text-sm font-medium text-gray-600 cursor-pointer select-none", fieldRing("is_narcotic"))}>
-                            <input name="is_narcotic" type="checkbox" value="true" defaultChecked={product.is_narcotic} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-3 pt-1">
+                          <label className={checkboxChangedCls("is_narcotic")}>
+                            <input name="is_narcotic" type="checkbox" value="true" defaultChecked={product.is_narcotic} className={checkboxChangedInputCls("is_narcotic")} />
                             Narcotic {tip("is_narcotic")}
                           </label>
-                          <label className={cn("flex items-center gap-2 text-sm font-medium text-gray-600 cursor-pointer select-none", fieldRing("cold_chain_needed"))}>
-                            <input name="cold_chain_needed" type="checkbox" value="true" defaultChecked={product.cold_chain_needed} className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
+                          <label className={checkboxChangedCls("cold_chain_needed")}>
+                            <input name="cold_chain_needed" type="checkbox" value="true" defaultChecked={product.cold_chain_needed} className={checkboxChangedInputCls("cold_chain_needed")} />
                             Cold chain needed {tip("cold_chain_needed")}
                           </label>
                         </div>

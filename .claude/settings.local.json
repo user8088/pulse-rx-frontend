@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__zai-mcp-server__analyze_image",
+      "Bash(head:*)",
+      "Bash(xxd:*)",
+      "Bash(wc:*)",
+      "Bash(tail:*)",
+      "Bash(git:*)",
+      "mcp__zai-mcp-server__extract_text_from_screenshot"
+    ]
+  }
+}

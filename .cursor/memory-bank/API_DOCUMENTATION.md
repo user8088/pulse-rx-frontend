@@ -1,4 +1,4 @@
-## Pulse RX API Documentation
+## Pulse RX API Doc
 
 This document describes **every API route currently registered in** `routes/api.php`, including the exact path, required middleware, request validation rules, response shapes, and important behavioral notes.
 

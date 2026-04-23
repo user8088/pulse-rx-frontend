@@ -4,7 +4,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductGrid from "@/components/ProductGrid";
 import { Pagination } from "@/components/ui/Pagination";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { ChevronRight } from "lucide-react";
 import { getProducts } from "@/lib/api/products";
 import { getOffers } from "@/lib/api/offers";

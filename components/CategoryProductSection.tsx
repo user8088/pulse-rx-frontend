@@ -1,6 +1,6 @@
 'use client';
 
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 import { getProducts } from "@/lib/api/products";

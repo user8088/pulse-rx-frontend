@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { getProductImportLogs } from "@/lib/productImportLogs";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";

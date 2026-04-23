@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/utils/cn";
 import { User, Percent, ShoppingCart, FolderHeart } from "lucide-react";

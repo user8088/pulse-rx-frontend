@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import Image from "next/image";
 import { getDashboardOrder } from "@/lib/api/dashboardOrders";
 import type { Order } from "@/types/order";

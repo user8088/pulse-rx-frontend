@@ -1,7 +1,7 @@
 'use client';
 
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { Star, ChevronRight, Quote } from "lucide-react";
 import { useRef, useState } from "react";
 

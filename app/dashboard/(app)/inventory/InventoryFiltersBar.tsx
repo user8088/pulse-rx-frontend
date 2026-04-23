@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useCallback, useMemo } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import type { Category, User } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { SlidersHorizontal } from "lucide-react";

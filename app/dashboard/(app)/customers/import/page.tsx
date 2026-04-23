@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { importCustomersAction } from "../actions";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";

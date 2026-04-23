@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { getCustomer, getCustomerOrders } from "@/lib/api/dashboardCustomers";
 import { CustomerDetailTabs } from "./CustomerDetailTabs";
 import { CustomerInfoTab } from "./CustomerInfoTab";

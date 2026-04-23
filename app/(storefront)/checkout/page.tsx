@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter } from "@/lib/navigation";
+import Link from "@/lib/navigation";
 import Image from 'next/image';
 import { ChevronRight, ArrowLeft, ShieldCheck, CreditCard, Truck, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';

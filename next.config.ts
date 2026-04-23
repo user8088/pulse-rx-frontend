@@ -18,6 +18,18 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "10mb",
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: "/test",
+        destination: "/",
+      },
+      {
+        source: "/test/:path*",
+        destination: "/:path*",
+      },
+    ];
+  },
   images: {
     remotePatterns: bucketHost
       ? [

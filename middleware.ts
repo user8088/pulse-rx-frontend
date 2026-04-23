@@ -18,8 +18,9 @@ export function middleware(req: NextRequest) {
   }
 
   // Set COMING_SOON=false in the environment to restore the full site.
+  // Paths under /test always bypass the coming-soon redirect.
   const comingSoon = process.env.COMING_SOON !== "false";
-  if (comingSoon) {
+  if (comingSoon && !pathname.startsWith("/test")) {
     if (pathname === "/coming-soon") {
       return NextResponse.next();
     }

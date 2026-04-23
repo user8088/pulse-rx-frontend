@@ -1,7 +1,7 @@
 'use client';
 
 import { Percent, ChevronRight, Sparkles, Tag } from 'lucide-react';
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import { useAuth } from '@/lib/context/AuthContext';
 
 export default function OffersPage() {

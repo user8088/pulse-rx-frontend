@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 import ProductGrid from "@/components/ProductGrid";
 import { OfferBanner, FlashSaleBanner, DeliveryBanner, ProcedureBanner } from "@/components/CategoryPromoBanner";
 import SubcategoryChips from "@/components/SubcategoryChips";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { ChevronRight } from "lucide-react";
 import { getCategories, getSubcategories } from "@/lib/api/categories";
 import { getProducts } from "@/lib/api/products";

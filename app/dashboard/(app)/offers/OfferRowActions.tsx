@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Link from "@/lib/navigation";
+import { useRouter } from "@/lib/navigation";
 import { deleteOfferAction } from "./actions";
 
 export function OfferRowActions({ offerId, offerName }: { offerId: number; offerName: string }) {

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import { X, Minus, Plus, ShoppingBag, ArrowRight, Trash2, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
 import { useCart, cartItemKey } from '@/lib/context/CartContext';
 import { useAuth } from '@/lib/context/AuthContext';

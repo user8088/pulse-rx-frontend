@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { getDashboardOrders } from "@/lib/api/dashboardOrders";
 import type { Order } from "@/types/order";
 import { Badge } from "@/components/ui/Badge";

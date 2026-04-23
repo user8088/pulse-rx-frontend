@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { X, ChevronDown, ChevronUp } from "lucide-react";
 import type { Subcategory } from "@/types/category";
 

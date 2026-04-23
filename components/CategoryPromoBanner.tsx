@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { ShoppingCart, Truck, Phone, ArrowRight, Tag } from "lucide-react";
 
 interface PromoBannerProps {

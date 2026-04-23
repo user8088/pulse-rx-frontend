@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import Image from 'next/image';
 import { ChevronRight, CheckCircle2, MapPin, ShoppingBag, Search, FileText } from 'lucide-react';
 import Header from '@/components/Header';

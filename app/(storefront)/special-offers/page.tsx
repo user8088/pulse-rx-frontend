@@ -3,7 +3,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ProductGrid from "@/components/ProductGrid";
 import OfferBannerDetail from "@/components/OfferBannerDetail";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { ChevronRight, Tag } from "lucide-react";
 import { getOffers } from "@/lib/api/offers";
 import { getProducts } from "@/lib/api/products";

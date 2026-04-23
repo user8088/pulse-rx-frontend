@@ -1,7 +1,7 @@
 'use client';
 
 import { useAuth } from '@/lib/context/AuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter } from "@/lib/navigation";
 import { useEffect } from 'react';
 
 interface ProtectedRouteProps {

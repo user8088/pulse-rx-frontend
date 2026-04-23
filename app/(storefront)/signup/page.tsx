@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Link from "@/lib/navigation";
+import { useRouter } from "@/lib/navigation";
 import { useAuth } from '@/lib/context/AuthContext';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, Phone, MapPin } from 'lucide-react';
 import Header from '@/components/Header';

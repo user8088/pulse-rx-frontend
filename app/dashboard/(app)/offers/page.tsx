@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import Image from "next/image";
 import { getOffers } from "@/lib/api/dashboardOffers";
 import { dashboardFetch } from "@/lib/dashboardApi";

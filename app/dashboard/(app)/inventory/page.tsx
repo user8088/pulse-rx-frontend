@@ -1,5 +1,5 @@
 import React from "react";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { cookies } from "next/headers";
 import { dashboardFetch } from "@/lib/dashboardApi";
 import { getDashboardUser } from "@/lib/dashboardUser";

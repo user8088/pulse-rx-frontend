@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import Image from 'next/image';
 import { Minus, Plus, Trash2, ChevronRight, ArrowLeft, ShoppingBag, CheckCircle2, Clock, XCircle, AlertCircle } from 'lucide-react';
 import Header from '@/components/Header';

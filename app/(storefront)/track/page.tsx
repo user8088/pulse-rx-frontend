@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import Image from 'next/image';
 import { Search, ChevronRight, MapPin, ShoppingBag, Package, AlertCircle, FileText } from 'lucide-react';
 import Header from '@/components/Header';

@@ -1,8 +1,9 @@
 'use client';
 
 import { useAuth } from '@/lib/context/AuthContext';
-import { useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useRouter } from "@/lib/navigation";
+import Link from "@/lib/navigation";
 import { 
   User, 
   ShoppingBag, 

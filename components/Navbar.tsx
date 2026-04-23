@@ -1,6 +1,6 @@
 'use client';
 
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Menu, X, ChevronDown, ChevronRight } from "lucide-react";

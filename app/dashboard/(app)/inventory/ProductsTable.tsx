@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { ProductTableRow } from "./ProductTableRow";
 import { X, CheckSquare } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import {
   canApproveOrReject,
   canDeleteProducts,

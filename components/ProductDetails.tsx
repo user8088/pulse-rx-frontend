@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/navigation";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { X, Plus, Minus, AlertCircle, ShoppingCart } from "lucide-react";
 import { useCart } from "@/lib/context/CartContext";
 import { useAuth } from "@/lib/context/AuthContext";

@@ -1,5 +1,5 @@
 import React from "react";
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { cn } from "@/utils/cn";
 
 function clamp(n: number, min: number, max: number) {

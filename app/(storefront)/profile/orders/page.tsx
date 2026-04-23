@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { ShoppingBag, Search, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import { getCustomerOrders } from '@/lib/api/orders';
 import type { Order } from '@/types/order';
 

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { getCustomers } from "@/lib/api/dashboardCustomers";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Pagination } from "@/components/ui/Pagination";

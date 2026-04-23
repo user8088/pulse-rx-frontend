@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/context/AuthContext';
 import { ShoppingBag, Tag, Clock, ChevronRight, Package, Calendar } from 'lucide-react';
-import Link from 'next/link';
+import Link from "@/lib/navigation";
 import { getCustomerOrders } from '@/lib/api/orders';
 import type { Order } from '@/types/order';
 

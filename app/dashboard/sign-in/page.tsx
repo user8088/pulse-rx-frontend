@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/navigation";
 import { dashboardSignIn } from "./actions";
 import { PendingSubmitButton } from "@/components/ui/PendingSubmitButton";
 import { Input } from "@/components/ui/Input";
